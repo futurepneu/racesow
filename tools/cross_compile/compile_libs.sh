@@ -33,45 +33,61 @@ COMMAND_PREF="${COMMAND_PREF} ENABLE_SHARED=$ENABLE_SHARED SHARED_LIBRARY_EXT=$S
 
 
 # zlib
-COMMAND="${COMMAND_PREF} "
-if [ ! -z "$MINGW_DIR" ]; then
-    COMMAND="${COMMAND} PATH=\"${MINGW_DIR}mingw/bin:$PATH\""
-    COMMAND="${COMMAND} CC=\"${HOST_PREF}gcc\" RC=\"${HOST_PREF}windres\" DLLWRAP=\"${HOST_PREF}dllwrap\" STRIP=\"${HOST_PREF}strip\" AR=\"${HOST_PREF}ar\""
+if [ -z "$3" ] || [ "$3" == "zlib" ]; then
+    COMMAND="${COMMAND_PREF} "
+    if [ ! -z "$MINGW_DIR" ]; then
+        COMMAND="${COMMAND} PATH=\"${MINGW_DIR}mingw/bin:$PATH\""
+        COMMAND="${COMMAND} CC=\"${HOST_PREF}gcc\" RC=\"${HOST_PREF}windres\" DLLWRAP=\"${HOST_PREF}dllwrap\" STRIP=\"${HOST_PREF}strip\" AR=\"${HOST_PREF}ar\""
+    fi
+    COMMAND="${COMMAND} ./libs/zlib.sh"
+    echo "$COMMAND" && eval $COMMAND
 fi
-COMMAND="${COMMAND} ./libs/zlib.sh"
-echo "$COMMAND" && eval $COMMAND
 
 # libcurl
-COMMAND="${COMMAND_PREF}"
-COMMAND="${COMMAND} ./libs/curl.sh"
-echo "$COMMAND" && eval $COMMAND
+if [ -z "$3" ] || [ "$3" == "curl" ]; then
+    COMMAND="${COMMAND_PREF}"
+    COMMAND="${COMMAND} ./libs/curl.sh"
+    echo "$COMMAND" && eval $COMMAND
+fi
 
 # libjpeg
-COMMAND="${COMMAND_PREF} CFLAGS=\"${CFLAGS_COMMON}\""
-COMMAND="${COMMAND} ./libs/jpeg.sh"
-echo "$COMMAND" && eval $COMMAND
+if [ -z "$3" ] || [ "$3" == "jpeg" ]; then
+    COMMAND="${COMMAND_PREF} CFLAGS=\"${CFLAGS_COMMON}\""
+    COMMAND="${COMMAND} ./libs/jpeg.sh"
+    echo "$COMMAND" && eval $COMMAND
+fi
 
 # libogg
-COMMAND="${COMMAND_PREF}"
-COMMAND="${COMMAND} ./libs/ogg.sh"
-echo "$COMMAND" && eval $COMMAND
+if [ -z "$3" ] || [ "$3" == "ogg" ]; then
+    COMMAND="${COMMAND_PREF}"
+    COMMAND="${COMMAND} ./libs/ogg.sh"
+    echo "$COMMAND" && eval $COMMAND
+fi
 
 # libvorbis
-COMMAND="${COMMAND_PREF}"
-COMMAND="${COMMAND} ./libs/vorbis.sh"
-echo "$COMMAND" && eval $COMMAND
+if [ -z "$3" ] || [ "$3" == "vorbis" ]; then
+    COMMAND="${COMMAND_PREF}"
+    COMMAND="${COMMAND} ./libs/vorbis.sh"
+    echo "$COMMAND" && eval $COMMAND
+fi
 
 # libtheora
-COMMAND="${COMMAND_PREF}"
-COMMAND="${COMMAND} ./libs/theora.sh"
-echo "$COMMAND" && eval $COMMAND
+if [ -z "$3" ] || [ "$3" == "theora" ]; then
+    COMMAND="${COMMAND_PREF}"
+    COMMAND="${COMMAND} ./libs/theora.sh"
+    echo "$COMMAND" && eval $COMMAND
+fi
 
 # libfreetype
-COMMAND="${COMMAND_PREF}"
-COMMAND="${COMMAND} ./libs/freetype.sh"
-echo "$COMMAND" && eval $COMMAND
+if [ -z "$3" ] || [ "$3" == "freetype" ]; then
+    COMMAND="${COMMAND_PREF}"
+    COMMAND="${COMMAND} ./libs/freetype.sh"
+    echo "$COMMAND" && eval $COMMAND
+fi
 
 # libpng
-COMMAND="${COMMAND_PREF}"
-COMMAND="${COMMAND} ./libs/png.sh"
-echo "$COMMAND" && eval $COMMAND
+if [ -z "$3" ] || [ "$3" == "png" ]; then
+    COMMAND="${COMMAND_PREF}"
+    COMMAND="${COMMAND} ./libs/png.sh"
+    echo "$COMMAND" && eval $COMMAND
+fi
