@@ -7,8 +7,8 @@ MORE_OPTS=""
 
 cd ${SOURCE_DIR}libsrcs/libogg && \
 MORE_OPTS="${MORE_OPTS} --build=`./config.guess`" \
-./configure \
-${MORE_OPTS} && \
+./configure ${MORE_OPTS} && \
+${MAKE} clean && \
 ${MAKE}
 
 cp -f src/.libs/libogg.a "${TARGET_DIR}liboggstat.a"
