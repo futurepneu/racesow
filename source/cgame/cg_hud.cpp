@@ -371,6 +371,10 @@ lm: edit for race mod,
 
 //lm: for readability
 enum race_index {
+	// racesow
+	cp1, cp2, cp3, cp4, cp5, cp6, cp7, cp8,
+	cp9, cp10, cp11, cp12, cp13, cp14, cp15,
+	// !racesow
 	mouse_x,
 	mouse_y,
 	jumpspeed,
@@ -379,6 +383,8 @@ enum race_index {
 	strafe_an,
 	max_index
 };
+
+int race_jump = 0; // racesow
 
 static int CG_GetRaceVars( const void* parameter )
 {
@@ -390,6 +396,11 @@ static int CG_GetRaceVars( const void* parameter )
 		return 0;
 
 	switch( index ) {
+		case cp1:  case cp2:  case cp3:  case cp4:  case cp5:
+		case cp6:  case cp7:  case cp8:  case cp9:  case cp10:
+		case cp11: case cp12: case cp13: case cp14: case cp15:
+			return cg.checkpoints[index];
+
 		case diff_an:
 			// difference of look and move angles
 			hor_vel[0] = cg.predictedPlayerState.pmove.velocity[0];
@@ -413,6 +424,7 @@ static int CG_GetRaceVars( const void* parameter )
 				return -18000 + iNum;
 
 		case strafe_an:
+			// racesow TODO: verify this formula
 			// optimal strafing angle
 			iNum = Q_rint(100 * (acos((320-320*cg.realFrameTime)/CG_GetSpeed(0))*180/M_PI-45) ); //maybe need to check if speed below 320 is allowed for acos
 			if (iNum > 0)
@@ -431,6 +443,12 @@ static int CG_GetRaceVars( const void* parameter )
 			while( iNum < -18000 )
 				iNum += 36000;
 			return iNum;
+
+		// racesow
+		case jumpspeed:
+			return race_jump;
+		// !racesow
+
 		case mouse_x:
 			return Q_rint(100 * cg.predictedPlayerState.viewangles[YAW]);
 		case mouse_y:
@@ -441,7 +459,41 @@ static int CG_GetRaceVars( const void* parameter )
 }
 
 // racesow
-int race_jump = 0;
+/**
+ * CG_GetMaxAccel
+ * Calculate theoretical maximum strafe acceleration
+ */
+static int CG_GetMaxAccel( const void* parameter )
+{
+	int base_speed = cg.predictedPlayerState.pmove.stats[PM_STAT_MAXSPEED];
+	float base_accel = base_speed * cg.frameTime;
+
+	float speed = _getspeed();
+	return (int)( 1000 * ( sqrt( speed*speed + base_accel * ( 2 * base_speed - base_accel ) ) - speed ) / cg.frameTime );
+}
+
+/**
+ * CG_GetRocketAccel
+ * Saves a speed difference for the hud if the acceleration is past some
+ * threshold.
+ */
+static int CG_GetRocketAccel( const void* parameter )
+{
+#define MINSPEEDDIFF 100.0f
+#define RASAMPLESCOUNT 2
+#define RASAMPLESMASK ( RASAMPLESCOUNT - 1 )
+	static float speeds[RASAMPLESCOUNT];
+	static int speedDiff = 0;
+	float newSpeed;
+
+	newSpeed = _getspeed();
+	speeds[cg.frameCount & RASAMPLESMASK] = newSpeed;
+	if( fabs( newSpeed - speeds[(cg.frameCount-1) & RASAMPLESMASK] ) > MINSPEEDDIFF )
+	{
+		speedDiff = (int)( newSpeed - speeds[(cg.frameCount-1) & RASAMPLESMASK]);
+	}
+	return speedDiff;
+}
 
 /**
  * CG_AddJumpspeed
@@ -582,6 +634,25 @@ static const reference_numeric_t cg_numeric_references[] =
 	{ "MOVEANGLE", CG_GetRaceVars, (void *)move_an	},
 	{ "STRAFEANGLE", CG_GetRaceVars, (void *)strafe_an },
 	{ "DIFF_ANGLE", CG_GetRaceVars, (void *)diff_an	},
+	// racesow
+	{ "MAX_ACCEL", CG_GetMaxAccel, NULL },
+	{ "SHOW_ACCEL", CG_GetCvar, "cg_showAcceleration" },
+	{ "CP1",  CG_GetRaceVars, (void *)cp1  },
+	{ "CP2",  CG_GetRaceVars, (void *)cp1  },
+	{ "CP3",  CG_GetRaceVars, (void *)cp1  },
+	{ "CP4",  CG_GetRaceVars, (void *)cp4  },
+	{ "CP5",  CG_GetRaceVars, (void *)cp5  },
+	{ "CP6",  CG_GetRaceVars, (void *)cp6  },
+	{ "CP7",  CG_GetRaceVars, (void *)cp7  },
+	{ "CP8",  CG_GetRaceVars, (void *)cp8  },
+	{ "CP9",  CG_GetRaceVars, (void *)cp9  },
+	{ "CP10", CG_GetRaceVars, (void *)cp10 },
+	{ "CP11", CG_GetRaceVars, (void *)cp11 },
+	{ "CP12", CG_GetRaceVars, (void *)cp12 },
+	{ "CP13", CG_GetRaceVars, (void *)cp13 },
+	{ "CP14", CG_GetRaceVars, (void *)cp14 },
+	{ "CP15", CG_GetRaceVars, (void *)cp15 },
+	// !racesow
 
 	// cvars
 	{ "SHOW_FPS", CG_GetCvar, "cg_showFPS" },
@@ -2164,6 +2235,43 @@ static bool CG_LFuncIf( struct cg_layoutnode_s *commandnode, struct cg_layoutnod
 	return (int)CG_GetNumericArg( &argumentnode ) != 0;
 }
 
+// racesow
+/**
+ * CG_LFuncDrawCheckpoint
+ * Draw checkpoint message, based on drawTimer
+ */
+static bool CG_LFuncDrawCheckpoint( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	const char *fmtstr, *sign;
+	char time[64];
+	int min, sec, milli;
+
+	milli = (int)CG_GetNumericArg( &argumentnode );
+	sign = milli < 0 ? "-" : "+";
+	milli = milli < 0 ? -milli : milli;
+
+	min = milli / 60000;
+	milli -= min * 60000;
+	sec = milli / 1000;
+	milli -= sec * 1000;
+
+	if( min >= 100 )
+		fmtstr = "%s%003d:%002d.%03d";
+	else if( min >= 10 )
+		fmtstr = "%s%002d:%002d.%03d";
+	else if( min >= 1 )
+		fmtstr = "%s%1d:%002d.%03d";
+	else if( sec >= 10 )
+		fmtstr = "%s%3$02d.%4$03d";
+	else
+		fmtstr = "%s%3$1d.%4$03d";
+	Q_snprintfz( time, sizeof( time ), fmtstr, sign, min, sec, milli );
+
+	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, time, layout_cursor_font, layout_cursor_color );
+	return true;
+}
+// !racesow
+
 
 typedef struct cg_layoutcommand_s
 {
@@ -2359,6 +2467,16 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 		"Draws configstring of argument id",
 		false
 	},
+
+	// racesow
+	{
+		"drawCheckPoint",
+		CG_LFuncDrawCheckpoint,
+		1,
+		"Draws last checkpoint time of argument id",
+		false
+	},
+	// !racesow
 
 	{
 		"drawItemName",
