@@ -635,8 +635,10 @@ static const reference_numeric_t cg_numeric_references[] =
 	{ "STRAFEANGLE", CG_GetRaceVars, (void *)strafe_an },
 	{ "DIFF_ANGLE", CG_GetRaceVars, (void *)diff_an	},
 	// racesow
+	{ "ROCKETACCEL", CG_GetRocketAccel, NULL },
 	{ "MAX_ACCEL", CG_GetMaxAccel, NULL },
 	{ "SHOW_ACCEL", CG_GetCvar, "cg_showAcceleration" },
+	{ "JUMPSPEED", CG_GetRaceVars, (void *)jumpspeed },
 	{ "CP1",  CG_GetRaceVars, (void *)cp1  },
 	{ "CP2",  CG_GetRaceVars, (void *)cp1  },
 	{ "CP3",  CG_GetRaceVars, (void *)cp1  },
