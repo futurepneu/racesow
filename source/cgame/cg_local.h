@@ -997,8 +997,13 @@ void CG_PLink( vec3_t start, vec3_t end, vec4_t color, int flags );
 //
 
 // racesow
+extern cvar_t *cg_showPlayerTrails;
+extern cvar_t *cg_playerTrailsColor;
+extern cvar_t *cg_playerTrailsAlpha;
+extern cvar_t *cg_playerTrailsSize;
 extern cvar_t *rs_autoRaceDemo;
 extern cvar_t *rs_autoRaceScreenshot;
+void CG_AddLinearTrail( centity_t *cent, float lifetime );
 // !racesow
 
 void CG_ClearEffects( void );
