@@ -80,6 +80,8 @@ cvar_t *cg_scoreboardWidthScale;
 cvar_t *cg_showTeamLocations;
 cvar_t *cg_showViewBlends;
 
+cvar_t *cg_showAcceleration; // racesow
+
 float scr_damagetime_start;
 float scr_damagetime_off;
 
@@ -305,6 +307,8 @@ void CG_ScreenInit( void )
 	cg_scoreboardFontFamily = trap_Cvar_Get( "cg_scoreboardFontFamily", DEFAULT_SCOREBOARD_FONT_FAMILY, CVAR_ARCHIVE );
 	cg_scoreboardFontSize = trap_Cvar_Get( "cg_scoreboardFontSize", STR_TOSTR( DEFAULT_SCOREBOARD_FONT_SIZE ), CVAR_ARCHIVE );
 	cg_scoreboardWidthScale = trap_Cvar_Get( "cg_scoreboardWidthScale", "1.0", CVAR_ARCHIVE );
+
+	cg_showAcceleration = trap_Cvar_Get( "cg_showAcceleration", "1", CVAR_ARCHIVE ); // racesow
 
 	// wsw : hud debug prints
 	cg_debugHUD =		    trap_Cvar_Get( "cg_debugHUD", "0", 0 );
