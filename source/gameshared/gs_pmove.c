@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "q_comref.h"
 #include "q_collision.h"
 #include "gs_public.h"
+#include "gs_racesow.h" // racesow
 
 //===============================================================
 //		WARSOW player AAboxes sizes
@@ -521,11 +522,11 @@ static void PM_AirAccelerate( vec3_t wishdir, float wishspeed )
 	float dot;
 	// air movement parameters:
 	float airforwardaccel = 1.00001f; // Default: 1.0f : how fast you accelerate until you reach pm_maxspeed
-	float bunnyaccel = 0.1593f; // (0.42 0.1593f) Default: 0.1585f how fast you accelerate after reaching pm_maxspeed
+	float bunnyaccel = 0.1593f; // (0.42 0.1593f, 1.02: 0.1586) Default: 0.1585f how fast you accelerate after reaching pm_maxspeed
 	// (it gets harder as you near bunnytopspeed)
 	float bunnytopspeed = 925; // (0.42: 925) soft speed limit (can get faster with rjs and on ramps)
-	float turnaccel = 4.0f;    // (0.42: 9.0) Default: 7 max sharpness of turns
-	float backtosideratio = 0.8f; // (0.42: 0.8) Default: 0.8f lower values make it easier to change direction without
+	float turnaccel = 4.0f;    // (0.42: 9.0, 1.02: 6.0) Default: 7 max sharpness of turns
+	float backtosideratio = 0.8f; // (0.42: 0.8, 1.02: 0.9) Default: 0.8f lower values make it easier to change direction without
 	// losing speed; the drawback is "understeering" in sharp turns
 
 	if( !wishspeed )
@@ -783,6 +784,12 @@ static void PM_Move( void )
 			return;
 
 		PM_StepSlideMove();
+
+		// racesow - if player is walking: clear prejump counters
+		float hspeed = VectorLengthFast( tv( pml.velocity[0], pml.velocity[1], 0 ) );
+		if( hspeed < DEFAULT_PLAYERSPEED_RACE + 5.0f )
+			RS_ResetPjState( pm->playerState->playerNum );
+		// !racesow
 	}
 	else if( ( pm->playerState->pmove.stats[PM_STAT_FEATURES] & PMFEAT_AIRCONTROL ) 
 		&& !( pm->playerState->pmove.stats[PM_STAT_FEATURES] & PMFEAT_FWDBUNNY ) )
@@ -1053,11 +1060,13 @@ static void PM_CheckJump( void )
 	{
 		module_PredictedEvent( pm->playerState->POVnum, EV_JUMP, 0 );
 		pml.velocity[2] += pml.jumpPlayerSpeed;
+		RS_IncrementJumps( pm->playerState->playerNum ); // racesow - pjcount
 	}
 	else
 	{
 		module_PredictedEvent( pm->playerState->POVnum, EV_JUMP, 0 );
 		pml.velocity[2] = pml.jumpPlayerSpeed;
+		RS_IncrementJumps( pm->playerState->playerNum ); // racesow - pjcount
 	}
 
 	// remove wj count
@@ -1146,6 +1155,8 @@ static void PM_CheckDash( void )
 		{
 			module_PredictedEvent( pm->playerState->POVnum, EV_DASH, 0 );
 		}
+
+		RS_IncrementDashes( pm->playerState->playerNum ); // racesow - pjcount
 	}
 	else if( pm->groundentity == -1 )
 		pm->playerState->pmove.pm_flags &= ~PMF_DASHING;
@@ -1266,6 +1277,7 @@ static void PM_CheckWallJump( void )
 
 					// Create the event
 					module_PredictedEvent( pm->playerState->POVnum, EV_WALLJUMP, DirToByte( normal ) );
+					RS_IncrementWallJumps( pm->playerState->playerNum ); // racesow - pjcount
 				}
 			}
 		}
