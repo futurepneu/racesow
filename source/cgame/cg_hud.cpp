@@ -469,7 +469,7 @@ static int CG_GetMaxAccel( const void* parameter )
 	float base_accel = base_speed * cg.frameTime;
 
 	float speed = _getspeed();
-	return (int)( 1000 * ( sqrt( speed*speed + base_accel * ( 2 * base_speed - base_accel ) ) - speed ) / cg.frameTime );
+	return (int)( ( sqrt( speed*speed + base_accel * ( 2 * base_speed - base_accel ) ) - speed ) / cg.frameTime );
 }
 
 /**
