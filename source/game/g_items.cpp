@@ -959,7 +959,7 @@ void G_Items_FinishSpawningItems( void )
 		if( !ent->r.inuse )
 			continue;
 
-		if( G_ItemTimerNeeded( ent->item ) )
+		if( G_ItemTimerNeeded( ent->item ) && !GS_RaceGametype() ) // racesow: no item timers
 		{
 			if( Spawn_ItemTimer( ent ) )
 				num_timers++;
@@ -974,7 +974,7 @@ void G_Items_FinishSpawningItems( void )
 
 	// if there are less timers than MAX_IMPORTANT_ITEMS_THRESHOLD, spawn
 	// timers for less important items
-	if( num_timers < MAX_IMPORTANT_ITEMS_THRESHOLD )
+	if( num_timers < MAX_IMPORTANT_ITEMS_THRESHOLD && !GS_RaceGametype() ) // racesow: no item timers
 	{
 		for( ; num_opts > 0; num_opts-- )
 			Spawn_ItemTimer( ops[num_opts-1] );

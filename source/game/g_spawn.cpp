@@ -139,7 +139,7 @@ spawn_t	spawns[] = {
 	{ "target_position", SP_target_position },
 	{ "target_print", SP_target_print },
 	{ "target_give", SP_target_give },
-	{ "target_push", SP_info_notnull },
+	{ "target_push", SP_target_push }, // racesow - IMHO this entity should actually be in warsow too but isn't... -K1ll
 	{ "target_changelevel", SP_target_changelevel },
 	{ "target_relay", SP_target_relay },
 	{ "target_delay", SP_target_delay },
@@ -243,6 +243,13 @@ bool G_CallSpawn( edict_t *ent )
 		return true;
 	}
 
+	// racesow - Give gametype definitions precedence over C ones
+	// see if there's a spawn definition in the gametype scripts
+	ent->scriptSpawned = G_asCallMapEntitySpawnScript( ent->classname, ent );
+	if( ent->scriptSpawned ) {
+		return true; // handled by the script
+	}
+
 	// check normal spawn functions
 	for( s = spawns; s->name; s++ )
 	{
@@ -252,12 +259,7 @@ bool G_CallSpawn( edict_t *ent )
 			return true;
 		}
 	}
-
-	// see if there's a spawn definition in the gametype scripts
-	ent->scriptSpawned = G_asCallMapEntitySpawnScript( ent->classname, ent );
-	if( ent->scriptSpawned ) {
-		return true; // handled by the script
-	}
+	// !racesow
 
 	if( sv_cheats->integer || developer->integer ) // mappers load their maps with devmap
 		G_Printf( "%s doesn't have a spawn function\n", ent->classname );
@@ -839,6 +841,11 @@ void G_InitLevel( char *mapname, char *entities, int entstrlen, unsigned int lev
 		if( !ent->classname )
 		{
 			i++;
+			// racesow - introducing the freestyle map bug again in
+			// order to make some freestyle maps work
+			if( !level.gametype.freestyleMapFix )
+				G_FreeEdict( ent );
+			// !racesow
 			G_FreeEdict( ent );
 			continue;
 		}
