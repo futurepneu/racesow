@@ -440,6 +440,19 @@ static int CG_GetRaceVars( const void* parameter )
 	}
 }
 
+// racesow
+int race_jump = 0;
+
+/**
+ * CG_AddJumpspeed
+ * Save the current speed at jump time for the hud
+ */
+void CG_AddJumpspeed( void )
+{
+	race_jump = CG_GetSpeed(0);
+}
+// !racesow
+
 static int CG_GetAccel( const void* parameter )
 {
 #define ACCEL_SAMPLE_COUNT 16
