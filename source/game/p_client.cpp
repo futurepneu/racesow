@@ -358,6 +358,11 @@ void G_Client_InactivityRemove( gclient_t *client )
 	if( !client )
 		return;
 
+	// racesow
+	if( !level.gametype.autoInactivityRemove )
+		return;
+	// !racesow
+
 	if( trap_GetClientState( client - game.clients ) < CS_SPAWNED )
 		return;
 
@@ -386,6 +391,7 @@ void G_Client_InactivityRemove( gclient_t *client )
 
 			// move to spectators and reset the queue time, effectively removing from the challengers queue
 			G_Teams_SetTeam( ent, TEAM_SPECTATOR );
+			G_SpawnQueue_RemoveClient( ent ); // racesow - set player in free-view
 			client->queueTimeStamp = 0;
 
 			G_PrintMsg( NULL, "%s"S_COLOR_YELLOW" has been moved to spectator after %.1f seconds of inactivity\n", client->netname, g_inactivity_maxtime->value );
