@@ -766,36 +766,36 @@ void G_RadiusDamage( edict_t *inflictor, edict_t *attacker, cplane_t *plane, edi
 			{
 				weapondef = GS_GetWeaponDef( WEAP_ROCKETLAUNCHER );
 				// racesow
-				rs_minKnockback = trap_Cvar_Get( "rs_rocket_minknockback", "10", CVAR_ARCHIVE )->integer;
-				rs_maxKnockback = trap_Cvar_Get( "rs_rocket_maxknockback", "100", CVAR_ARCHIVE )->integer;
-				rs_radius = trap_Cvar_Get( "rs_rocket_splash", "140", CVAR_ARCHIVE )->integer;
+				rs_minKnockback = rs_rocket_minKnockback->integer;
+				rs_maxKnockback = rs_rocket_maxKnockback->integer;
+				rs_radius = rs_rocket_splash->integer;
 				// !racesow
 			}
 			else if( inflictor->s.type == ET_GRENADE )
 			{
 				weapondef = GS_GetWeaponDef( WEAP_GRENADELAUNCHER );
 				// racesow
-				rs_minKnockback = trap_Cvar_Get( "rs_grenade_minknockback", "5", CVAR_ARCHIVE )->integer;
-				rs_maxKnockback = trap_Cvar_Get( "rs_grenade_maxknockback", "90", CVAR_ARCHIVE )->integer;
-				rs_radius = trap_Cvar_Get( "rs_grenade_splash", "160", CVAR_ARCHIVE )->integer;
+				rs_minKnockback = rs_grenade_minKnockback->integer;
+				rs_maxKnockback = rs_grenade_maxKnockback->integer;
+				rs_radius = rs_grenade_splash->integer;
 				// !racesow
 			}
 			else if( inflictor->s.type == ET_PLASMA )
 			{
 				weapondef = GS_GetWeaponDef( WEAP_PLASMAGUN );
 				// racesow
-				rs_minKnockback = trap_Cvar_Get( "rs_plasma_minknockback", "1", CVAR_ARCHIVE )->integer;
-				rs_maxKnockback = trap_Cvar_Get( "rs_plasma_maxknockback", "20", CVAR_ARCHIVE )->integer;
-				rs_radius = trap_Cvar_Get( "rs_plasma_splash", "45", CVAR_ARCHIVE )->integer;
+				rs_minKnockback = rs_plasma_minKnockback->integer;
+				rs_maxKnockback = rs_plasma_maxKnockback->integer;
+				rs_radius = rs_plasma_splash->integer;
 				// !racesow
 			}
 			else if( inflictor->s.type == ET_BLASTER )
 			{
 				weapondef = GS_GetWeaponDef( WEAP_GUNBLADE );
 				// racesow - TODO: decide default values
-				rs_minKnockback = trap_Cvar_Get( "rs_gunblade_minknockback", "10", CVAR_ARCHIVE )->integer;
-				rs_maxKnockback = trap_Cvar_Get( "rs_gunblade_maxknockback", "60", CVAR_ARCHIVE )->integer;
-				rs_radius = trap_Cvar_Get( "rs_gunblade_splash", "80", CVAR_ARCHIVE )->integer;
+				rs_minKnockback = rs_gunblade_minKnockback->integer;
+				rs_maxKnockback = rs_gunblade_maxKnockback->integer;
+				rs_radius = rs_gunblade_splash->integer;
 				// !racesow
 			}
 

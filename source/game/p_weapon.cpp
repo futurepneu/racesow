@@ -215,7 +215,7 @@ static void G_ProjectileDistancePrestep( edict_t *projectile, float distance )
 
 	// ffs : hack for the plasmagun
 #ifdef PLASMAHACK
-	if( projectile->s.type == ET_PLASMA && trap_Cvar_Get( "rs_plasma_hack", "1", CVAR_ARCHIVE )->integer ) // racesow
+	if( projectile->s.type == ET_PLASMA && rs_plasma_hack->integer ) // racesow
 		W_Plasma_Backtrace( projectile, plasma_hack_start );
 #endif
 }
@@ -776,7 +776,7 @@ void G_FireWeapon( edict_t *ent, int parm )
 		projectile = G_Fire_Grenade( origin, angles, firedef, ent, ucmdSeed );
 		// racesow - racesow 0.42 had grenade prestep 24
 		if( GS_RaceGametype() )
-			prestep = trap_Cvar_Get( "rs_rocket_prestep", "90", CVAR_ARCHIVE)->integer;
+			prestep = rs_grenade_prestep->integer;
 		// !racesow
 		break;
 
@@ -784,14 +784,14 @@ void G_FireWeapon( edict_t *ent, int parm )
 		projectile = G_Fire_Rocket( origin, angles, firedef, ent, ucmdSeed );
 		// racesow - racesow 0.42 had rocket prestep 0
 		if( GS_RaceGametype() )
-			prestep = trap_Cvar_Get( "rs_rocket_prestep", "90", CVAR_ARCHIVE)->integer;
+			prestep = rs_rocket_prestep->integer;
 		// !racesow
 		break;
 	case WEAP_PLASMAGUN:
 		projectile = G_Fire_Plasma( origin, angles, firedef, ent, ucmdSeed );
 		// racesow - racesow 0.42 had plasma prestep 32
 		if( GS_RaceGametype() )
-			prestep = trap_Cvar_Get( "rs_plasma_prestep", "90", CVAR_ARCHIVE)->integer;
+			prestep = rs_plasma_prestep->integer;
 		// !racesow
 		break;
 
@@ -821,7 +821,7 @@ void G_FireWeapon( edict_t *ent, int parm )
 	}
 
 	// racesow - enable no_antilag skipping if rs_rocket_antilag is 1
-	if( GS_RaceGametype() && ( ( trap_Cvar_Get( "rs_rocket_antilag", "0", CVAR_ARCHIVE )->integer && projectile->s.type == ET_ROCKET ) ) )
+	if( GS_RaceGametype() && ( ( rs_rocket_antilag->integer && projectile->s.type == ET_ROCKET ) ) )
 		return;
 	// !racesow
 
