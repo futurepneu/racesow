@@ -1185,6 +1185,13 @@ static const asProperty_t gametypedescr_Properties[] =
 	{ ASLIB_PROPERTY_DECL(bool, customDeadBodyCam), ASLIB_FOFFSET(gametype_descriptor_t, customDeadBodyCam) },
 	{ ASLIB_PROPERTY_DECL(bool, mmCompatible), ASLIB_FOFFSET(gametype_descriptor_t, mmCompatible ) },
 
+	// racesow
+	{ ASLIB_PROPERTY_DECL(bool, autoInactivityRemove), ASLIB_FOFFSET(gametype_descriptor_t, autoInactivityRemove) },
+	{ ASLIB_PROPERTY_DECL(bool, playerInteraction), ASLIB_FOFFSET(gametype_descriptor_t, playerInteraction) },
+	{ ASLIB_PROPERTY_DECL(bool, freestyleMapFix), ASLIB_FOFFSET(gametype_descriptor_t, freestyleMapFix) },
+	{ ASLIB_PROPERTY_DECL(bool, enableDrowning), ASLIB_FOFFSET(gametype_descriptor_t, enableDrowning) },
+	// !racesow
+
 	ASLIB_PROPERTY_NULL
 };
 
@@ -1967,7 +1974,7 @@ static const asProperty_t gameclient_Properties[] =
 	{ ASLIB_PROPERTY_DECL(const int, zoomFov), ASLIB_FOFFSET(gclient_t, zoomfov) },
 	{ ASLIB_PROPERTY_DECL(const bool, isOperator), ASLIB_FOFFSET(gclient_t, isoperator) },
 	{ ASLIB_PROPERTY_DECL(const uint, queueTimeStamp), ASLIB_FOFFSET(gclient_t, queueTimeStamp) },
-	{ ASLIB_PROPERTY_DECL(const int, muted), ASLIB_FOFFSET(gclient_t, muted) },
+	{ ASLIB_PROPERTY_DECL(int, muted), ASLIB_FOFFSET(gclient_t, muted) }, // racesow - allow editing the int
 	{ ASLIB_PROPERTY_DECL(float, armor), ASLIB_FOFFSET(gclient_t, resp.armor) },
 	{ ASLIB_PROPERTY_DECL(uint, gunbladeChargeTimeStamp), ASLIB_FOFFSET(gclient_t, resp.gunbladeChargeTimeStamp) },
 	{ ASLIB_PROPERTY_DECL(const bool, chaseActive), ASLIB_FOFFSET(gclient_t, resp.chase.active) },
@@ -1976,6 +1983,7 @@ static const asProperty_t gameclient_Properties[] =
 	{ ASLIB_PROPERTY_DECL(int, chaseFollowMode), ASLIB_FOFFSET(gclient_t, resp.chase.followmode) },
 	{ ASLIB_PROPERTY_DECL(const bool, coach), ASLIB_FOFFSET(gclient_t, teamstate.is_coach) },
 	{ ASLIB_PROPERTY_DECL(const int, ping), ASLIB_FOFFSET(gclient_t, r.ping) },
+	{ ASLIB_PROPERTY_DECL(const uint, uCmdTimeStamp), ASLIB_FOFFSET(gclient_t, ucmd.serverTimeStamp) }, // racesow
 	{ ASLIB_PROPERTY_DECL(const int16, weapon), ASLIB_FOFFSET(gclient_t, ps.stats[STAT_WEAPON]) },
 	{ ASLIB_PROPERTY_DECL(const int16, pendingWeapon), ASLIB_FOFFSET(gclient_t, ps.stats[STAT_PENDING_WEAPON]) },
 	{ ASLIB_PROPERTY_DECL(bool, takeStun), ASLIB_FOFFSET(gclient_t, resp.takeStun) },
@@ -2815,6 +2823,25 @@ static asstring_t *asFunc_LoadFile( asstring_t *path )
 	return data;
 }
 
+// racesow
+static void asFunc_RS_removeProjectiles( edict_t *owner )
+{
+	RS_removeProjectiles( owner );
+}
+
+static bool asFunc_RS_QueryPjState( int playerNum )
+{
+	// FIXME: There's an implicit qboolean->bool conversion here
+	return RS_QueryPjState( playerNum );
+}
+
+static bool asFunc_RS_ResetPjState( int playerNum )
+{
+	RS_ResetPjState( playerNum );
+	return true;
+}
+// !racesow
+
 static int asFunc_FileLength( asstring_t *path )
 {
 	if( !path || !path->len )
@@ -3175,6 +3202,11 @@ static edict_t *asFunc_FireBlast( asvec3_t *origin, asvec3_t *angles, int speed,
 
 static const asglobfuncs_t asGlobFuncs[] =
 {
+	// racesow
+	{ "bool RS_QueryPjState( int playerNum )", asFUNCTION(asFunc_RS_QueryPjState), NULL },
+	{ "bool RS_ResetPjState( int playerNum )", asFUNCTION(asFunc_RS_ResetPjState), NULL },
+	// !racesow
+
 	{ "Entity @G_SpawnEntity( const String &in )", asFUNCTION(asFunc_G_Spawn), NULL },
 	{ "const String @G_SpawnTempValue( const String &in )", asFUNCTION(asFunc_G_SpawnTempValue), NULL },
 	{ "Entity @G_GetEntity( int entNum )", asFUNCTION(asFunc_GetEntity), NULL },
