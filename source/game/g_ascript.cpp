@@ -3220,6 +3220,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 
 	// misc management utils
 	{ "void G_RemoveAllProjectiles()", asFUNCTION(asFunc_G_Match_RemoveAllProjectiles), NULL },
+	{ "void G_RemoveProjectiles( Entity @ )", asFUNCTION(asFunc_RS_removeProjectiles), NULL }, // racesow
 	{ "void G_RemoveDeadBodies()", asFUNCTION(asFunc_G_Match_FreeBodyQueue), NULL },
 	{ "void G_Items_RespawnByType( uint typeMask, int item_tag, float delay )", asFUNCTION(asFunc_G_Items_RespawnByType), NULL },
 
