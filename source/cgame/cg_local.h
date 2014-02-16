@@ -385,6 +385,7 @@ typedef struct
 #define PREDICTED_STEP_TIME 150 // stairs smoothing time
 #define MAX_AWARD_LINES 3
 #define MAX_AWARD_DISPLAYTIME 5000
+#define MAX_CHECKPOINTS 50 // racesow
 
 // view types
 enum
@@ -592,6 +593,8 @@ typedef struct
 	unsigned int award_times[MAX_AWARD_LINES];
 	int award_head;
 
+	int checkpoints[MAX_CHECKPOINTS]; // racesow
+
 	// statusbar program
 	struct cg_layoutnode_s *statusBar;
 
@@ -746,6 +749,12 @@ extern cvar_t *cg_strafeHUD;
 void CG_SC_Obituary( void );
 void Cmd_CG_PrintHudHelp_f( void );
 void CG_ExecuteLayoutProgram( struct cg_layoutnode_s *rootnode );
+
+// racesow
+void CG_CheckpointsClear( void );
+void CG_CheckpointsAdd( int cpNum, int time );
+void CG_AddJumpspeed( void ); // lm: don't depend on the hudscripts for obtaining jump values..
+// !racesow
 
 //
 // cg_damage_indicator.c
@@ -987,6 +996,18 @@ void CG_PLink( vec3_t start, vec3_t end, vec4_t color, int flags );
 //
 // cg_effects.c
 //
+
+// racesow
+extern cvar_t *cg_showPlayerTrails;
+extern cvar_t *cg_playerTrailsColor;
+extern cvar_t *cg_playerTrailsAlpha;
+extern cvar_t *cg_playerTrailsSize;
+extern cvar_t *rs_autoRaceDemo;
+extern cvar_t *rs_autoRaceScreenshot;
+extern cvar_t *rs_ignoreTeleEffect;
+void CG_AddLinearTrail( centity_t *cent, float lifetime );
+// !racesow
+
 void CG_ClearEffects( void );
 
 void CG_AddLightToScene( vec3_t org, float radius, float r, float g, float b );

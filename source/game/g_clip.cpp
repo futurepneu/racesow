@@ -983,8 +983,15 @@ void GClip_SetBrushModel( edict_t *ent, const char *name )
 	struct cmodel_s *cmodel;
 
 	if( !name )
+	{
 		G_Error( "GClip_SetBrushModel: NULL model in '%s'", 
 		ent->classname ? ent->classname : "no classname" );
+		// racesow
+		GClip_UnlinkEntity( ent );
+		G_FreeEdict( ent );
+		return;
+		// !racesow
+	}
 
 	if( !name[0] )
 	{
@@ -1204,8 +1211,16 @@ void G_SplashFrac4D( int entNum, vec3_t hitpoint, float maxradius, vec3_t pushdi
 	c4clipedict_t *clipEnt;
 
 	clipEnt = GClip_GetClipEdictForDeltaTime( entNum, timeDelta );
-	G_SplashFrac( clipEnt->s.origin, clipEnt->r.mins, clipEnt->r.maxs, hitpoint, 
-		maxradius, pushdir, kickFrac, dmgFrac );
+	// racesow
+	if( rs_splashfrac->integer )
+		RS_SplashFrac( clipEnt->s.origin, clipEnt->r.mins,
+			clipEnt->r.maxs, hitpoint, maxradius, pushdir,
+			kickFrac, dmgFrac );
+	else
+		G_SplashFrac( clipEnt->s.origin, clipEnt->r.mins,
+			clipEnt->r.maxs, hitpoint, maxradius, pushdir,
+			kickFrac, dmgFrac );
+	// !racesow
 }
 
 entity_state_t *G_GetEntityStateForDeltaTime( int entNum, int deltaTime )

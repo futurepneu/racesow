@@ -335,7 +335,7 @@ gs_weapon_definition_t gs_weaponDefs[] =
 			//timings (in msecs)
 			WEAPONUP_FRAMETIME,				// weapon up frametime
 			WEAPONDOWN_FRAMETIME,			// weapon down frametime
-			725,							// reload frametime
+			800,							// reload frametime - racesow - basewsw had (0.6 725, 1.0: 675, 1.1: 725)
 			0,								// cooldown frametime
 			1250,							// projectile timeout
 			qfalse,							// smooth refire
@@ -369,7 +369,7 @@ gs_weapon_definition_t gs_weaponDefs[] =
 			//timings (in msecs)
 			WEAPONUP_FRAMETIME,				// weapon up frametime
 			WEAPONDOWN_FRAMETIME,			// weapon down frametime
-			725,							// reload frametime
+			800,							// reload frametime - racesow - basewsw had (0.6 725, 1.0: 675, 1.1: 725)
 			0,								// cooldown frametime
 			1250,							// projectile timeout
 			qfalse,							// smooth refire
@@ -407,9 +407,9 @@ gs_weapon_definition_t gs_weaponDefs[] =
 			//timings (in msecs)
 			WEAPONUP_FRAMETIME,             // weapon up frametime
 			WEAPONDOWN_FRAMETIME,           // weapon down frametime
-			900,							// reload frametime
+			850,							// reload frametime - racesow - basewsw had (0.5: 950, 0.6: 925, 1.0: 850, 1.1: 900)
 			0,								// cooldown frametime
-			10000,							// projectile timeout
+			100000,							// projectile timeout - racesow - basewsw had (0.6: 10000)
 			qfalse,							// smooth refire
 
 			//damages
@@ -441,9 +441,9 @@ gs_weapon_definition_t gs_weaponDefs[] =
 			//timings (in msecs)
 			WEAPONUP_FRAMETIME,             // weapon up frametime
 			WEAPONDOWN_FRAMETIME,           // weapon down frametime
-			900,							// reload frametime
+			850,							// reload frametime - racesow - basewsw had (0.5: 950, 0.6: 925, 1.0: 850, 1.1: 900)
 			0,								// cooldown frametime
-			10000,							// projectile timeout
+			100000,							// projectile timeout - racesow - basewsw had (0.6: 10000)
 			qfalse,							// smooth refire
 
 			//damages
@@ -528,9 +528,9 @@ gs_weapon_definition_t gs_weaponDefs[] =
 			1,                              // splash minimum knockback
 
 			//projectile def
-			2600,							// speed
-			90,								// spread
-			0,                              // v_spread
+			2400,							// speed - racesow - basewsw had (1.1: 2600)
+			0,							// spread - racesow - basewsw had (1.1: 90)
+			0,			                                // v_spread
 
 			//ammo
 			0,                              // weapon pickup amount

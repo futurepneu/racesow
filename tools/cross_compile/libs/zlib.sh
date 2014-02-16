@@ -6,6 +6,7 @@ MORE_OPTS=""
 cd ${SOURCE_DIR}libsrcs/zlib && \
 ./configure --libdir={$LIB_DIR} --includedir=${INCLUDE_DIR} \
 $MORE_OPTS && \
+${MAKE} clean && \
 ${MAKE}
 
 cp libz.a "${TARGET_DIR}libzstat.a"

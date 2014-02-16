@@ -34,6 +34,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "../matchmaker/mm_rating.h"
 
+// racesow
+#include "g_racesow.h"
+#include "../gameshared/gs_racesow.h"
+// !racesow
+
 //==================================================================
 // round(x)==floor(x+0.5f)
 
@@ -652,7 +657,10 @@ extern game_locals_t game;
 #define PLAYERNUM( x ) ( ( x ) - game.edicts - 1 )
 #define PLAYERENT( x ) ( game.edicts + ( x ) + 1 )
 #define G_ISGHOSTING( x ) ( ( ( x )->s.modelindex == 0 ) && ( ( x )->r.solid == SOLID_NOT ) )
-#define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) ) ? qtrue : qfalse )
+// racesow: fix maps with many models: allows for 50 non-inlane models to load
+// #define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) ) ? qtrue : qfalse )
+#define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) && ( (int)x < MAX_MODELS - 50 ) ) ? qtrue : qfalse )
+// !racesow
 
 void G_TeleportEffect( edict_t *ent, bool in );
 void G_RespawnEffect( edict_t *ent );
@@ -694,6 +702,7 @@ void G_CallVotes_CmdVote( edict_t *ent );
 void G_CallVotes_Think( void );
 void G_CallVote_Cmd( edict_t *ent );
 void G_OperatorVote_Cmd( edict_t *ent );
+void G_Cancelvote_f( void ); // racesow
 void G_RegisterGametypeScriptCallvote( const char *name, const char *usage, const char *type, const char *help );
 http_response_code_t G_CallVotes_WebRequest( http_query_method_t method, const char *resource, 
 	const char *query_string, char **content, size_t *content_length );
@@ -708,6 +717,7 @@ void SP_trigger_once( edict_t *ent );
 void SP_trigger_multiple( edict_t *ent );
 void SP_trigger_relay( edict_t *ent );
 void SP_trigger_push( edict_t *ent );
+void SP_target_push( edict_t *ent ); // racesow
 void SP_trigger_hurt( edict_t *ent );
 void SP_trigger_key( edict_t *ent );
 void SP_trigger_counter( edict_t *ent );

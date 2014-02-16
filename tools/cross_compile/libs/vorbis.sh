@@ -9,8 +9,8 @@ cd ${SOURCE_DIR}libsrcs/libvorbis && \
 MORE_OPTS="${MORE_OPTS} --build=`./config.guess`" \
 ln -s -f ../../libogg/include/ogg ./include/ogg && \
 LDFLAGS="$LDFLAGS -L`pwd`/../libogg/src/.libs/" \
-./autogen.sh --disable-docs \
-${MORE_OPTS} && \
+./autogen.sh --disable-docs ${MORE_OPTS} && \
+${MAKE} clean && \
 ${MAKE}
 
 cp -f lib/.libs/libvorbis.a "${TARGET_DIR}libvorbisstat.a" && \

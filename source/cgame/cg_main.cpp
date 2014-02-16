@@ -54,6 +54,16 @@ cvar_t *cg_gunbob;
 
 cvar_t *developer;
 
+// racesow
+cvar_t *cg_showPlayerTrails;
+cvar_t *cg_playerTrailsAlpha;
+cvar_t *cg_playerTrailsColor;
+cvar_t *cg_playerTrailsSize;
+cvar_t *rs_autoRaceDemo;
+cvar_t *rs_autoRaceScreenshot;
+cvar_t *rs_ignoreTeleEffect;
+// !racesow
+
 cvar_t *cg_handOffset;
 cvar_t *cg_gun_fov;
 cvar_t *cg_gun_alpha;
@@ -614,6 +624,16 @@ static void CG_RegisterLightStyles( void )
 */
 static void CG_RegisterVariables( void )
 {
+	// racesow
+	cg_showPlayerTrails = trap_Cvar_Get( "cg_showPlayerTrails", "0", CVAR_ARCHIVE );
+	cg_playerTrailsAlpha = trap_Cvar_Get( "cg_playerTrailsAlpha", "1.0", CVAR_ARCHIVE );
+	cg_playerTrailsColor = trap_Cvar_Get( "cg_playerTrailsColor", "0.0 1.0 0.0", CVAR_ARCHIVE );
+	cg_playerTrailsSize = trap_Cvar_Get( "cg_playerTrailsSize", "1.5", CVAR_ARCHIVE );
+	rs_autoRaceDemo = trap_Cvar_Get( "rs_autoRaceDemo", "0", CVAR_ARCHIVE );
+	rs_autoRaceScreenshot = trap_Cvar_Get( "rs_autoRaceScreenshot", "0", CVAR_ARCHIVE );
+	rs_ignoreTeleEffect = trap_Cvar_Get( "rs_ignoreTeleEffect", "0", CVAR_ARCHIVE );
+	// !racesow
+	
 	cg_predict =	    trap_Cvar_Get( "cg_predict", "1", 0 );
 	cg_predict_optimize = trap_Cvar_Get( "cg_predict_optimize", "1", 0 );
 	cg_showMiss =	    trap_Cvar_Get( "cg_showMiss", "0", 0 );
@@ -626,7 +646,7 @@ static void CG_RegisterVariables( void )
 	hand =		    trap_Cvar_Get( "hand", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 	handicap =		trap_Cvar_Get( "handicap", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 	clan =		    trap_Cvar_Get( "clan", "", CVAR_USERINFO | CVAR_ARCHIVE );
-	cg_oldMovement =	trap_Cvar_Get( "cg_oldMovement", "0", CVAR_USERINFO | CVAR_ARCHIVE );
+	cg_oldMovement =	trap_Cvar_Get( "cg_oldMovement", "1", CVAR_USERINFO | CVAR_ARCHIVE ); // racesow - old movement ftw!
 	cg_noAutohop =	trap_Cvar_Get( "cg_noAutohop", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 	cg_fov =	    trap_Cvar_Get( "fov", "100", CVAR_USERINFO | CVAR_ARCHIVE );
 	cg_zoomSens =	    trap_Cvar_Get( "zoomsens", "0", CVAR_ARCHIVE );
@@ -634,7 +654,7 @@ static void CG_RegisterVariables( void )
 	cg_addDecals =	    trap_Cvar_Get( "cg_decals", "1", CVAR_ARCHIVE );
 	//cg_footSteps =	    trap_Cvar_Get( "cg_footSteps", "1", 0 );
 
-	cg_thirdPerson =	trap_Cvar_Get( "cg_thirdPerson", "0", CVAR_CHEAT );
+	cg_thirdPerson =	trap_Cvar_Get( "cg_thirdPerson", "0", CVAR_ARCHIVE ); // racesow - it's no cheat in race :)
 	cg_thirdPersonAngle =	trap_Cvar_Get( "cg_thirdPersonAngle", "0", 0 );
 	cg_thirdPersonRange =	trap_Cvar_Get( "cg_thirdPersonRange", "90", 0 );
 
@@ -1050,6 +1070,8 @@ void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int 
 	CG_ConfigString( CS_AUTORECORDSTATE, cgs.configStrings[CS_AUTORECORDSTATE] );
 
 	CG_DemocamInit();
+
+	CG_CheckpointsClear(); // racesow
 }
 
 /*

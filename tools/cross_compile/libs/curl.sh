@@ -14,6 +14,7 @@ MORE_OPTS="${MORE_OPTS} --build=`./config.guess`" \
  --disable-gopher --disable-imap --disable-pop3 --disable-smtp --disable-rtsp --disable-telnet \
  --without-libssh2 \
  ${MORE_OPTS} && \
+ ${MAKE} clean && \
  ${MAKE}
 
 cp -f lib/.libs/libcurl.a "${TARGET_DIR}libcurlstat.a"

@@ -11,8 +11,8 @@ fi
 
 cd ${SOURCE_DIR}libsrcs/libjpeg && \
 MORE_OPTS="${MORE_OPTS} --build=`./config.guess`" \
-./configure --enable-static=yes \
-${MORE_OPTS} && \
+./configure --enable-static=yes ${MORE_OPTS} && \
+${MAKE} clean && \
 ${MAKE}
 
 cp -f .libs/libjpeg.a "${TARGET_DIR}libjpegstat.a"

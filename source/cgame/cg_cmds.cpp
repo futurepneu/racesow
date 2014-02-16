@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "cg_local.h"
+#include "../qcommon/version.h" // racesow - need this for demo file extension
 
 /*
 ==========================================================================
@@ -351,6 +352,143 @@ static const char *CG_SC_AutoRecordName( void )
 	return name;
 }
 
+// racesow
+/**
+ * CG_SC_RaceDemoRename
+ * Rename the demo file at demos/src to demos/dst.ext
+ * @param src Relative path to source file (including extension)
+ * @param dst Relative path to target (excluding extension)
+ */
+static bool CG_SC_RaceDemoRename( const char *src, const char *dst )
+{
+	const char *baseDirectory = "demos",
+		*srcPath = va( "%s/%s", baseDirectory, src ),
+		*dstPath = va( "%s/%s", baseDirectory, dst, APP_DEMO_EXTENSION_STR );
+	int file;
+
+	if( !trap_FS_MoveFile( srcPath, dstPath ) )
+	{
+		// workaround to create the path
+		trap_FS_FOpenFile( dstPath, &file, FS_WRITE );
+		trap_FS_FCloseFile( file );
+
+		if( !trap_FS_MoveFile( srcPath, dstPath ) )
+			return false;
+	}
+	return true;
+}
+
+/**
+ * CG_SC_RaceDemoName
+ * Generate the demoname for a race
+ * @param raceTime The time of the race
+ */
+static const char *CG_SC_RaceDemoName( unsigned int raceTime )
+{
+	unsigned int hour, min, sec, milli;
+	static char name[MAX_STRING_CHARS];
+	char mapname[MAX_CONFIGSTRING_CHARS];
+
+	milli = raceTime;
+	hour = milli / 3600000;
+	milli -= hour * 3600000;
+	min = milli / 60000;
+	milli -= min * 60000;
+	sec = milli / 1000;
+	milli -= sec * 1000;
+
+	// lowercase mapname
+	Q_strncpyz( mapname, cgs.configStrings[CS_MAPNAME], sizeof( mapname ) );
+	Q_strlwr( mapname );
+
+	// make file path
+	// "gametype/map/map_time_random"
+	Q_snprintfz( name, sizeof( name ), "%s/%s/%s_%02u-%02u-%02u-%003u_%04i",
+		gs.gametypeName,
+		mapname, mapname,
+		hour, min, sec, milli, (int)brandom( 0, 9999 )
+		);
+
+	return name;
+}
+
+enum {
+	RS_RACEDEMO_START = 0,
+	RS_RACEDEMO_STOP,
+	RS_RACEDEMO_CANCEL
+};
+
+/**
+ * CG_SC_RaceDemo
+ * Handles starting/stopping/renaming demos
+ * @param action The action to perform
+ * @param raceTime The time of the race
+ */
+static void CG_SC_RaceDemo( int action, unsigned int raceTime )
+{                                                                                
+        const char *demoname = "currentrace.rec",
+		*directory = "autorecord",
+		*realname;
+        static bool autorecording = false;
+
+        // filter out autorecord commands when playing a demo
+        if( cgs.demoPlaying )
+                return;
+
+        switch( action )
+        {
+        case RS_RACEDEMO_START:
+                if( rs_autoRaceDemo->integer )
+                {
+                        trap_Cmd_ExecuteText( EXEC_NOW, "stop silent" );
+                        trap_Cmd_ExecuteText( EXEC_NOW, va( "record %s/%s silent",
+                                        directory, demoname ) );
+                }
+                autorecording = true;
+                break;
+        case RS_RACEDEMO_STOP:
+                if( rs_autoRaceDemo->integer )
+                        trap_Cmd_ExecuteText( EXEC_NOW, "stop silent" );
+
+                if( autorecording && raceTime > 0 )
+                {
+                        realname = CG_SC_RaceDemoName( raceTime );
+                        if( rs_autoRaceScreenshot->integer )
+                                trap_Cmd_ExecuteText( EXEC_NOW, va( "screenshot %s/%s silent",
+                                                directory, realname ) );
+                        if( rs_autoRaceDemo->integer )
+                                CG_SC_RaceDemoRename( va( "%s/%s", directory, demoname ),
+                                                va( "%s/%s", directory, realname ) );
+                }
+                autorecording = false;
+                break;
+	case RS_RACEDEMO_CANCEL:
+                if( rs_autoRaceDemo->integer )
+                        trap_Cmd_ExecuteText( EXEC_NOW, "stop cancel silent" );
+                autorecording = false;
+                break;
+        }
+}
+
+/**
+ * RaceDemo control functions
+ */
+static void CG_SC_RaceDemoStart( void )
+{
+	CG_SC_RaceDemo( RS_RACEDEMO_START, 0 );
+}
+
+static void CG_SC_RaceDemoStop( void )
+{
+	CG_SC_RaceDemo( RS_RACEDEMO_STOP, atoi( trap_Cmd_Argv( 1 ) ) );
+}
+
+static void CG_SC_RaceDemoCancel( void )
+{
+	CG_SC_RaceDemo( RS_RACEDEMO_CANCEL, 0 );
+}
+// !racesow
+
 /*
 * CG_SC_AutoRecordAction
 */
@@ -635,6 +773,51 @@ void CG_AddAward( const char *str )
 	cg.award_head++;
 }
 
+// racesow
+/**
+ * CG_CheckpointsAdd
+ * Add a checkpoint time
+ * @param cpNum The checkpoint number
+ * @param time The time at the checkpoint
+ */
+void CG_CheckpointsAdd( int cpNum, int time )
+{
+	if( cpNum >= 0 && cpNum < MAX_CHECKPOINTS )
+		cg.checkpoints[cpNum] = time;
+}
+
+/**
+ * CG_SC_CheckpointsAdd
+ * Add a checkpoint time
+ */
+static void CG_SC_CheckpointsAdd( void )
+{
+	CG_CheckpointsAdd( atoi( trap_Cmd_Argv( 1 ) ), atoi( trap_Cmd_Argv( 2 ) ) );
+}
+
+/**
+ * CG_CheckpointsClear
+ * Clear all checkpoints
+ */
+void CG_CheckpointsClear( void )
+{
+	int i;
+	for ( i = 0; i < MAX_CHECKPOINTS; i++ )
+	{
+		cg.checkpoints[i] = STAT_NOTSET;
+	}
+}
+
+/**
+ * CG_SC_CheckpointsClear
+ * Clear all checkpoints
+ */
+static void CG_SC_CheckpointsClear( void )
+{
+	CG_CheckpointsClear();
+}
+// !racesow
+
 /*
 * CG_SC_AddAward
 */
@@ -678,6 +861,11 @@ static const svcmd_t cg_svcmds[] =
 	{ "mecu", CG_SC_MenuCustom },
 	{ "motd", CG_SC_MOTD },
 	{ "aw", CG_SC_AddAward },
+	{ "cpa", CG_SC_CheckpointsAdd }, //racesow
+	{ "cpc", CG_SC_CheckpointsClear }, //racesow
+	{ "dstart", CG_SC_RaceDemoStart }, //racesow
+	{ "dstop", CG_SC_RaceDemoStop }, //racesow
+	{ "dcancel", CG_SC_RaceDemoCancel }, //racesow
 	{ "cmd", CG_SC_ExecuteText },
 
 	{ NULL }

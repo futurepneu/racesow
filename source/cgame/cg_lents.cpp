@@ -994,6 +994,11 @@ void CG_CartoonHitEffect( vec3_t origin, vec3_t dir, int damage )
 */
 void CG_PModel_SpawnTeleportEffect( centity_t *cent )
 {
+	// racesow
+	if( rs_ignoreTeleEffect->integer )
+		return;
+	// ! racesow
+
 	// the thing is, we must have a built skeleton, so we
 	// can run all bones and spawn a polygon at their origin
 	int i, j;

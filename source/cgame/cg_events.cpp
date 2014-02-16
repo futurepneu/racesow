@@ -1007,6 +1007,11 @@ void CG_Event_Dash( entity_state_t *state, int parm )
 
 	// since most dash animations jump with right leg, reset the jump to start with left leg after a dash
 	cg_entities[state->number].jumpedLeft = true;
+
+	// racesow - lm: filter out other players
+	if( ISVIEWERENTITY( state->number ) )
+		CG_AddJumpspeed();
+	// !racesow
 }
 
 /*
@@ -1051,6 +1056,11 @@ void CG_Event_WallJump( entity_state_t *state, int parm, int ev )
 			CG_DustCircle( pos, normal, 65, 12 );
 		}
 	}
+
+	// racesow - lm: filter out other players
+	if( ISVIEWERENTITY( state->number ) )
+		CG_AddJumpspeed();
+	// !racesow
 }
 
 /*
@@ -1116,6 +1126,11 @@ void CG_Event_Jump( entity_state_t *state, int parm )
 		}
 	}
 #undef MOVEDIREPSILON
+
+	// racesow - lm: filter out other players
+	if( ISVIEWERENTITY( state->number ) )
+		CG_AddJumpspeed();
+	// !racesow
 }
 
 /*
