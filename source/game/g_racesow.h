@@ -21,6 +21,9 @@ extern cvar_t *rs_plasma_hack;
 extern cvar_t *rs_gunblade_minKnockback;
 extern cvar_t *rs_gunblade_maxKnockback;
 extern cvar_t *rs_gunblade_splash;
+extern cvar_t *rs_splashfrac;
+
 void RS_Init( void );
 void RS_Shutdown( void );
 void RS_removeProjectiles( edict_t *owner );
+void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, const vec3_t point, float maxradius, vec3_t pushdir, float *kickFrac, float *dmgFrac );
