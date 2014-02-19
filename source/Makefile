@@ -652,7 +652,7 @@ clean-depend:
 	@echo "  > Removing depend files" && \
 	$(RM) $(DEPENDFILE_CLIENT) $(DEPENDFILE_DED) $(DEPENDFILE_CGAME) $(DEPENDFILE_GAME) $(DEPENDFILE_UI_ROCKET) $(DEPENDFILE_OPENAL) $(DEPENDFILE_TV_SERVER) $(DEPENDFILE_QF) $(DEPENDFILE_IRC) $(DEPENDFILE_CIN) $(DEPENDFILE_FTLIB) $(DEPENDFILE_STEAMLIB) $(DEPENDFILE_REF_GL) $(DEPENDFILE_ANGELWRAP)
 
-$(BUILDDIRS) $(BINDIR) $(BINDIR)/base $(BINDIR)/libs:
+$(BUILDDIRS) $(BINDIR) $(BINDIR)/racesow $(BINDIR)/libs:
 	@mkdir -p $@
 
 ifeq ($(BUILD_CLIENT),YES)
@@ -711,7 +711,7 @@ message-cgame:
 	@echo "> * Building cgame"
 	@echo "> *********************************************************"
 compile-cgame: $(OBJS_CGAME)
-link-cgame: $(BINDIR)/base $(BINDIR)/base/cgame_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
+link-cgame: $(BINDIR)/racesow $(BINDIR)/racesow/cgame_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
 clean-cgame:
 	@echo "  > Removing cgame objects" && \
 	$(RM) $(OBJS_CGAME)
@@ -723,7 +723,7 @@ message-game:
 	@echo "> * Building game"
 	@echo "> *********************************************************"
 compile-game: $(OBJS_GAME)
-link-game: $(BINDIR)/base $(BINDIR)/base/game_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
+link-game: $(BINDIR)/racesow $(BINDIR)/racesow/game_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
 clean-game:
 	@echo "  > Removing game objects" && \
 	$(RM) $(OBJS_GAME)
@@ -735,7 +735,7 @@ message-ui:
 	@echo "> * Building ui"
 	@echo "> *********************************************************"
 compile-ui: $(PCH_UI_ROCKET) $(OBJS_UI_ROCKET) $(LIBROCKET_LIB)
-link-ui: $(BINDIR)/base $(BINDIR)/base/ui_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
+link-ui: $(BINDIR)/racesow $(BINDIR)/racesow/ui_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
 clean-ui:
 	@echo "  > Removing ui objects" && \
 	$(RM) $(PCH_UI_ROCKET) $(OBJS_UI_ROCKET)
@@ -895,15 +895,15 @@ $(BINDIR)/libs/snd_qf_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_QF)
 ########
 # .SO
 ########
-$(BINDIR)/base/cgame_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_CGAME)
+$(BINDIR)/racesow/cgame_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_CGAME)
 	@echo "  > Linking $@" && \
 	$(LXX) -o $@ $^ $(LXXFLAGS_COMMON) $(LDFLAGS_MODULE)
 
-$(BINDIR)/base/game_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_GAME)
+$(BINDIR)/racesow/game_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_GAME)
 	@echo "  > Linking $@" && \
 	$(LXX) -o $@ $^ $(LXXFLAGS_COMMON) $(LDFLAGS_MODULE)
 
-$(BINDIR)/base/ui_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_UI_ROCKET) $(LIBROCKET_LIB)
+$(BINDIR)/racesow/ui_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_UI_ROCKET) $(LIBROCKET_LIB)
 	@echo "  > Linking $@" && \
 	$(LXX) -o $@ $^ $(LXXFLAGS_COMMON) $(LDFLAGS_MODULE) $(LDFLAGS_ROCKET)
 
