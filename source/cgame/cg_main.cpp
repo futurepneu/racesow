@@ -977,6 +977,7 @@ void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int 
 			 unsigned int snapFrameTime, int protocol, int sharedSeed )
 {
 	CG_InitGameShared();
+	RS_CG_Init();
 
 	memset( &cg, 0, sizeof( cg_state_t ) );
 	memset( &cgs, 0, sizeof( cg_static_t ) );
