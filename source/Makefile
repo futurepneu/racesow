@@ -224,9 +224,9 @@ endif
 LDFLAGS_IRC=-lwsock32 -lws2_32
 LDFLAGS_ANGELWRAP=$(ANGELSCRIPT_LIB)
 
-CLIENT_EXE=qfusion_$(ARCH).exe
-SERVER_EXE=qfusion_server_$(ARCH).exe
-TV_SERVER_EXE=qfusiontv_server_$(ARCH).exe
+CLIENT_EXE=warsow_$(ARCH).exe
+SERVER_EXE=wsw_server_$(ARCH).exe
+TV_SERVER_EXE=wswtv_server_$(ARCH).exe
 else # USE_MINGW
 ####################### NORMAL *NIX? ######################
 LOCALBASE?=/usr/local
@@ -313,9 +313,9 @@ endif
 LDFLAGS_IRC=
 LDFLAGS_ANGELWRAP=$(ANGELSCRIPT_LIB) -lpthread
 
-CLIENT_EXE=qfusion.$(ARCH)
-SERVER_EXE=qfusion_server.$(ARCH)
-TV_SERVER_EXE=qfusiontv_server.$(ARCH)
+CLIENT_EXE=warsow.$(ARCH)
+SERVER_EXE=warsow_server.$(ARCH)
+TV_SERVER_EXE=wswtv_server.$(ARCH)
 endif # USE_MINGW
 
 ####################### MAC support ######################
@@ -662,7 +662,7 @@ message-client:
 	@echo "> *********************************************************"
 compile-client: $(OBJS_CLIENT)
 link-client: $(BINDIR) $(BINDIR)/$(CLIENT_EXE)
-start-script-client: $(BINDIR) $(BINDIR)/qfusion
+start-script-client: $(BINDIR) $(BINDIR)/warsow
 clean-client:
 	@echo "  > Removing client objects" && \
 	$(RM) $(OBJS_CLIENT)
@@ -985,7 +985,7 @@ $(BUILDDIR)/client/%.o: gameshared/%.c
 $(BUILDDIR)/client/%.o: qalgo/%.c
 	@$(DO_CC_CLIENT)
 
-$(BINDIR)/qfusion: unix/start_script.sh
+$(BINDIR)/warsow: unix/start_script.sh
 	@echo "  > Installing client start script" && \
 	cp $< $@ && \
 	chmod a+x $@
