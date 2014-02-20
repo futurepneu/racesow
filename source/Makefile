@@ -477,6 +477,7 @@ CPPFILES_GAME += $(wildcard game/ai/*.cpp)
 CFILES_GAME = $(wildcard gameshared/*.c)
 CFILES_GAME += $(wildcard qalgo/*.c)
 CFILES_GAME += matchmaker/mm_rating.c
+CFILES_GAME += qcommon/cjson.c
 
 CFILES_GAME_WITHOUT_PATH= $(notdir  $(CFILES_GAME))
 OFILES_GAME=$(CFILES_GAME_WITHOUT_PATH:.c=.o)
@@ -1086,6 +1087,11 @@ $(BUILDDIR)/game/%.o: qalgo/%.c
 	
 $(BUILDDIR)/game/%.o: matchmaker/%.c
 	@$(DO_CC_MODULE) $(CFLAGS_GAME)
+
+# racesow
+$(BUILDDIR)/game/%.o: qcommon/%.c
+	@$(DO_CC_MODULE) $(CFLAGS_GAME)
+# !racesow
 
 ########
 # UI.ROCKET

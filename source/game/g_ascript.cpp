@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "g_local.h"
 #include "g_as_local.h"
+#include "../qcommon/cjson.h" // racesow
 
 angelwrap_api_t *angelExport = NULL;
 
@@ -2532,7 +2533,84 @@ static const asClassDescriptor_t asGameEntityClassDescriptor =
 	NULL, NULL					/* string factory hack */
 };
 
-//=======================================================================
+//= racesow =============================================================
+
+typedef struct
+{
+	cJSON *json;
+} asjson_t;
+
+void objectJson_Constructor( int type, asjson_t *self )
+{
+	switch( type )
+	{
+	case cJSON_False:
+		self->json = cJSON_CreateFalse();
+		break;
+	case cJSON_True:
+		self->json = cJSON_CreateTrue();
+		break;
+	case cJSON_NULL:
+		self->json = cJSON_CreateNull();
+		break;
+	case cJSON_Number:
+		self->json = cJSON_CreateNumber( 0 );
+		break;
+	case cJSON_String:
+		self->json = cJSON_CreateString( "" );
+		break;
+	case cJSON_Array:
+		self->json = cJSON_CreateArray();
+		break;
+	case cJSON_Object:
+		self->json = cJSON_CreateObject();
+		break;
+	}
+}
+
+void objectJson_Destructor( asjson_t *self )
+{
+	cJSON_Delete( self->json );
+}
+
+static const asFuncdef_t json_Funcdefs[] =
+{
+	ASLIB_FUNCDEF_NULL
+};
+
+static const asBehavior_t json_ObjectBehaviors[] =
+{
+	{ asBEHAVE_CONSTRUCT, ASLIB_FUNCTION_DECL(void, f, (int type)), asFUNCTION(objectJson_Constructor), asCALL_CDECL_OBJLAST },
+	{ asBEHAVE_DESTRUCT, ASLIB_FUNCTION_DECL(void, f, ()), asFUNCTION(objectJson_Destructor), asCALL_CDECL_OBJLAST },
+
+	ASLIB_BEHAVIOR_NULL
+};
+
+static const asMethod_t json_Methods[] =
+{
+	ASLIB_METHOD_NULL
+};
+
+static const asProperty_t json_Properties[] =
+{
+	ASLIB_PROPERTY_NULL
+};
+
+static const asClassDescriptor_t asJsonClassDescriptor =
+{
+	"Json",						/* name */
+	asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_CK,	/* object type flags */
+	sizeof( asjson_t ),			/* size */
+	json_Funcdefs,				/* funcdefs */
+	json_ObjectBehaviors,		/* object behaviors */
+	json_Methods,				/* methods */
+	json_Properties,			/* properties */
+
+	NULL, NULL					/* string factory hack */
+};
+
+//= !racesow ============================================================
+
 
 static const asClassDescriptor_t * const asClassesDescriptors[] = 
 {
@@ -2545,6 +2623,7 @@ static const asClassDescriptor_t * const asClassesDescriptors[] =
 	&asBotClassDescriptor,
 	&asGameClientDescriptor,
 	&asGameEntityClassDescriptor,
+	&asJsonClassDescriptor, // racesow
 
 	NULL
 };
