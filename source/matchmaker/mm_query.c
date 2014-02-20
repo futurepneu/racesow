@@ -563,6 +563,16 @@ char **StatQuery_GetTokenizedResponse( stat_query_t *query, int *argc )
 	return query->response_tokens;
 }
 
+// racesow
+int *StatQuery_GetStatus( stat_query_t *query )
+{
+	if( !query->req )
+		return -1;
+
+	return wswcurl_get_status( query->req );
+}
+// !racesow
+
 void StatQuery_Poll( void )
 {
 	// TODO: handle and state validation
@@ -620,6 +630,7 @@ void StatQuery_Init( void )
 	sq_export.AddArrayNumber = StatQuery_AddArrayNumber;
 	sq_export.GetRawResponse = StatQuery_GetRawResponse;
 	sq_export.GetTokenizedResponse = StatQuery_GetTokenizedResponse;
+	sq_export.GetStatus = StatQuery_GetStatus; // racesow
 	sq_export.Poll = StatQuery_Poll;
 
 	// init JSON

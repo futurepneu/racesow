@@ -69,6 +69,8 @@ typedef struct stat_query_api_s
 	// char *const *( *GetTokenizedResponse )( stat_query_t *query, int *argc );
 	char **( *GetTokenizedResponse )( stat_query_t *query, int *argc );
 
+	int ( *GetStatus )( stat_query_t *query ); // racesow
+
 	// translates to wswcurl_perform()
 	void ( *Poll )( void );
 } stat_query_api_t;
