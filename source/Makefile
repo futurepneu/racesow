@@ -314,7 +314,7 @@ LDFLAGS_IRC=
 LDFLAGS_ANGELWRAP=$(ANGELSCRIPT_LIB) -lpthread
 
 CLIENT_EXE=warsow.$(ARCH)
-SERVER_EXE=warsow_server.$(ARCH)
+SERVER_EXE=wsw_server.$(ARCH)
 TV_SERVER_EXE=wswtv_server.$(ARCH)
 endif # USE_MINGW
 
