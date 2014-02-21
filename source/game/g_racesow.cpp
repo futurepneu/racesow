@@ -8,6 +8,7 @@ stat_query_api_t *rs_sqapi;
 
 cvar_t *rs_statsEnabled;
 cvar_t *rs_statsUrl;
+cvar_t *rs_statsId;
 cvar_t *rs_statsKey;
 cvar_t *rs_grenade_minKnockback;
 cvar_t *rs_grenade_maxKnockback;
@@ -69,8 +70,10 @@ void RS_Init( void )
 	rs_splashfrac = trap_Cvar_Get( "rs_splashfrac", "0", CVAR_ARCHIVE );
 
 	// TODO: Decide what these flags should really be
+	G_Printf( "Racesow Init\n" );
 	rs_statsEnabled = trap_Cvar_Get( "rs_statsEnabled", "0", CVAR_ARCHIVE );
 	rs_statsUrl = trap_Cvar_Get( "rs_statsUrl", "localhost", CVAR_ARCHIVE );
+	rs_statsId = trap_Cvar_Get( "rs_statsId", "", CVAR_ARCHIVE );
 	rs_statsKey = trap_Cvar_Get( "rs_statsKey", "", CVAR_ARCHIVE );
 	rs_sqapi = trap_GetStatQueryAPI();
 	if( !rs_sqapi )
@@ -198,11 +201,12 @@ void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
 
 	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.authPlayerDone) );
-	if( error < 0 ) 
+	if( error < 0 )
 		return;
 
 	// Set the parameters
 	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
+	ctx->SetArgObject( 1, rs_sqapi->GetRoot( query ) );
 
 	error = ctx->Execute();
 	if( G_ExecutionErrorReport( error ) )
@@ -230,9 +234,61 @@ void RS_AuthPlayer( const char *name, const char *ctoken, uint authTime )
 	G_Printf( "player/%s?time=%d?stoken=%s?ctoken=%s\n", name, authTime,	stoken,	ctoken );
 
 	query = rs_sqapi->CreateQuery(
-		va( "player/%s?time=%d?stoken=%s?ctoken=%s", name, authTime, stoken, ctoken ),
+		va( "player/%s?time=%d?stoken=%s?ctoken=%s&", name, authTime, stoken, ctoken ),
 		qtrue );
 	rs_sqapi->SetCallback( query, RS_AuthPlayer_Done, NULL );
+	trap_MM_SendQuery( query );
+	query = NULL;
+}
+
+/**
+ * AuthMap callback function
+ * @param query Query calling this function
+ * @param success True on any response
+ * @param customp Extra parameters, should be NULL
+ * @return void
+ */
+void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	int error;
+	asIScriptContext *ctx;
+
+	if( !level.gametype.authMapDone )
+		return;
+
+	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
+
+	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.authMapDone) );
+	if( error < 0 )
+		return;
+
+	// Set the parameters
+	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
+	ctx->SetArgObject( 1, rs_sqapi->GetRoot( query ) );
+
+	error = ctx->Execute();
+	if( G_ExecutionErrorReport( error ) )
+		GT_asShutdownScript();
+}
+
+/**
+ * Get auth data for the current map
+ * @return void
+ */
+void RS_AuthMap( uint authTime )
+{
+	stat_query_t *query;
+	char *stoken, *b64name;
+	size_t *outlen;
+
+	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), outlen );
+	stoken = (char*)RS_GenToken( va( "%d", authTime ) );
+	G_Printf( "Token: %s\n", stoken );
+
+	query = rs_sqapi->CreateQuery(
+		va( "api/map/%s?sid=%d&time=%d&stoken=%s&", b64name, rs_statsId->integer, authTime, stoken ),
+		qtrue );
+	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
 	trap_MM_SendQuery( query );
 	query = NULL;
 }

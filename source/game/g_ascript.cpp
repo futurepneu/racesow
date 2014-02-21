@@ -582,6 +582,21 @@ static const asEnumVal_t asMiscelaneaEnumVals[] =
 	ASLIB_ENUM_VAL_NULL
 };
 
+// racesow
+static const asEnumVal_t asJsonEnumVals[] =
+{
+	ASLIB_ENUM_VAL( cJSON_False ),
+	ASLIB_ENUM_VAL( cJSON_True ),
+	ASLIB_ENUM_VAL( cJSON_NULL ),
+	ASLIB_ENUM_VAL( cJSON_Number ),
+	ASLIB_ENUM_VAL( cJSON_String ),
+	ASLIB_ENUM_VAL( cJSON_Array ),
+	ASLIB_ENUM_VAL( cJSON_Object ),
+
+	ASLIB_ENUM_VAL_NULL
+};
+// !racesow
+
 //=======================================================================
 
 static const asEnum_t asEnums[] =
@@ -615,6 +630,8 @@ static const asEnum_t asEnums[] =
 	{ "meaningsofdeath_e", asMeaningsOfDeathEnumVals },
 	{ "takedamage_e", asDamageEnumVals },
 	{ "miscelanea_e", asMiscelaneaEnumVals },
+
+	{ "json_e", asJsonEnumVals }, // racesow
 
 	ASLIB_ENUM_VAL_NULL
 };
@@ -2536,42 +2553,14 @@ static const asClassDescriptor_t asGameEntityClassDescriptor =
 
 //= racesow =============================================================
 
-typedef struct
+static asstring_t *objectJson_getName( cJSON *self )
 {
-	cJSON *json;
-} asjson_t;
-
-void objectJson_Constructor( int type, asjson_t *self )
-{
-	switch( type )
-	{
-	case cJSON_False:
-		self->json = cJSON_CreateFalse();
-		break;
-	case cJSON_True:
-		self->json = cJSON_CreateTrue();
-		break;
-	case cJSON_NULL:
-		self->json = cJSON_CreateNull();
-		break;
-	case cJSON_Number:
-		self->json = cJSON_CreateNumber( 0 );
-		break;
-	case cJSON_String:
-		self->json = cJSON_CreateString( "" );
-		break;
-	case cJSON_Array:
-		self->json = cJSON_CreateArray();
-		break;
-	case cJSON_Object:
-		self->json = cJSON_CreateObject();
-		break;
-	}
+	return angelExport->asStringFactoryBuffer( self->string, self->string ? strlen(self->string) : 0 );
 }
 
-void objectJson_Destructor( asjson_t *self )
+static asstring_t *objectJson_getString( cJSON *self )
 {
-	cJSON_Delete( self->json );
+	return angelExport->asStringFactoryBuffer( self->valuestring, self->valuestring ? strlen(self->valuestring) : 0 );
 }
 
 static const asFuncdef_t json_Funcdefs[] =
@@ -2581,27 +2570,34 @@ static const asFuncdef_t json_Funcdefs[] =
 
 static const asBehavior_t json_ObjectBehaviors[] =
 {
-	{ asBEHAVE_CONSTRUCT, ASLIB_FUNCTION_DECL(void, f, (int type)), asFUNCTION(objectJson_Constructor), asCALL_CDECL_OBJLAST },
-	{ asBEHAVE_DESTRUCT, ASLIB_FUNCTION_DECL(void, f, ()), asFUNCTION(objectJson_Destructor), asCALL_CDECL_OBJLAST },
-
 	ASLIB_BEHAVIOR_NULL
 };
 
 static const asMethod_t json_Methods[] =
 {
+	{ ASLIB_FUNCTION_DECL(const String @, getName, () const), asFUNCTION(objectJson_getName), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(const String @, getString, () const), asFUNCTION(objectJson_getName), asCALL_CDECL_OBJLAST },
+
 	ASLIB_METHOD_NULL
 };
 
 static const asProperty_t json_Properties[] =
 {
+	{ ASLIB_PROPERTY_DECL(int, type), ASLIB_FOFFSET(cJSON, type) },
+	{ ASLIB_PROPERTY_DECL(int, valueint), ASLIB_FOFFSET(cJSON, valueint) },
+	{ ASLIB_PROPERTY_DECL(float, value), ASLIB_FOFFSET(cJSON, valuedouble) },
+	{ ASLIB_PROPERTY_DECL(Json, @next), ASLIB_FOFFSET(cJSON, next) },
+	{ ASLIB_PROPERTY_DECL(Json, @prev), ASLIB_FOFFSET(cJSON, prev) },
+	{ ASLIB_PROPERTY_DECL(Json, @child), ASLIB_FOFFSET(cJSON, child) },
+
 	ASLIB_PROPERTY_NULL
 };
 
 static const asClassDescriptor_t asJsonClassDescriptor =
 {
 	"Json",						/* name */
-	asOBJ_VALUE | asOBJ_POD | asOBJ_APP_CLASS_CK,	/* object type flags */
-	sizeof( asjson_t ),			/* size */
+	asOBJ_REF|asOBJ_NOCOUNT,	/* object type flags */
+	sizeof( cJSON ),			/* size */
 	json_Funcdefs,				/* funcdefs */
 	json_ObjectBehaviors,		/* object behaviors */
 	json_Methods,				/* methods */
@@ -2609,9 +2605,6 @@ static const asClassDescriptor_t asJsonClassDescriptor =
 
 	NULL, NULL					/* string factory hack */
 };
-
-//= !racesow ============================================================
-
 
 //= !racesow ============================================================
 
@@ -2927,6 +2920,11 @@ static bool asFunc_RS_ResetPjState( int playerNum )
 static void asFunc_RS_AuthPlayer( asstring_t *name, asstring_t *ctoken, uint authTime )
 {
 	RS_AuthPlayer( name->buffer, ctoken->buffer, authTime );
+}
+
+static void asFunc_RS_AuthMap( uint authTime )
+{
+	RS_AuthMap( authTime );
 }
 // !racesow
 
@@ -3294,6 +3292,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "bool RS_QueryPjState( int playerNum )", asFUNCTION(asFunc_RS_QueryPjState), NULL },
 	{ "bool RS_ResetPjState( int playerNum )", asFUNCTION(asFunc_RS_ResetPjState), NULL },
 	{ "void RS_AuthPlayer( const String &name, const String &ctoken, uint authTime )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
+	{ "void RS_AuthMap( uint authTime )", asFUNCTION(asFunc_RS_AuthMap), NULL },
 	// !racesow
 
 	{ "Entity @G_SpawnEntity( const String &in )", asFUNCTION(asFunc_G_Spawn), NULL },

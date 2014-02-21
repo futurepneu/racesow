@@ -170,6 +170,7 @@ typedef struct
 
 	// racesow
 	void *authPlayerDone;
+	void *authMapDone;
 
 	bool autoInactivityRemove;
 	bool playerInteraction;
