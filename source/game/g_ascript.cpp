@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "g_local.h"
 #include "g_as_local.h"
 #include "../qcommon/cjson.h" // racesow
+#include "g_racesow.h" // racesow
 
 angelwrap_api_t *angelExport = NULL;
 
@@ -2612,6 +2613,9 @@ static const asClassDescriptor_t asJsonClassDescriptor =
 //= !racesow ============================================================
 
 
+//= !racesow ============================================================
+
+
 static const asClassDescriptor_t * const asClassesDescriptors[] = 
 {
 	&asTraceClassDescriptor,
@@ -2918,6 +2922,11 @@ static bool asFunc_RS_ResetPjState( int playerNum )
 {
 	RS_ResetPjState( playerNum );
 	return true;
+}
+
+static void asFunc_RS_AuthPlayer( asstring_t *name, asstring_t *ctoken, uint authTime )
+{
+	RS_AuthPlayer( name->buffer, ctoken->buffer, authTime );
 }
 // !racesow
 
@@ -3284,6 +3293,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	// racesow
 	{ "bool RS_QueryPjState( int playerNum )", asFUNCTION(asFunc_RS_QueryPjState), NULL },
 	{ "bool RS_ResetPjState( int playerNum )", asFUNCTION(asFunc_RS_ResetPjState), NULL },
+	{ "void RS_AuthPlayer( const String &name, const String &ctoken, uint authTime )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
 	// !racesow
 
 	{ "Entity @G_SpawnEntity( const String &in )", asFUNCTION(asFunc_G_Spawn), NULL },

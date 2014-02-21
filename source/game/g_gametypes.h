@@ -169,6 +169,8 @@ typedef struct
 	bool mmCompatible;
 
 	// racesow
+	void *authPlayerDone;
+
 	bool autoInactivityRemove;
 	bool playerInteraction;
 	bool freestyleMapFix;

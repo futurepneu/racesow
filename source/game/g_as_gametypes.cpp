@@ -494,6 +494,18 @@ static bool G_asInitializeGametypeScript( asIScriptModule *asModule )
 	else
 		funcCount++;
 
+	// racesow
+	fdeclstr = "void RS_AuthPlayer_Done( int status )";
+	level.gametype.authPlayerDone = asModule->GetFunctionByDecl( fdeclstr );
+	if( !level.gametype.authPlayerDone )
+	{
+		if( developer->integer || sv_cheats->integer )
+			G_Printf( "* The function '%s' was not present in the script.\n", fdeclstr );
+	}
+	else
+		funcCount++;
+	// !racesow
+
 	//
 	// execute the GT_InitGametype function
 	//

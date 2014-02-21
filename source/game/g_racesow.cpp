@@ -1,5 +1,14 @@
 #include "g_local.h"
+#include "g_as_local.h"
+#include "../matchmaker/mm_query.h"
+#include "../qalgo/base64.h"
+#include "../qalgo/sha2.h"
 
+stat_query_api_t *rs_sqapi;
+
+cvar_t *rs_statsEnabled;
+cvar_t *rs_statsUrl;
+cvar_t *rs_statsKey;
 cvar_t *rs_grenade_minKnockback;
 cvar_t *rs_grenade_maxKnockback;
 cvar_t *rs_grenade_splash;
@@ -58,6 +67,14 @@ void RS_Init( void )
 	rs_gunblade_maxKnockback = trap_Cvar_Get( "rs_gunblade_maxKnockback", "60", CVAR_ARCHIVE );
 	rs_gunblade_splash = trap_Cvar_Get( "rs_gunblade_splash", "80", CVAR_ARCHIVE );
 	rs_splashfrac = trap_Cvar_Get( "rs_splashfrac", "0", CVAR_ARCHIVE );
+
+	// TODO: Decide what these flags should really be
+	rs_statsEnabled = trap_Cvar_Get( "rs_statsEnabled", "0", CVAR_ARCHIVE );
+	rs_statsUrl = trap_Cvar_Get( "rs_statsUrl", "localhost", CVAR_ARCHIVE );
+	rs_statsKey = trap_Cvar_Get( "rs_statsKey", "", CVAR_ARCHIVE );
+	rs_sqapi = trap_GetStatQueryAPI();
+	if( !rs_sqapi )
+		trap_Cvar_ForceSet( rs_statsEnabled->name, "0" );
 }
 
 /**
@@ -145,4 +162,77 @@ void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, c
 
 	VectorSubtract( boxcenter, point, pushdir );
 	VectorNormalizeFast( pushdir );
+}
+
+/**
+ * RS_GenToken
+ * Generate the server token for the given salt
+ * @return The generated token
+ */
+const char *RS_GenToken( const char *salt )
+{
+	unsigned char digest[SHA256_DIGEST_SIZE];
+	size_t *outlen;
+
+	const char *message = va( "%s|%s", salt, rs_statsKey->string );
+
+	sha256( (const unsigned char*)message, strlen( message ), digest );
+	return (const char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, outlen );
+}
+
+/**
+ * AuthPlayer callback function
+ * @param query Query calling this function
+ * @param success True on any response
+ * @param customp Extra parameters, should be NULL
+ * @return void
+ */
+void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	int error;
+	asIScriptContext *ctx;
+
+	if( !level.gametype.authPlayerDone )
+		return;
+
+	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
+
+	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.authPlayerDone) );
+	if( error < 0 ) 
+		return;
+
+	// Set the parameters
+	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
+
+	error = ctx->Execute();
+	if( G_ExecutionErrorReport( error ) )
+		GT_asShutdownScript();
+}
+
+/**
+ * Authenticate a player
+ * @param name The player's auth name
+ * @param ctoken The client's signed token
+ * @param realTime Time tokens were generated with
+ * @return void
+ */
+void RS_AuthPlayer( const char *name, const char *ctoken, uint authTime )
+{
+	stat_query_t *query;
+	const char *stoken;
+
+	if( !name || !strlen( name ) || !ctoken || !strlen( ctoken ) )
+		return;
+
+	stoken = RS_GenToken( va( "%d", authTime ) );
+
+	G_Printf( "QueryPlayer %s %s %d\n", name, ctoken, authTime );
+	G_Printf( "player/%s?time=%d?stoken=%s?ctoken=%s\n", name, authTime,	stoken,	ctoken );
+
+	query = rs_sqapi->CreateQuery(
+		va( "player/%s?time=%d?stoken=%s?ctoken=%s", name, authTime, stoken, ctoken ),
+		qtrue );
+	rs_sqapi->SetCallback( query, RS_AuthPlayer_Done, NULL );
+	trap_MM_SendQuery( query );
+	query = NULL;
 }
