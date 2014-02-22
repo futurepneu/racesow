@@ -2,6 +2,8 @@
 #include "../qalgo/sha2.h"
 #include "../qalgo/base64.h"
 
+#define RS_HASH_ITERATIONS 100000
+
 cvar_t *rs_authUser;
 cvar_t *rs_authToken;
 
@@ -73,13 +75,24 @@ const char *RS_PasswordRead()
 void RS_PasswordWrite( const char *password )
 {
 	const char *filename;
+	char *hash;
 	int filenum;
+	unsigned char digest[SHA256_DIGEST_SIZE];
+
+	sha256( (const unsigned char*)password, strlen( password ), digest);
+	for( int i = 1; i < RS_HASH_ITERATIONS; i++ )
+		sha256( digest, SHA256_DIGEST_SIZE, digest );
+	hash = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, NULL );
 
 	filename = RS_PasswordFilename();
 	if( !filename || trap_FS_FOpenFile( filename, &filenum, FS_WRITE ) == -1 )
+	{
+		free( hash );
 		return;
+	}
 
-	trap_FS_Write( password, strlen( password ), filenum );
+	trap_FS_Write( hash, strlen( hash ), filenum );
+	free( hash );
 	trap_FS_FCloseFile( filenum );
 }
 
@@ -109,14 +122,22 @@ void RS_CG_Login( const char *user, const char *pass )
  */
 void RS_CG_GenToken( const char *salt )
 {
-	const char *pass = RS_PasswordRead(),
-		*message = va( "%s|%s", salt, pass );
+	static char message[MAX_STRING_CHARS];
 	unsigned char digest[SHA256_DIGEST_SIZE];
-	size_t *outlen;
+	char *token, *password;
 
-	if( rs_authUser->string[0] == '\0' || !pass )
+	password = (char*)RS_PasswordRead();
+	if( !password || !strlen( rs_authUser->string ) )
+	{
+		trap_Cvar_ForceSet( rs_authToken->name, "" );
 		return;
+	}
+
+	Q_strncpyz( message, va( "%s|", salt ), sizeof( message ) - 1 );
+	Q_strncatz( message, password, sizeof( message ) - 1 );
 
 	sha256( (const unsigned char*)message, strlen( message ), digest );
-	trap_Cvar_ForceSet( rs_authToken->name, (const char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, outlen ) );
+	token = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, NULL );
+	trap_Cvar_ForceSet( rs_authToken->name, token );
+	free( token );
 }

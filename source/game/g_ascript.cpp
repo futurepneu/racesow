@@ -2576,7 +2576,7 @@ static const asBehavior_t json_ObjectBehaviors[] =
 static const asMethod_t json_Methods[] =
 {
 	{ ASLIB_FUNCTION_DECL(const String @, getName, () const), asFUNCTION(objectJson_getName), asCALL_CDECL_OBJLAST },
-	{ ASLIB_FUNCTION_DECL(const String @, getString, () const), asFUNCTION(objectJson_getName), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(const String @, getString, () const), asFUNCTION(objectJson_getString), asCALL_CDECL_OBJLAST },
 
 	ASLIB_METHOD_NULL
 };
@@ -2917,9 +2917,22 @@ static bool asFunc_RS_ResetPjState( int playerNum )
 	return true;
 }
 
-static void asFunc_RS_AuthPlayer( asstring_t *name, asstring_t *ctoken, uint authTime )
+static bool asFunc_RS_RenameClient( gclient_t *client, asstring_t *name )
 {
-	RS_AuthPlayer( name->buffer, ctoken->buffer, authTime );
+	qboolean success = Info_SetValueForKey( client->userinfo, "name", name->buffer );
+	if( success )
+		return true;
+	return false;
+}
+
+static void asFunc_RS_AuthPlayer( gclient_t *client, asstring_t *name, asstring_t *ctoken, uint authTime, uint mapId )
+{
+	RS_AuthPlayer( client, name->buffer, ctoken->buffer, authTime, mapId );
+}
+
+static void asFunc_RS_AuthNick( gclient_t *client, asstring_t *nick )
+{
+	RS_AuthNick( client, nick->buffer );
 }
 
 static void asFunc_RS_AuthMap( uint authTime )
@@ -3291,7 +3304,9 @@ static const asglobfuncs_t asGlobFuncs[] =
 	// racesow
 	{ "bool RS_QueryPjState( int playerNum )", asFUNCTION(asFunc_RS_QueryPjState), NULL },
 	{ "bool RS_ResetPjState( int playerNum )", asFUNCTION(asFunc_RS_ResetPjState), NULL },
-	{ "void RS_AuthPlayer( const String &name, const String &ctoken, uint authTime )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
+	{ "bool RS_RenameClient( Client @client, const String &name )", asFUNCTION(asFunc_RS_RenameClient), NULL },
+	{ "void RS_AuthPlayer( Client @client, const String &name, const String &ctoken, uint authTime, uint mapId )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
+	{ "void RS_AuthNick( Client @client, const String &nick )", asFUNCTION(asFunc_RS_AuthNick), NULL },
 	{ "void RS_AuthMap( uint authTime )", asFUNCTION(asFunc_RS_AuthMap), NULL },
 	// !racesow
 
