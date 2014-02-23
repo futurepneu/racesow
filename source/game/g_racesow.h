@@ -1,3 +1,5 @@
+#include "g_as_local.h"
+
 extern cvar_t *rs_statsEnabled;
 extern cvar_t *rs_statsUrl;
 extern cvar_t *rs_grenade_minKnockback;
@@ -33,3 +35,5 @@ void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, c
 void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uint authTime, uint mapId );
 void RS_AuthNick( gclient_t *client, const char *nick );
 void RS_AuthMap( uint authTime );
+
+void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint time, CScriptArrayInterface *checkpoints );

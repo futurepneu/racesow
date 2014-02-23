@@ -1,5 +1,7 @@
+#include <ctime>
 #include "g_local.h"
 #include "g_as_local.h"
+#include "../qcommon/cjson.h"
 #include "../matchmaker/mm_query.h"
 #include "../qalgo/base64.h"
 #include "../qalgo/sha2.h"
@@ -340,5 +342,47 @@ void RS_AuthMap( uint authTime )
 		qtrue );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
 	trap_MM_SendQuery( query );
+	query = NULL;
+}
+
+/**
+ * Callback for report race
+ * @return void
+ */
+void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	G_Printf( "ReportRace Done\n" );
+}
+
+/**
+ * Report Race data
+ */
+void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CScriptArrayInterface *checkpoints )
+{
+	stat_query_t *query;
+	stat_query_section_t *section;
+	char *stoken;
+	uint numCheckpoints = checkpoints->GetSize();
+	int unixTime = (int)time(NULL);
+
+	// Sign the request
+	stoken = (char*)RS_GenToken( va( "%d|%d", unixTime, rtime ) );
+
+	// Form the query
+	query = rs_sqapi->CreateQuery( "api/race", qfalse );
+	rs_sqapi->SetField( query, "playerId", va( "%d", playerId ) );
+	rs_sqapi->SetField( query, "mapId", va( "%d", mapId ) );
+	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
+	rs_sqapi->SetField( query, "unixTime", va( "%d", unixTime ) );
+	rs_sqapi->SetField( query, "stoken", stoken );
+
+	// Use cJSON to format the checkpoint array
+	cJSON *arr = cJSON_CreateArray();
+	for( uint i = 0; i < numCheckpoints; i++)
+		cJSON_AddItemToArray( arr, cJSON_CreateNumber( *((uint*)checkpoints->At( i )) ) );
+	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
+
+	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)client );
+	rs_sqapi->Send( query );
 	query = NULL;
 }
