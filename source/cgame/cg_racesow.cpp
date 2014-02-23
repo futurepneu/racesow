@@ -43,8 +43,8 @@ static const char *RS_PasswordFilename( void )
 }
 
 /**
- * Read the users password from file
- * @return Users saved password
+ * Read the users hashed password from file
+ * @return Users saved and hashed password
  */
 const char *RS_PasswordRead()
 {
@@ -61,7 +61,7 @@ const char *RS_PasswordRead()
 	trap_FS_FCloseFile( filenum );
 
 	if( bytes == 0 || bytes >= sizeof(buffer) - 1 )
-		return NULL;
+		return NULL;	
 
 	buffer[bytes] = '\0';
 
@@ -69,8 +69,8 @@ const char *RS_PasswordRead()
 }
 
 /**
- * Save the users password to a file
- * @param password The users password
+ * Hash the users password and save to a file
+ * @param password The users raw password
  */
 void RS_PasswordWrite( const char *password )
 {
@@ -100,7 +100,7 @@ void RS_PasswordWrite( const char *password )
  * RS_CG_Login
  * Save the user name and password
  * @param user Username
- * @param pass Password
+ * @param pass User's raw password
  * @return void
  */
 void RS_CG_Login( const char *user, const char *pass )
