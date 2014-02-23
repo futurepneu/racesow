@@ -714,6 +714,10 @@ enum
 	, STAT_MESSAGE_ALPHA
 	, STAT_MESSAGE_BETA
 
+	// racesow - gametype set hud variables
+	, STAT_START_SPEED
+	// !racesow
+
 	, GS_GAMETYPE_STATS_END = PS_MAX_STATS
 
 	, MAX_STATS = PS_MAX_STATS //64
