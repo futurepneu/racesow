@@ -36,3 +36,5 @@ void RS_AuthNick( gclient_t *client, const char *nick );
 void RS_AuthMap( uint authTime );
 
 void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint time, CScriptArrayInterface *checkpoints );
+void RS_ReportMap( uint playTime, uint races );
+void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races );

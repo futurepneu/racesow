@@ -338,7 +338,6 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 
 /**
  * Get auth data for the current map
- * @param uTime Unix timestamp that the token was generated with
  * @return void
  */
 void RS_AuthMap( uint uTime )
@@ -397,10 +396,76 @@ void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CS
 	rs_sqapi->SetField( query, "playerId", va( "%d", playerId ) );
 	rs_sqapi->SetField( query, "mapId", va( "%d", mapId ) );
 	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
-	rs_sqapi->SetField( query, "unixTime", va( "%d", uTime ) );
+	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
 	rs_sqapi->SetField( query, "stoken", stoken );
 	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
 	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)client );
+	rs_sqapi->Send( query );
+	query = NULL;
+}
+
+/**
+ * Report Map data
+ * @param playTime Time in milliseconds played on the map
+ * @param races Number of races completed on the map
+ * @return void
+ */
+void RS_ReportMap( uint playTime, uint races )
+{
+	stat_query_t *query;
+	char *b64name, stoken[MAX_STRING_CHARS], url[MAX_STRING_CHARS];
+	uint uTime = (uint)time(NULL);
+
+	// Form the url
+	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
+	Q_strncpyz( url, "api/map/", sizeof( url ) - 1 );
+	Q_strncatz( url, b64name, sizeof( url ) - 1 );
+	free( b64name );
+
+	// Sign the request
+	RS_GenToken( stoken, va( "%d", uTime ) );
+
+	// Form the query
+	query = rs_sqapi->CreateQuery( url, qfalse );
+	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
+	rs_sqapi->SetField( query, "races", va( "%d", races ) );
+	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
+	rs_sqapi->SetField( query, "stoken", stoken );
+	rs_sqapi->Send( query );
+	query = NULL;
+}
+
+/**
+ * Report Player data
+ * @param name Auth name of the player to report
+ * @param mapId ID number of the map reporting on
+ * @param playTime
+ * @param races
+ * @param client
+ */
+void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races )
+{
+	stat_query_t *query;
+	char *b64name, stoken[MAX_STRING_CHARS], url[MAX_STRING_CHARS];
+	uint uTime = (uint)time(NULL);
+
+	// Make the URL
+	b64name = (char*)base64_encode( (unsigned char *)name, strlen( name ), NULL );
+	Q_strncpyz( url, "api/player/", sizeof( url ) - 1 );
+	Q_strncatz( url, b64name, sizeof( url ) - 1 );
+	free( b64name );
+
+
+	// Sign the request
+	RS_GenToken( stoken, va( "%d|%d", uTime ) );
+
+	// Form the query
+	query = rs_sqapi->CreateQuery( "api/race", qfalse );
+	rs_sqapi->SetField( query, "mapId", va( "%d", mapId ) );
+	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
+	rs_sqapi->SetField( query, "races", va( "%d", races ) );
+	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
+	rs_sqapi->SetField( query, "stoken", stoken );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
