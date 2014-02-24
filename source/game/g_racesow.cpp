@@ -174,7 +174,7 @@ void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, c
 static const char *RS_GenToken( const char *str )
 {
 	unsigned char digest[SHA256_DIGEST_SIZE];
-	static char token[MAX_STRING_CHARS],
+	char token[MAX_STRING_CHARS],
 		*digest64,
 		*message = va( "%s|%s", str, rs_statsKey->string );
 
