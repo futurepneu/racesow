@@ -315,10 +315,7 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 	asIScriptContext *ctx;
 
 	if( !level.gametype.authMapDone )
-	{
-		G_Printf( "No map callback\n" );
 		return;
-	}
 
 	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
 
@@ -337,22 +334,28 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 
 /**
  * Get auth data for the current map
+ * @param uTime Unix timestamp that the token was generated with
  * @return void
  */
-void RS_AuthMap( uint authTime )
+void RS_AuthMap( uint uTime )
 {
 	stat_query_t *query;
-	char *stoken, *b64name;
+	char *b64name, url[MAX_STRING_CHARS];
 	size_t *outlen;
 
+	// Form the url
 	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), outlen );
-	stoken = (char*)RS_GenToken( va( "%d", authTime ) );
+	Q_strncpyz( url, "api/map/", sizeof( url ) - 1 );
+	Q_strncatz( url, b64name, sizeof( url ) - 1 );
+	free( b64name );
 
-	query = rs_sqapi->CreateQuery(
-		va( "api/map/%s?sid=%d&time=%d&stoken=%s&", b64name, rs_statsId->integer, authTime, stoken ),
-		qtrue );
+	// Form the query
+	query = rs_sqapi->CreateQuery( url, qtrue );
+	rs_sqapi->SetField( query, "sid", rs_statsId->string );
+	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
+	rs_sqapi->SetField( query, "stoken", (char*)RS_GenToken( va( "%d", uTime ) ) );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
-	trap_MM_SendQuery( query );
+	rs_sqapi->Send( query );
 	query = NULL;
 }
 
