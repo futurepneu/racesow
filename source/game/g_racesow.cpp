@@ -184,7 +184,6 @@ static void RS_GenToken( char *token, const char *str )
 	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, &outlen );
 
 	Q_strncpyz( token, digest64, outlen + 1 );
-	G_Printf( "%s %s\n", digest64, token );
 	free( digest64 );
 }
 
