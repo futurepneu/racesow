@@ -258,7 +258,7 @@ void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uin
  * AuthNick callback function
  * @param query Query calling this function
  * @param success True on any response
- * @param customp Extra parameters, should be NULL
+ * @param customp The gclient_t client to nick check
  * @return void
  */
 void RS_AuthNick_Done( stat_query_t *query, qboolean success, void *customp )
@@ -293,13 +293,12 @@ void RS_AuthNick_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_AuthNick( gclient_t *client, const char *nick )
 {
 	stat_query_t *query;
-	char *b64name;
-
-	b64name = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
+	char *b64name = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
 
 	query = rs_sqapi->CreateQuery( va( "api/nick/%s", b64name ), qtrue );
 	rs_sqapi->SetCallback( query, RS_AuthNick_Done, (void*)client );
-	trap_MM_SendQuery( query );
+	rs_sqapi->Send( query );
+	free( b64name );
 	query = NULL;
 }
 
