@@ -1,7 +1,6 @@
 #include "g_as_local.h"
 
 extern cvar_t *rs_statsEnabled;
-extern cvar_t *rs_statsUrl;
 extern cvar_t *rs_grenade_minKnockback;
 extern cvar_t *rs_grenade_maxKnockback;
 extern cvar_t *rs_grenade_splash;

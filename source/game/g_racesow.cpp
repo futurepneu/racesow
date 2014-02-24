@@ -9,7 +9,6 @@
 stat_query_api_t *rs_sqapi;
 
 cvar_t *rs_statsEnabled;
-cvar_t *rs_statsUrl;
 cvar_t *rs_statsId;
 cvar_t *rs_statsKey;
 cvar_t *rs_grenade_minKnockback;
@@ -73,7 +72,6 @@ void RS_Init( void )
 
 	// TODO: Decide what these flags should really be
 	rs_statsEnabled = trap_Cvar_Get( "rs_statsEnabled", "0", CVAR_ARCHIVE );
-	rs_statsUrl = trap_Cvar_Get( "rs_statsUrl", "localhost", CVAR_ARCHIVE );
 	rs_statsId = trap_Cvar_Get( "rs_statsId", "", CVAR_ARCHIVE );
 	rs_statsKey = trap_Cvar_Get( "rs_statsKey", "", CVAR_ARCHIVE );
 	rs_sqapi = trap_GetStatQueryAPI();
@@ -170,18 +168,22 @@ void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, c
 
 /**
  * RS_GenToken
- * Generate the server token for the given salt
+ * Generate the server token for the given string
  * @return The generated token
  */
-const char *RS_GenToken( const char *salt )
+static const char *RS_GenToken( const char *str )
 {
 	unsigned char digest[SHA256_DIGEST_SIZE];
-	size_t *outlen;
-
-	const char *message = va( "%s|%s", salt, rs_statsKey->string );
+	static char token[MAX_STRING_CHARS],
+		*digest64,
+		*message = va( "%s|%s", str, rs_statsKey->string );
 
 	sha256( (const unsigned char*)message, strlen( message ), digest );
-	return (const char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, outlen );
+	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, NULL );
+
+	Q_strncpyz( token, digest64, sizeof( token ) - 1 );
+	free( digest64 );
+	return token;
 }
 
 /**
