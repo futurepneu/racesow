@@ -169,21 +169,23 @@ void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, c
 /**
  * RS_GenToken
  * Generate the server token for the given string
- * @return The generated token
+ * @param token The token string to output to
+ * @param str The message to generate a token for
+ * @return void
  */
-static const char *RS_GenToken( const char *str )
+static void RS_GenToken( char *token, const char *str )
 {
 	unsigned char digest[SHA256_DIGEST_SIZE];
-	char token[MAX_STRING_CHARS],
-		*digest64,
+	char *digest64,
 		*message = va( "%s|%s", str, rs_statsKey->string );
+	size_t outlen;
 
 	sha256( (const unsigned char*)message, strlen( message ), digest );
-	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, NULL );
+	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, &outlen );
 
-	Q_strncpyz( token, digest64, sizeof( token ) - 1 );
+	Q_strncpyz( token, digest64, outlen + 1 );
+	G_Printf( "%s %s\n", digest64, token );
 	free( digest64 );
-	return token;
 }
 
 /**
@@ -230,7 +232,7 @@ void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uint uTime, uint mapId )
 {
 	stat_query_t *query;
-	char url[MAX_STRING_CHARS], *b64name;
+	char url[MAX_STRING_CHARS], *b64name, stoken[MAX_STRING_CHARS];
 
 	if( !name || !strlen( name ) || !ctoken || !strlen( ctoken ) )
 		return;
@@ -241,12 +243,15 @@ void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uin
 	Q_strncatz( url, b64name, sizeof( url ) - 1 );
 	free( b64name );
 
+	// Sign the query
+	RS_GenToken( stoken, va( "%d", uTime ) );
+
 	// Form the query and query parameters
 	query = rs_sqapi->CreateQuery( url, qtrue );
 	rs_sqapi->SetField( query, "sid",  va( "%d", rs_statsId->integer ) );
 	rs_sqapi->SetField( query, "mid",  va( "%d", mapId ) );
 	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "stoken", (char*)RS_GenToken( va( "%d", uTime ) ) );
+	rs_sqapi->SetField( query, "stoken",  stoken );
 	rs_sqapi->SetField( query, "ctoken", ctoken );
 	rs_sqapi->SetCallback( query, RS_AuthPlayer_Done, (void*)client );
 	rs_sqapi->Send( query );
@@ -340,7 +345,7 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_AuthMap( uint uTime )
 {
 	stat_query_t *query;
-	char *b64name, url[MAX_STRING_CHARS];
+	char *b64name, url[MAX_STRING_CHARS], stoken[MAX_STRING_CHARS];
 
 	// Form the url
 	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
@@ -348,11 +353,14 @@ void RS_AuthMap( uint uTime )
 	Q_strncatz( url, b64name, sizeof( url ) - 1 );
 	free( b64name );
 
+	// Sign the query
+	RS_GenToken( stoken, va( "%d", uTime ) );
+
 	// Form the query
 	query = rs_sqapi->CreateQuery( url, qtrue );
 	rs_sqapi->SetField( query, "sid", rs_statsId->string );
 	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "stoken", (char*)RS_GenToken( va( "%d", uTime ) ) );
+	rs_sqapi->SetField( query, "stoken", stoken );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
 	rs_sqapi->Send( query );
 	query = NULL;
@@ -373,28 +381,26 @@ void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CScriptArrayInterface *checkpoints )
 {
 	stat_query_t *query;
-	stat_query_section_t *section;
-	char *stoken;
-	uint numCheckpoints = checkpoints->GetSize();
-	int unixTime = (int)time(NULL);
+	char stoken[MAX_STRING_CHARS];
+	uint numCheckpoints = checkpoints->GetSize(),
+		uTime = (uint)time(NULL);
 
 	// Sign the request
-	stoken = (char*)RS_GenToken( va( "%d|%d", unixTime, rtime ) );
+	RS_GenToken( stoken, va( "%d|%d", uTime, rtime ) );
+
+	// Use cJSON to format the checkpoint array
+	cJSON *arr = cJSON_CreateArray();
+	for( uint i = 0; i < numCheckpoints; i++ )
+		cJSON_AddItemToArray( arr, cJSON_CreateNumber( *((uint*)checkpoints->At( i )) ) );
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( "api/race", qfalse );
 	rs_sqapi->SetField( query, "playerId", va( "%d", playerId ) );
 	rs_sqapi->SetField( query, "mapId", va( "%d", mapId ) );
 	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
-	rs_sqapi->SetField( query, "unixTime", va( "%d", unixTime ) );
+	rs_sqapi->SetField( query, "unixTime", va( "%d", uTime ) );
 	rs_sqapi->SetField( query, "stoken", stoken );
-
-	// Use cJSON to format the checkpoint array
-	cJSON *arr = cJSON_CreateArray();
-	for( uint i = 0; i < numCheckpoints; i++)
-		cJSON_AddItemToArray( arr, cJSON_CreateNumber( *((uint*)checkpoints->At( i )) ) );
 	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
-
 	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)client );
 	rs_sqapi->Send( query );
 	query = NULL;
