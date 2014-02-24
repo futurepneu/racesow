@@ -220,26 +220,36 @@ void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 
 /**
  * Authenticate a player
+ * @param client The client being authenticated
  * @param name The player's auth name
  * @param ctoken The client's signed token
- * @param realTime Time tokens were generated with
+ * @param uTime Unix timestamp tokens were generated with
+ * @param mapId Id number of the map to return playerdata for
  * @return void
  */
-void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uint authTime, uint mapId )
+void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uint uTime, uint mapId )
 {
 	stat_query_t *query;
-	char *stoken, *b64name, *qUrl;
+	char url[MAX_STRING_CHARS], *b64name;
 
 	if( !name || !strlen( name ) || !ctoken || !strlen( ctoken ) )
 		return;
 
+	// Make the URL
 	b64name = (char*)base64_encode( (unsigned char *)name, strlen( name ), NULL );
-	stoken = (char*)RS_GenToken( va( "%d", authTime ) );
-	qUrl = va( "api/player/%s?sid=%d&mid=%d&time=%d&stoken=%s&ctoken=%s&", b64name, rs_statsId->integer, mapId, authTime, stoken, ctoken );
+	Q_strncpyz( url, "api/player/", sizeof( url ) - 1 );
+	Q_strncatz( url, b64name, sizeof( url ) - 1 );
+	free( b64name );
 
-	query = rs_sqapi->CreateQuery( qUrl, qtrue );
+	// Form the query and query parameters
+	query = rs_sqapi->CreateQuery( url, qtrue );
+	rs_sqapi->SetField( query, "sid",  va( "%d", rs_statsId->integer ) );
+	rs_sqapi->SetField( query, "mid",  va( "%d", mapId ) );
+	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
+	rs_sqapi->SetField( query, "stoken", (char*)RS_GenToken( va( "%d", uTime ) ) );
+	rs_sqapi->SetField( query, "ctoken", ctoken );
 	rs_sqapi->SetCallback( query, RS_AuthPlayer_Done, (void*)client );
-	trap_MM_SendQuery( query );
+	rs_sqapi->Send( query );
 	query = NULL;
 }
 
