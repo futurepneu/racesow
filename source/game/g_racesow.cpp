@@ -460,7 +460,7 @@ void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races )
 	RS_GenToken( stoken, va( "%d|%d", uTime ) );
 
 	// Form the query
-	query = rs_sqapi->CreateQuery( "api/race", qfalse );
+	query = rs_sqapi->CreateQuery( url, qfalse );
 	rs_sqapi->SetField( query, "mapId", va( "%d", mapId ) );
 	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
 	rs_sqapi->SetField( query, "races", va( "%d", races ) );
