@@ -341,10 +341,9 @@ void RS_AuthMap( uint uTime )
 {
 	stat_query_t *query;
 	char *b64name, url[MAX_STRING_CHARS];
-	size_t *outlen;
 
 	// Form the url
-	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), outlen );
+	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
 	Q_strncpyz( url, "api/map/", sizeof( url ) - 1 );
 	Q_strncatz( url, b64name, sizeof( url ) - 1 );
 	free( b64name );
