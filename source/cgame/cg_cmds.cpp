@@ -1039,7 +1039,7 @@ static void CG_Cmd_RSLogin_f( void )
 {
 	if( trap_Cmd_Argc() != 3 )
 	{
-		CG_Printf( "Usage: rs_login <user> <pass>\n" );
+		CG_Printf( "Usage: login <user> <pass>\n" );
 		return;
 	}
 
@@ -1085,7 +1085,7 @@ static const cgcmd_t cgcmds[] =
 	{ "weapprev", CG_Cmd_PrevWeapon_f, true },
 	{ "weaplast", CG_Cmd_LastWeapon_f, true },
 	{ "viewpos", CG_Viewpos_f, true },
-	{ "rs_login", CG_Cmd_RSLogin_f, true }, //racesow
+	{ "login", CG_Cmd_RSLogin_f, true }, //racesow
 	{ "players", NULL, false },
 	{ "spectators", NULL, false },
 
