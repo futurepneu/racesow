@@ -2930,6 +2930,11 @@ static bool asFunc_RS_RenameClient( gclient_t *client, asstring_t *name )
 	return false;
 }
 
+static uint asFunc_RS_GetTime()
+{
+	return (uint)time(NULL);
+}
+
 static void asFunc_RS_AuthPlayer( gclient_t *client, asstring_t *name, asstring_t *ctoken, uint authTime, uint mapId )
 {
 	RS_AuthPlayer( client, name->buffer, ctoken->buffer, authTime, mapId );
@@ -3325,6 +3330,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "bool RS_QueryPjState( int playerNum )", asFUNCTION(asFunc_RS_QueryPjState), NULL },
 	{ "bool RS_ResetPjState( int playerNum )", asFUNCTION(asFunc_RS_ResetPjState), NULL },
 	{ "bool RS_RenameClient( Client @client, const String &name )", asFUNCTION(asFunc_RS_RenameClient), NULL },
+	{ "uint RS_GetTime()", asFUNCTION(asFunc_RS_GetTime), NULL },
 	{ "void RS_AuthPlayer( Client @client, const String &name, const String &ctoken, uint authTime, uint mapId )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
 	{ "void RS_AuthNick( Client @client, const String &nick )", asFUNCTION(asFunc_RS_AuthNick), NULL },
 	{ "void RS_AuthMap( uint authTime )", asFUNCTION(asFunc_RS_AuthMap), NULL },
