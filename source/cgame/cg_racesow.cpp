@@ -16,7 +16,7 @@ cvar_t *rs_authToken;
 void RS_CG_Init( void )
 {
 	rs_authMessage = trap_Cvar_Get( "rs_authMessage", "", CVAR_READONLY );
-	rs_authUser = trap_Cvar_Get( "rs_authUser", "", CVAR_READONLY | CVAR_USERINFO );
+	rs_authUser = trap_Cvar_Get( "rs_authUser", "", CVAR_ARCHIVE | CVAR_USERINFO );
 	rs_authToken = trap_Cvar_Get( "rs_authToken", "", CVAR_READONLY | CVAR_USERINFO );
 	trap_Cvar_ForceSet( rs_authToken->name, "" );
 	trap_Cvar_ForceSet( rs_authMessage->name, "" );
