@@ -2919,9 +2919,14 @@ static bool asFunc_RS_ResetPjState( int playerNum )
 
 static bool asFunc_RS_RenameClient( gclient_t *client, asstring_t *name )
 {
-	qboolean success = Info_SetValueForKey( client->userinfo, "name", name->buffer );
-	if( success )
+	edict_t *ent = objectGameClient_GetEntity( client );
+
+	if( Info_SetValueForKey( client->userinfo, "name", name->buffer ) && ent )
+	{
+		ClientUserinfoChanged( ent, client->userinfo );
 		return true;
+	}
+
 	return false;
 }
 
