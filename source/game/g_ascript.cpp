@@ -2945,9 +2945,9 @@ static void asFunc_RS_AuthNick( gclient_t *client, asstring_t *nick )
 	RS_AuthNick( client, nick->buffer );
 }
 
-static void asFunc_RS_AuthMap( uint authTime )
+static void asFunc_RS_AuthMap()
 {
-	RS_AuthMap( authTime );
+	RS_AuthMap();
 }
 
 static void asFunc_RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint time, CScriptArrayInterface *checkpoints )
@@ -3333,7 +3333,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "uint RS_GetTime()", asFUNCTION(asFunc_RS_GetTime), NULL },
 	{ "void RS_AuthPlayer( Client @client, const String &name, const String &ctoken, uint authTime, uint mapId )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
 	{ "void RS_AuthNick( Client @client, const String &nick )", asFUNCTION(asFunc_RS_AuthNick), NULL },
-	{ "void RS_AuthMap( uint authTime )", asFUNCTION(asFunc_RS_AuthMap), NULL },
+	{ "void RS_AuthMap()", asFUNCTION(asFunc_RS_AuthMap), NULL },
 	{ "void RS_ReportRace( Client @client, uint playerId, uint mapId, uint time, array<uint> @checkpoints )", asFUNCTION(asFunc_RS_ReportRace), NULL },
 	{ "void RS_ReportMap( uint playTime, uint races )", asFUNCTION(asFunc_RS_ReportMap), NULL },
 	{ "void RS_ReportPlayer( const String &name, uint mapId, uint playTime, uint races )", asFUNCTION(asFunc_RS_ReportPlayer), NULL },

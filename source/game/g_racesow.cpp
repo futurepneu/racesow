@@ -1,4 +1,3 @@
-#include <ctime>
 #include "g_local.h"
 #include "g_as_local.h"
 #include "../qcommon/cjson.h"
@@ -340,10 +339,11 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
  * Get auth data for the current map
  * @return void
  */
-void RS_AuthMap( uint uTime )
+void RS_AuthMap()
 {
 	stat_query_t *query;
 	char *b64name, url[MAX_STRING_CHARS], stoken[MAX_STRING_CHARS];
+	uint uTime = (uint)time( NULL );
 
 	// Form the url
 	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
