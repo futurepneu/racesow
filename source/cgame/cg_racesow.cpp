@@ -4,6 +4,7 @@
 
 #define RS_HASH_ITERATIONS 100000
 
+cvar_t *rs_authMessage;
 cvar_t *rs_authUser;
 cvar_t *rs_authToken;
 
@@ -14,9 +15,11 @@ cvar_t *rs_authToken;
  */
 void RS_CG_Init( void )
 {
-	rs_authUser = trap_Cvar_Get( "rs_authUser", "", CVAR_ARCHIVE | CVAR_USERINFO );
+	rs_authMessage = trap_Cvar_Get( "rs_authMessage", "", CVAR_READONLY );
+	rs_authUser = trap_Cvar_Get( "rs_authUser", "", CVAR_READONLY | CVAR_USERINFO );
 	rs_authToken = trap_Cvar_Get( "rs_authToken", "", CVAR_READONLY | CVAR_USERINFO );
 	trap_Cvar_ForceSet( rs_authToken->name, "" );
+	trap_Cvar_ForceSet( rs_authMessage->name, "" );
 }
 
 /**
@@ -113,6 +116,10 @@ void RS_CG_Login( const char *user, const char *pass )
 
 	trap_Cvar_ForceSet( rs_authUser->name, user );
 	RS_PasswordWrite( pass );
+
+	// Regenerate the token
+	if( strlen( rs_authMessage->string ) )
+		RS_CG_GenToken( rs_authMessage->string );
 }
 
 /**
@@ -125,6 +132,9 @@ void RS_CG_GenToken( const char *salt )
 	static char message[MAX_STRING_CHARS];
 	unsigned char digest[SHA256_DIGEST_SIZE];
 	char *token, *password;
+
+	// Save the server message for future login attempts
+	trap_Cvar_ForceSet( rs_authMessage->name, salt );
 
 	password = (char*)RS_PasswordRead();
 	if( !password || !strlen( rs_authUser->string ) )
