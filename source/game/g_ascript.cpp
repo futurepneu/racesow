@@ -2563,6 +2563,30 @@ static asstring_t *objectJson_getString( cJSON *self )
 	return angelExport->asStringFactoryBuffer( self->valuestring, self->valuestring ? strlen(self->valuestring) : 0 );
 }
 
+static int objectJson_getSize( cJSON *self )
+{
+	if( self->type != cJSON_Object && self->type != cJSON_Array )
+		return 0;
+
+	return cJSON_GetArraySize( self );
+}
+
+static cJSON *objectJson_getObjectItem( asstring_t *name, cJSON *self )
+{
+	if( self->type != cJSON_Object )
+		return NULL;
+
+	return cJSON_GetObjectItem( self, name->buffer );
+}
+
+static cJSON *objectJson_getArrayItem( int index, cJSON *self )
+{
+	if( self->type != cJSON_Array )
+		return NULL;
+
+	return cJSON_GetArrayItem( self, index );
+}
+
 static const asFuncdef_t json_Funcdefs[] =
 {
 	ASLIB_FUNCDEF_NULL
@@ -2577,6 +2601,9 @@ static const asMethod_t json_Methods[] =
 {
 	{ ASLIB_FUNCTION_DECL(const String @, getName, () const), asFUNCTION(objectJson_getName), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(const String @, getString, () const), asFUNCTION(objectJson_getString), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(int, getSize, ()), asFUNCTION(objectJson_getSize), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(Json @, getItem, (const String &name)), asFUNCTION(objectJson_getObjectItem), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(Json @, getItem, (int index)), asFUNCTION(objectJson_getArrayItem), asCALL_CDECL_OBJLAST },
 
 	ASLIB_METHOD_NULL
 };
