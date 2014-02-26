@@ -143,6 +143,14 @@ void RS_CG_GenToken( const char *salt )
 		return;
 	}
 
+	// Special case for register
+	// put the hashed pass directly in authToken
+	if( !strcmp( salt, "REGISTER" ) )
+	{
+		trap_Cvar_ForceSet( rs_authToken->name, password );
+		return;
+	}
+
 	Q_strncpyz( message, va( "%s|", salt ), sizeof( message ) - 1 );
 	Q_strncatz( message, password, sizeof( message ) - 1 );
 

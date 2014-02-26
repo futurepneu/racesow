@@ -496,7 +496,7 @@ static bool G_asInitializeGametypeScript( asIScriptModule *asModule )
 
 	// racesow
 	fdeclstr = "void RS_AuthRegister_Done( int status, Client @client, Json @data )";
-	level.gametype.authMapDone = asModule->GetFunctionByDecl( fdeclstr );
+	level.gametype.authRegisterDone = asModule->GetFunctionByDecl( fdeclstr );
 	if( !level.gametype.authRegisterDone )
 	{
 		if( developer->integer || sv_cheats->integer )
