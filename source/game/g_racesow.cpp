@@ -168,7 +168,7 @@ void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, c
 /**
  * RS_GenToken
  * Generate the server token for the given string
- * @param token The token string to output to
+ * @param dst The token string to append to
  * @param str The message to generate a token for
  * @return void
  */
@@ -182,8 +182,28 @@ static void RS_GenToken( char *token, const char *str )
 	sha256( (const unsigned char*)message, strlen( message ), digest );
 	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, &outlen );
 
-	Q_strncpyz( token, digest64, outlen + 1 );
+	Q_strncatz( token, digest64, MAX_STRING_CHARS );
 	free( digest64 );
+}
+
+/**
+ * Sign a query with the generated server token
+ * @param query The query to sign
+ * @param uTime The time to sign the query with
+ */
+static void RS_SignQuery( stat_query_t *query, uint uTime )
+{
+	char *token;
+
+	token = (char*)G_Malloc( MAX_STRING_CHARS );
+	Q_strncpyz( token, rs_statsId->string, sizeof( token ) );
+	Q_strncatz( token, ".", sizeof( token ) );
+	RS_GenToken( token, va( "%d", uTime ) );
+
+	rs_sqapi->SetField( query, "sid", rs_statsId->string );
+	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
+	rs_sqapi->SetField( query, "sToken", token );
+	G_Free( token );
 }
 
 /**
@@ -230,7 +250,7 @@ void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uint uTime, uint mapId )
 {
 	stat_query_t *query;
-	char url[MAX_STRING_CHARS], *b64name, stoken[MAX_STRING_CHARS];
+	char url[MAX_STRING_CHARS], *b64name;
 
 	if( !name || !strlen( name ) || !ctoken || !strlen( ctoken ) )
 		return;
@@ -241,16 +261,12 @@ void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uin
 	Q_strncatz( url, b64name, sizeof( url ) - 1 );
 	free( b64name );
 
-	// Sign the query
-	RS_GenToken( stoken, va( "%d", uTime ) );
-
 	// Form the query and query parameters
 	query = rs_sqapi->CreateQuery( url, qtrue );
-	rs_sqapi->SetField( query, "sid",  va( "%d", rs_statsId->integer ) );
 	rs_sqapi->SetField( query, "mid",  va( "%d", mapId ) );
-	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "stoken",  stoken );
 	rs_sqapi->SetField( query, "ctoken", ctoken );
+
+	RS_SignQuery( query, uTime );
 	rs_sqapi->SetCallback( query, RS_AuthPlayer_Done, (void*)client );
 	rs_sqapi->Send( query );
 	query = NULL;
@@ -299,9 +315,11 @@ void RS_AuthNick( gclient_t *client, const char *nick )
 	char *b64name = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
 
 	query = rs_sqapi->CreateQuery( va( "api/nick/%s", b64name ), qtrue );
+	free( b64name );
+
+	RS_SignQuery( query, (uint)time( NULL ) );
 	rs_sqapi->SetCallback( query, RS_AuthNick_Done, (void*)client );
 	rs_sqapi->Send( query );
-	free( b64name );
 	query = NULL;
 }
 
@@ -342,8 +360,7 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_AuthMap()
 {
 	stat_query_t *query;
-	char *b64name, url[MAX_STRING_CHARS], stoken[MAX_STRING_CHARS];
-	uint uTime = (uint)time( NULL );
+	char *b64name, url[MAX_STRING_CHARS];
 
 	// Form the url
 	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
@@ -351,15 +368,11 @@ void RS_AuthMap()
 	Q_strncatz( url, b64name, sizeof( url ) - 1 );
 	free( b64name );
 
-	// Sign the query
-	RS_GenToken( stoken, va( "%d", uTime ) );
-
 	// Form the query
 	query = rs_sqapi->CreateQuery( url, qtrue );
-	rs_sqapi->SetField( query, "sid", rs_statsId->string );
-	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "stoken", stoken );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
+
+	RS_SignQuery( query, (uint)time( NULL ) );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -379,12 +392,7 @@ void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CScriptArrayInterface *checkpoints )
 {
 	stat_query_t *query;
-	char stoken[MAX_STRING_CHARS];
-	uint numCheckpoints = checkpoints->GetSize(),
-		uTime = (uint)time(NULL);
-
-	// Sign the request
-	RS_GenToken( stoken, va( "%d|%d", uTime, rtime ) );
+	uint numCheckpoints = checkpoints->GetSize();
 
 	// Use cJSON to format the checkpoint array
 	cJSON *arr = cJSON_CreateArray();
@@ -393,12 +401,12 @@ void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CS
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( "api/race", qfalse );
-	rs_sqapi->SetField( query, "playerId", va( "%d", playerId ) );
-	rs_sqapi->SetField( query, "mapId", va( "%d", mapId ) );
+	rs_sqapi->SetField( query, "pid", va( "%d", playerId ) );
+	rs_sqapi->SetField( query, "mid", va( "%d", mapId ) );
 	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
-	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "stoken", stoken );
 	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
+
+	RS_SignQuery( query, (uint)time( NULL ) );
 	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)client );
 	rs_sqapi->Send( query );
 	query = NULL;
@@ -413,8 +421,7 @@ void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CS
 void RS_ReportMap( uint playTime, uint races )
 {
 	stat_query_t *query;
-	char *b64name, stoken[MAX_STRING_CHARS], url[MAX_STRING_CHARS];
-	uint uTime = (uint)time(NULL);
+	char *b64name, url[MAX_STRING_CHARS];
 
 	// Form the url
 	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
@@ -422,15 +429,12 @@ void RS_ReportMap( uint playTime, uint races )
 	Q_strncatz( url, b64name, sizeof( url ) - 1 );
 	free( b64name );
 
-	// Sign the request
-	RS_GenToken( stoken, va( "%d", uTime ) );
-
 	// Form the query
 	query = rs_sqapi->CreateQuery( url, qfalse );
 	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
 	rs_sqapi->SetField( query, "races", va( "%d", races ) );
-	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "stoken", stoken );
+
+	RS_SignQuery( query, (uint)time( NULL ) );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -446,8 +450,7 @@ void RS_ReportMap( uint playTime, uint races )
 void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races )
 {
 	stat_query_t *query;
-	char *b64name, stoken[MAX_STRING_CHARS], url[MAX_STRING_CHARS];
-	uint uTime = (uint)time(NULL);
+	char *b64name, url[MAX_STRING_CHARS];
 
 	// Make the URL
 	b64name = (char*)base64_encode( (unsigned char *)name, strlen( name ), NULL );
@@ -455,17 +458,13 @@ void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races )
 	Q_strncatz( url, b64name, sizeof( url ) - 1 );
 	free( b64name );
 
-
-	// Sign the request
-	RS_GenToken( stoken, va( "%d|%d", uTime ) );
-
 	// Form the query
 	query = rs_sqapi->CreateQuery( url, qfalse );
-	rs_sqapi->SetField( query, "mapId", va( "%d", mapId ) );
+	rs_sqapi->SetField( query, "mid", va( "%d", mapId ) );
 	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
 	rs_sqapi->SetField( query, "races", va( "%d", races ) );
-	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "stoken", stoken );
+
+	RS_SignQuery( query, (uint)time( NULL ) );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
