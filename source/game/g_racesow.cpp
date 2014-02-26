@@ -450,7 +450,33 @@ void RS_AuthMap()
  */
 void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	G_Printf( "ReportRace Done\n" );
+	int error;
+	gclient_t *client = (gclient_t *)customp;
+	asIScriptContext *ctx;
+
+	if( !level.gametype.reportRaceDone )
+	{
+		G_Printf( "Report Race Done NotExist\n" );
+		return;
+	}
+
+	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
+
+	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.reportRaceDone) );
+	if( error < 0 )
+	{
+		G_Printf( "Report Race Error: %d\n", error );
+		return;
+	}
+
+	// Set the parameters
+	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
+	ctx->SetArgObject( 1, client );
+	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
+
+	error = ctx->Execute();
+	if( G_ExecutionErrorReport( error ) )
+		GT_asShutdownScript();
 }
 
 /**

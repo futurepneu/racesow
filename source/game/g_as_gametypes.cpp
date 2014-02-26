@@ -534,6 +534,16 @@ static bool G_asInitializeGametypeScript( asIScriptModule *asModule )
 	}
 	else
 		funcCount++;
+
+	fdeclstr = "void RS_ReportRace_Done( int status, Client @client, Json @data )";
+	level.gametype.reportRaceDone = asModule->GetFunctionByDecl( fdeclstr );
+	if( !level.gametype.reportRaceDone )
+	{
+		if( developer->integer || sv_cheats->integer )
+			G_Printf( "* The function '%s' was not present in the script.\n", fdeclstr );
+	}
+	else
+		funcCount++;
 	// !racesow
 
 	//
