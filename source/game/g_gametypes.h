@@ -169,6 +169,7 @@ typedef struct
 	bool mmCompatible;
 
 	// racesow
+	void *authRegisterDone;
 	void *authPlayerDone;
 	void *authNickDone;
 	void *authMapDone;

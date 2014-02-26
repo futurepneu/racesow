@@ -31,6 +31,7 @@ void RS_Shutdown( void );
 void RS_removeProjectiles( edict_t *owner );
 void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, const vec3_t point, float maxradius, vec3_t pushdir, float *kickFrac, float *dmgFrac );
 
+void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *nick );
 void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uint authTime, uint mapId );
 void RS_AuthNick( gclient_t *client, const char *nick );
 void RS_AuthMap();

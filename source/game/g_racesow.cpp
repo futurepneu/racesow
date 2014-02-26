@@ -213,6 +213,73 @@ static void RS_SignQuery( stat_query_t *query, uint uTime )
  * @param customp gclient_t of the client being queried
  * @return void
  */
+void RS_AuthRegister_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	int error;
+	gclient_t *client = (gclient_t *)customp;
+	asIScriptContext *ctx;
+
+	if( !level.gametype.authPlayerDone )
+		return;
+
+	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
+
+	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.authRegisterDone) );
+	if( error < 0 )
+		return;
+
+	// Set the parameters
+	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
+	ctx->SetArgObject( 1, client );
+	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
+
+	error = ctx->Execute();
+	if( G_ExecutionErrorReport( error ) )
+		GT_asShutdownScript();
+}
+
+/**
+ * Register a player
+ * @param client The client being authenticated
+ * @param name The player's auth name
+ * @param pass The player's pre-hashed password
+ * @param nick The player's nick to protect
+ * @return void
+ */
+void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *nick )
+{
+	stat_query_t *query;
+	char url[MAX_STRING_CHARS], *b64name, *b64nick;
+
+	if( !name || !strlen( name ) || !pass || !strlen( pass ) || !nick || !strlen( nick ) )
+		return;
+
+	// Make the URL
+	b64name = (char*)base64_encode( (unsigned char *)name, strlen( name ), NULL );
+	Q_strncpyz( url, "api/player/", sizeof( url ) - 1 );
+	Q_strncatz( url, b64name, sizeof( url ) - 1 );
+	free( b64name );
+
+	// Form the query and query parameters
+	b64nick = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
+	query = rs_sqapi->CreateQuery( url, qfalse );
+	rs_sqapi->SetField( query, "nick", b64nick );
+	rs_sqapi->SetField( query, "cToken", pass );
+
+	RS_SignQuery( query, (uint)time( NULL ) );
+	rs_sqapi->SetCallback( query, RS_AuthRegister_Done, (void*)client );
+	rs_sqapi->Send( query );
+	free( b64nick );
+	query = NULL;
+}
+
+/**
+ * AuthPlayer callback function
+ * @param query Query calling this function
+ * @param success True on any response
+ * @param customp gclient_t of the client being queried
+ * @return void
+ */
 void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 {
 	int error;
