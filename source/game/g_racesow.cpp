@@ -264,7 +264,7 @@ void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uin
 	// Form the query and query parameters
 	query = rs_sqapi->CreateQuery( url, qtrue );
 	rs_sqapi->SetField( query, "mid",  va( "%d", mapId ) );
-	rs_sqapi->SetField( query, "ctoken", ctoken );
+	rs_sqapi->SetField( query, "cToken", ctoken );
 
 	RS_SignQuery( query, uTime );
 	rs_sqapi->SetCallback( query, RS_AuthPlayer_Done, (void*)client );
