@@ -32,12 +32,12 @@ void RS_removeProjectiles( edict_t *owner );
 void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, const vec3_t point, float maxradius, vec3_t pushdir, float *kickFrac, float *dmgFrac );
 
 void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *nick );
-void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uint authTime, uint mapId );
+void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, int authTime, int mapId );
 void RS_AuthNick( gclient_t *client, const char *nick );
 void RS_AuthMap();
 
-void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint time, CScriptArrayInterface *checkpoints );
-void RS_ReportMap( uint playTime, uint races );
-void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races );
+void RS_ReportRace( gclient_t *client, int playerId, int mapId, int time, CScriptArrayInterface *checkpoints );
+void RS_ReportMap( int playTime, int races );
+void RS_ReportPlayer( const char *name, int mapId, int playTime, int races );
 
 void RS_QueryTop( gclient_t *client, const char* mapname, int limit );

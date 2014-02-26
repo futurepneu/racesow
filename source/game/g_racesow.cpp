@@ -191,7 +191,7 @@ static void RS_GenToken( char *token, const char *str )
  * @param query The query to sign
  * @param uTime The time to sign the query with
  */
-static void RS_SignQuery( stat_query_t *query, uint uTime )
+static void RS_SignQuery( stat_query_t *query, int uTime )
 {
 	char *token;
 
@@ -266,7 +266,7 @@ void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, con
 	rs_sqapi->SetField( query, "nick", b64nick );
 	rs_sqapi->SetField( query, "cToken", pass );
 
-	RS_SignQuery( query, (uint)time( NULL ) );
+	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->SetCallback( query, RS_AuthRegister_Done, (void*)client );
 	rs_sqapi->Send( query );
 	free( b64nick );
@@ -314,7 +314,7 @@ void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
  * @param mapId Id number of the map to return playerdata for
  * @return void
  */
-void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, uint uTime, uint mapId )
+void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, int uTime, int mapId )
 {
 	stat_query_t *query;
 	char url[MAX_STRING_CHARS], *b64name;
@@ -384,7 +384,7 @@ void RS_AuthNick( gclient_t *client, const char *nick )
 	query = rs_sqapi->CreateQuery( va( "api/nick/%s", b64name ), qtrue );
 	free( b64name );
 
-	RS_SignQuery( query, (uint)time( NULL ) );
+	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->SetCallback( query, RS_AuthNick_Done, (void*)client );
 	rs_sqapi->Send( query );
 	query = NULL;
@@ -439,7 +439,7 @@ void RS_AuthMap()
 	query = rs_sqapi->CreateQuery( url, qtrue );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
 
-	RS_SignQuery( query, (uint)time( NULL ) );
+	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -476,15 +476,15 @@ void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 /**
  * Report Race data
  */
-void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CScriptArrayInterface *checkpoints )
+void RS_ReportRace( gclient_t *client, int playerId, int mapId, int rtime, CScriptArrayInterface *checkpoints )
 {
 	stat_query_t *query;
-	uint numCheckpoints = checkpoints->GetSize();
+	int numCheckpoints = checkpoints->GetSize();
 
 	// Use cJSON to format the checkpoint array
 	cJSON *arr = cJSON_CreateArray();
-	for( uint i = 0; i < numCheckpoints; i++ )
-		cJSON_AddItemToArray( arr, cJSON_CreateNumber( *((uint*)checkpoints->At( i )) ) );
+	for( int i = 0; i < numCheckpoints; i++ )
+		cJSON_AddItemToArray( arr, cJSON_CreateNumber( *((int*)checkpoints->At( i )) ) );
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( "api/race/", qfalse );
@@ -493,7 +493,7 @@ void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CS
 	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
 	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
 
-	RS_SignQuery( query, (uint)time( NULL ) );
+	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)client );
 	rs_sqapi->Send( query );
 	query = NULL;
@@ -505,7 +505,7 @@ void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CS
  * @param races Number of races completed on the map
  * @return void
  */
-void RS_ReportMap( uint playTime, uint races )
+void RS_ReportMap( int playTime, int races )
 {
 	stat_query_t *query;
 	char *b64name, url[MAX_STRING_CHARS];
@@ -521,7 +521,7 @@ void RS_ReportMap( uint playTime, uint races )
 	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
 	rs_sqapi->SetField( query, "races", va( "%d", races ) );
 
-	RS_SignQuery( query, (uint)time( NULL ) );
+	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -534,7 +534,7 @@ void RS_ReportMap( uint playTime, uint races )
  * @param races
  * @param client
  */
-void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races )
+void RS_ReportPlayer( const char *name, int mapId, int playTime, int races )
 {
 	stat_query_t *query;
 	char *b64name, url[MAX_STRING_CHARS];
@@ -551,7 +551,7 @@ void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races )
 	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
 	rs_sqapi->SetField( query, "races", va( "%d", races ) );
 
-	RS_SignQuery( query, (uint)time( NULL ) );
+	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -596,7 +596,7 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
 	rs_sqapi->SetField( query, "map", b64name );
 	rs_sqapi->SetField( query, "limit", va( "%d", limit ) );
 
-	RS_SignQuery( query, (uint)time( NULL ) );
+	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->SetCallback( query, RS_QueryTop_Done, (void*)client );
 	rs_sqapi->Send( query );
 	free( b64name );

@@ -2957,9 +2957,9 @@ static bool asFunc_RS_RenameClient( gclient_t *client, asstring_t *name )
 	return false;
 }
 
-static uint asFunc_RS_GetTime()
+static unsigned int asFunc_RS_GetTime()
 {
-	return (uint)time(NULL);
+	return (unsigned int)time(NULL);
 }
 
 static void asFunc_RS_AuthRegister( gclient_t *client, asstring_t *name, asstring_t *pass, asstring_t *nick )
@@ -2967,7 +2967,7 @@ static void asFunc_RS_AuthRegister( gclient_t *client, asstring_t *name, asstrin
 	RS_AuthRegister( client, name->buffer, pass->buffer, nick->buffer );
 }
 
-static void asFunc_RS_AuthPlayer( gclient_t *client, asstring_t *name, asstring_t *ctoken, uint authTime, uint mapId )
+static void asFunc_RS_AuthPlayer( gclient_t *client, asstring_t *name, asstring_t *ctoken, int authTime, int mapId )
 {
 	RS_AuthPlayer( client, name->buffer, ctoken->buffer, authTime, mapId );
 }
@@ -2982,17 +2982,17 @@ static void asFunc_RS_AuthMap()
 	RS_AuthMap();
 }
 
-static void asFunc_RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint time, CScriptArrayInterface *checkpoints )
+static void asFunc_RS_ReportRace( gclient_t *client, int playerId, int mapId, int time, CScriptArrayInterface *checkpoints )
 {
 	RS_ReportRace( client, playerId, mapId, time, checkpoints );
 }
 
-static void asFunc_RS_ReportMap( uint playTime, uint races )
+static void asFunc_RS_ReportMap( int playTime, int races )
 {
 	RS_ReportMap( playTime, races );
 }
 
-static void asFunc_RS_ReportPlayer( asstring_t *name, uint mapId, uint playTime, uint races )
+static void asFunc_RS_ReportPlayer( asstring_t *name, int mapId, int playTime, int races )
 {
 	RS_ReportPlayer( name->buffer, mapId, playTime, races );
 }
@@ -3372,12 +3372,12 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "bool RS_RenameClient( Client @client, const String &name )", asFUNCTION(asFunc_RS_RenameClient), NULL },
 	{ "uint RS_GetTime()", asFUNCTION(asFunc_RS_GetTime), NULL },
 	{ "void RS_AuthRegister( Client @client, const String &name, const String &pass, const String &nick )", asFUNCTION(asFunc_RS_AuthRegister), NULL },
-	{ "void RS_AuthPlayer( Client @client, const String &name, const String &ctoken, uint authTime, uint mapId )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
+	{ "void RS_AuthPlayer( Client @client, const String &name, const String &ctoken, int authTime, int mapId )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
 	{ "void RS_AuthNick( Client @client, const String &nick )", asFUNCTION(asFunc_RS_AuthNick), NULL },
 	{ "void RS_AuthMap()", asFUNCTION(asFunc_RS_AuthMap), NULL },
-	{ "void RS_ReportRace( Client @client, uint playerId, uint mapId, uint time, array<uint> @checkpoints )", asFUNCTION(asFunc_RS_ReportRace), NULL },
-	{ "void RS_ReportMap( uint playTime, uint races )", asFUNCTION(asFunc_RS_ReportMap), NULL },
-	{ "void RS_ReportPlayer( const String &name, uint mapId, uint playTime, uint races )", asFUNCTION(asFunc_RS_ReportPlayer), NULL },
+	{ "void RS_ReportRace( Client @client, int playerId, int mapId, int time, array<int> @checkpoints )", asFUNCTION(asFunc_RS_ReportRace), NULL },
+	{ "void RS_ReportMap( int playTime, int races )", asFUNCTION(asFunc_RS_ReportMap), NULL },
+	{ "void RS_ReportPlayer( const String &name, int mapId, int playTime, int races )", asFUNCTION(asFunc_RS_ReportPlayer), NULL },
 	{ "void RS_QueryTop( Client @client, String @mapname, int limit )", asFUNCTION(asFunc_RS_QueryTop), NULL },
 	// !racesow
 
