@@ -455,19 +455,13 @@ void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 	asIScriptContext *ctx;
 
 	if( !level.gametype.reportRaceDone )
-	{
-		G_Printf( "Report Race Done NotExist\n" );
 		return;
-	}
 
 	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
 
 	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.reportRaceDone) );
 	if( error < 0 )
-	{
-		G_Printf( "Report Race Error: %d\n", error );
 		return;
-	}
 
 	// Set the parameters
 	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
@@ -493,7 +487,7 @@ void RS_ReportRace( gclient_t *client, uint playerId, uint mapId, uint rtime, CS
 		cJSON_AddItemToArray( arr, cJSON_CreateNumber( *((uint*)checkpoints->At( i )) ) );
 
 	// Form the query
-	query = rs_sqapi->CreateQuery( "api/race", qfalse );
+	query = rs_sqapi->CreateQuery( "api/race/", qfalse );
 	rs_sqapi->SetField( query, "pid", va( "%d", playerId ) );
 	rs_sqapi->SetField( query, "mid", va( "%d", mapId ) );
 	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
@@ -559,5 +553,52 @@ void RS_ReportPlayer( const char *name, uint mapId, uint playTime, uint races )
 
 	RS_SignQuery( query, (uint)time( NULL ) );
 	rs_sqapi->Send( query );
+	query = NULL;
+}
+
+/**
+ * Callback for top
+ * @return void
+ */
+void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	int error;
+	gclient_t *client = (gclient_t *)customp;
+	asIScriptContext *ctx;
+
+	if( !level.gametype.queryTopDone )
+		return;
+
+	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
+
+	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.queryTopDone) );
+	if( error < 0 )
+		return;
+
+	// Set the parameters
+	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
+	ctx->SetArgObject( 1, client );
+	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
+
+	error = ctx->Execute();
+	if( G_ExecutionErrorReport( error ) )
+		GT_asShutdownScript();
+}
+
+
+void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
+{
+	stat_query_t *query;
+	char *b64name = (char*)base64_encode( (unsigned char *)mapname, strlen( mapname ), NULL );
+
+	// Form the query
+	query = rs_sqapi->CreateQuery( "api/race/", qtrue );
+	rs_sqapi->SetField( query, "map", b64name );
+	rs_sqapi->SetField( query, "limit", va( "%d", limit ) );
+
+	RS_SignQuery( query, (uint)time( NULL ) );
+	rs_sqapi->SetCallback( query, RS_QueryTop_Done, (void*)client );
+	rs_sqapi->Send( query );
+	free( b64name );
 	query = NULL;
 }

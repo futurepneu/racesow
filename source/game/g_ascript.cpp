@@ -2996,6 +2996,14 @@ static void asFunc_RS_ReportPlayer( asstring_t *name, uint mapId, uint playTime,
 {
 	RS_ReportPlayer( name->buffer, mapId, playTime, races );
 }
+
+static void asFunc_RS_QueryTop( gclient_t *client, asstring_t *mapname, int limit )
+{
+	if( !mapname )
+		RS_QueryTop( client, level.mapname, limit );
+	else
+		RS_QueryTop( client, mapname->buffer, limit );
+}
 // !racesow
 
 static int asFunc_FileLength( asstring_t *path )
@@ -3370,6 +3378,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "void RS_ReportRace( Client @client, uint playerId, uint mapId, uint time, array<uint> @checkpoints )", asFUNCTION(asFunc_RS_ReportRace), NULL },
 	{ "void RS_ReportMap( uint playTime, uint races )", asFUNCTION(asFunc_RS_ReportMap), NULL },
 	{ "void RS_ReportPlayer( const String &name, uint mapId, uint playTime, uint races )", asFUNCTION(asFunc_RS_ReportPlayer), NULL },
+	{ "void RS_QueryTop( Client @client, String @mapname, int limit )", asFUNCTION(asFunc_RS_QueryTop), NULL },
 	// !racesow
 
 	{ "Entity @G_SpawnEntity( const String &in )", asFUNCTION(asFunc_G_Spawn), NULL },
