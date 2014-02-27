@@ -654,6 +654,11 @@ static const reference_numeric_t cg_numeric_references[] =
 	{ "CP13", CG_GetRaceVars, (void *)cp13 },
 	{ "CP14", CG_GetRaceVars, (void *)cp14 },
 	{ "CP15", CG_GetRaceVars, (void *)cp15 },
+
+	// gametype set variables
+	{ "START_SPEED", CG_GetRaceStatValue, (void *)STAT_START_SPEED },
+	{ "RACE_STATE", CG_GetRaceStatValue, (void *)STAT_RACE_STATE },
+	{ "PREJUMP_STATE", CG_GetRaceStatValue, (void *)STAT_PREJUMP_STATE },
 	// !racesow
 
 	// cvars
