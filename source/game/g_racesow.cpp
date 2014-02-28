@@ -157,8 +157,9 @@ void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, c
 
 	if( kickFrac )
 	{
-		*kickFrac = 1.0 - fabs( distance / maxradius );
-		clamp( *kickFrac, 0.0f, 1.0f );
+		distance = fabs( distance / maxradius );
+		clamp( distance, 0.0f, 1.0f );
+		*kickFrac = 1.0 - pow( distance, rs_splashfrac->value );
 	}
 
 	VectorSubtract( boxcenter, point, pushdir );
