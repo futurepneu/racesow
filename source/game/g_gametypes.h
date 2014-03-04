@@ -175,6 +175,7 @@ typedef struct
 	void *authMapDone;
 	void *reportRaceDone;
 	void *queryTopDone;
+	void *queryMapsDone;
 
 	bool autoInactivityRemove;
 	bool playerInteraction;

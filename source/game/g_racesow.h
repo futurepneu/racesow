@@ -41,3 +41,4 @@ void RS_ReportMap( int playTime, int races );
 void RS_ReportPlayer( const char *name, int mapId, int playTime, int races );
 
 void RS_QueryTop( gclient_t *client, const char* mapname, int limit );
+void RS_QueryMaps( gclient_t *client, const char* pattern, const char* tags, int page );

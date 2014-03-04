@@ -5,6 +5,8 @@
 #include "../qalgo/base64.h"
 #include "../qalgo/sha2.h"
 
+#define RS_MAPLIST_ITEMS 20
+
 stat_query_api_t *rs_sqapi;
 
 cvar_t *rs_statsEnabled;
@@ -400,6 +402,7 @@ void RS_AuthNick( gclient_t *client, const char *nick )
  */
 void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 {
+	G_Printf( "AuthMap Done\n" );
 	int error;
 	asIScriptContext *ctx;
 
@@ -427,6 +430,7 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
  */
 void RS_AuthMap()
 {
+	G_Printf( "AuthMap\n" );
 	stat_query_t *query;
 	char *b64name, url[MAX_STRING_CHARS];
 
@@ -601,5 +605,64 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
 	rs_sqapi->SetCallback( query, RS_QueryTop_Done, (void*)client );
 	rs_sqapi->Send( query );
 	free( b64name );
+	query = NULL;
+}
+
+void RS_QueryMaps_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	int error;
+	gclient_t *client = (gclient_t *)customp;
+	asIScriptContext *ctx;
+
+	if( !level.gametype.queryMapsDone )
+		return;
+	
+	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
+
+	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.queryMapsDone) );
+	if( error < 0 )
+		return;
+
+	// Set the parameters
+	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
+	ctx->SetArgObject( 1, client );
+	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
+	
+	error = ctx->Execute();
+	if( G_ExecutionErrorReport( error ) )
+		GT_asShutdownScript();
+}
+
+void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int page )
+{
+	stat_query_t *query;
+	char tagset[1024], *token, *b64tags, *b64pattern = (char*)base64_encode( (unsigned char *)pattern, strlen( pattern ), NULL );
+	cJSON *arr = cJSON_CreateArray();
+
+	// Make the taglist
+	Q_strncpyz( tagset, tags, sizeof( tagset ) );
+	token = strtok( tagset, " " );
+	G_Printf( "Tokens: %s\n", tagset );
+	while( token != NULL )
+	{
+		G_Printf( "Token: %s\n", token );
+		// cJSON_AddItemToArray( arr, cJSON_CreateString( token ) );
+		token = strtok( NULL, " " );
+	}
+	token = cJSON_Print( arr );
+	b64tags = (char*)base64_encode( (unsigned char *)token, strlen( token ), NULL );
+
+	// Form the query
+	query = rs_sqapi->CreateQuery( "api/map/", qtrue );
+	rs_sqapi->SetField( query, "pattern", b64pattern );
+	rs_sqapi->SetField( query, "tags", b64tags );
+	rs_sqapi->SetField( query, "start", va( "%d", page * RS_MAPLIST_ITEMS ) );
+	rs_sqapi->SetField( query, "limit", va( "%d", RS_MAPLIST_ITEMS ) );
+
+	RS_SignQuery( query, (int)time( NULL ) );
+	rs_sqapi->SetCallback( query, RS_QueryMaps_Done, (void*)client );
+	rs_sqapi->Send( query );
+	free( b64pattern );
+	free( b64tags );
 	query = NULL;
 }
