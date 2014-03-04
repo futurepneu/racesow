@@ -1648,6 +1648,7 @@ static void CG_FirePlayerStateEvents( void )
 					// auto-switch only works when the user didn't have the just-picked weapon
 					if( !cg.oldFrame.playerState.inventory[parm] )
 					{
+
 						// switch when player's only weapon is gunblade
 						if( cg_weaponAutoSwitch->integer == 2 )
 						{
@@ -1678,6 +1679,13 @@ static void CG_FirePlayerStateEvents( void )
 							if( best < parm )
 								CG_UseItem( va( "%i", parm ) );
 						}
+
+						// racesow - always switch weapons
+						else if( cg_weaponAutoSwitch->integer )
+						{
+							CG_UseItem( va( "%i", parm ) );
+						}
+						// !racesow
 					}
 				}
 			}
