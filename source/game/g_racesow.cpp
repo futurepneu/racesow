@@ -402,7 +402,6 @@ void RS_AuthNick( gclient_t *client, const char *nick )
  */
 void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	G_Printf( "AuthMap Done\n" );
 	int error;
 	asIScriptContext *ctx;
 
@@ -430,7 +429,6 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
  */
 void RS_AuthMap()
 {
-	G_Printf( "AuthMap\n" );
 	stat_query_t *query;
 	char *b64name, url[MAX_STRING_CHARS];
 
@@ -642,15 +640,16 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 	// Make the taglist
 	Q_strncpyz( tagset, tags, sizeof( tagset ) );
 	token = strtok( tagset, " " );
-	G_Printf( "Tokens: %s\n", tagset );
 	while( token != NULL )
 	{
-		G_Printf( "Token: %s\n", token );
-		// cJSON_AddItemToArray( arr, cJSON_CreateString( token ) );
+		cJSON_AddItemToArray( arr, cJSON_CreateString( token ) );
 		token = strtok( NULL, " " );
 	}
 	token = cJSON_Print( arr );
 	b64tags = (char*)base64_encode( (unsigned char *)token, strlen( token ), NULL );
+
+	// which page to display?
+	page = page == 0 ? 0 : page - 1;
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( "api/map/", qtrue );
