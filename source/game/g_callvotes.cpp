@@ -350,6 +350,30 @@ static http_response_code_t G_VoteMapWebRequest( http_query_method_t method, con
 }
 
 
+// racesow
+/*
+* randmap
+*/
+
+static bool G_VoteRandmapValidate( callvotedata_t *vote, bool first )
+{
+	if( first )
+	{
+		vote->data = G_Malloc( MAX_STRING_CHARS );
+		RS_QueryRandmap( vote->argv, &vote->data );
+		return true;
+	}
+
+	return true;
+}
+
+static void G_VoteRandmapPassed( callvotedata_t *vote )
+{
+	Q_strncpyz( level.forcemap, Q_strlwr( (char*)vote->data ), sizeof( level.forcemap ) );
+	G_EndMatch();
+}
+// !racesow
+
 /*
 * restart
 */
@@ -1919,6 +1943,10 @@ static void G_CallVotes_CheckState( void )
 	needvotes = (int)( ( voters * g_callvote_electpercentage->value ) / 100 );
 	if( yeses > needvotes || callvoteState.vote.operatorcall )
 	{
+		// racesow - delay passvote until randmap callback
+		if( !strcmp( callvoteState.vote.callvote->name, "randmap" ) && ( !callvoteState.vote.data || !strlen( (char*)callvoteState.vote.data ) ) )
+			return;
+		// !racesow
 		G_AnnouncerSound( NULL, trap_SoundIndex( va( S_ANNOUNCER_CALLVOTE_PASSED_1_to_2, ( rand()&1 )+1 ) ), GS_MAX_TEAMS, true, NULL );
 		G_PrintMsg( NULL, "Vote %s%s%s passed\n", S_COLOR_YELLOW,
 			G_CallVotes_String( &callvoteState.vote ), S_COLOR_WHITE );
@@ -2711,6 +2739,18 @@ void G_CallVotes_Init( void )
 	callvote->argument_format = G_LevelCopyString( "<1 or 0>" );
 	callvote->argument_type = G_LevelCopyString( "bool" );
 	callvote->help = G_LevelCopyString( "Toggles whether uneven teams is allowed" );
+
+	// racesow
+	callvote = G_RegisterCallvote( "randmap" );
+	callvote->expectedargs = -1;
+	callvote->validate = G_VoteRandmapValidate;
+	callvote->execute = G_VoteRandmapPassed;
+	callvote->current = G_VoteMapCurrent;
+	callvote->extraHelp = NULL;
+	callvote->argument_format = G_LevelCopyString( "<tag>" );
+	callvote->argument_type = G_LevelCopyString( "option" );
+	callvote->help = G_LevelCopyString( "Vote for a random map, optionally with given tags" );
+	// !racesow
 
 	// wsw : pb : server admin can now disable a specific callvote command (g_disable_vote_<callvote name>)
 	for( callvote = callvotesHeadNode; callvote != NULL; callvote = callvote->next )

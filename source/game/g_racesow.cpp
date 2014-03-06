@@ -665,3 +665,68 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 	free( b64tags );
 	query = NULL;
 }
+
+void RS_QueryRandmap_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	char **mapname = (char**)customp;
+	cJSON *data = (cJSON*)rs_sqapi->GetRoot( query );
+
+	// invalid response?
+	if( !data || rs_sqapi->GetStatus( query ) != 200 )
+	{
+		G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
+		G_CallVotes_Reset();
+		return;
+	}
+
+	// Did we get any results?
+	int count = cJSON_GetObjectItem( data, "count" )->valueint;
+	if( !count )
+	{
+		G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
+		G_CallVotes_Reset();
+		return;
+	}
+
+	// copy the mapname
+	cJSON *map = cJSON_GetObjectItem( cJSON_GetObjectItem( data, "maps" )->child, "name" );
+	Q_strncpyz( *mapname, map->valuestring, MAX_STRING_CHARS );
+
+	// do we have the map or is it the current map?
+	if( !trap_ML_FilenameExists( *mapname ) || !Q_stricmp( *mapname, level.mapname ) )
+	{
+		G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
+		G_CallVotes_Reset();
+		return;
+	}
+
+	G_PrintMsg( NULL, "Randmap picked: %s\n", *mapname );
+}
+
+void RS_QueryRandmap( char* tags[], void *data )
+{
+	stat_query_t *query;
+	char *b64tags;
+	cJSON *arr = cJSON_CreateArray();
+
+	// Format the tags
+	while( *tags )
+	{
+		cJSON_AddItemToArray( arr, cJSON_CreateString( *tags++ ) );
+		G_Printf( "%s\n", *tags++ );
+	}
+	b64tags = cJSON_Print( arr );
+	b64tags = (char*)base64_encode( (unsigned char *)b64tags, strlen( b64tags ), NULL );
+
+	// Form the query
+	query = rs_sqapi->CreateQuery( "api/map/", qtrue );
+	rs_sqapi->SetField( query, "pattern", "" );
+	rs_sqapi->SetField( query, "tags", b64tags );
+	rs_sqapi->SetField( query, "rand", "1" );
+	
+	RS_SignQuery( query, (int)time( NULL ) );
+	rs_sqapi->SetCallback( query, RS_QueryRandmap_Done, data );
+	rs_sqapi->Send( query );
+	query = NULL;
+	free( b64tags );
+}
