@@ -4,7 +4,7 @@
 
 #define RS_HASH_ITERATIONS 100000
 
-cvar_t *rs_authMessage;
+cvar_t *rs_authTime;
 cvar_t *rs_authUser;
 cvar_t *rs_authToken;
 
@@ -15,16 +15,15 @@ cvar_t *rs_authToken;
  */
 void RS_CG_Init( void )
 {
-	rs_authMessage = trap_Cvar_Get( "rs_authMessage", "", CVAR_READONLY );
 	rs_authUser = trap_Cvar_Get( "rs_authUser", "", CVAR_ARCHIVE | CVAR_USERINFO );
+	rs_authTime = trap_Cvar_Get( "rs_authTime", "", CVAR_READONLY | CVAR_USERINFO );
 	rs_authToken = trap_Cvar_Get( "rs_authToken", "", CVAR_READONLY | CVAR_USERINFO );
+	trap_Cvar_ForceSet( rs_authTime->name, "" );
 	trap_Cvar_ForceSet( rs_authToken->name, "" );
-	trap_Cvar_ForceSet( rs_authMessage->name, "" );
 }
 
 /**
  * Generate Filename for password file
- * ATM these are taken from mm_common
  * @return Filename of password file
  */
 static const char *RS_PasswordFilename( void )
@@ -49,7 +48,7 @@ static const char *RS_PasswordFilename( void )
  * Read the users hashed password from file
  * @return Users saved and hashed password
  */
-const char *RS_PasswordRead()
+static const char *RS_PasswordRead( void )
 {
 	static char buffer[MAX_STRING_CHARS];
 	const char *filename;
@@ -75,7 +74,7 @@ const char *RS_PasswordRead()
  * Hash the users password and save to a file
  * @param password The users raw password
  */
-void RS_PasswordWrite( const char *password )
+static void RS_PasswordWrite( const char *password )
 {
 	const char *filename;
 	char *hash;
@@ -100,6 +99,45 @@ void RS_PasswordWrite( const char *password )
 }
 
 /**
+ * RS_CG_GenToken
+ * Generate the auth token for the current time / username / password
+ * @return void
+ */
+static void RS_CG_GenToken()
+{
+	static char message[MAX_STRING_CHARS];
+	unsigned char digest[SHA256_DIGEST_SIZE];
+	char *token, *password;
+
+	// Set the login time
+	trap_Cvar_ForceSet( rs_authTime->name, va( "%d", (int)time( NULL ) ) );
+
+	// Read the password
+	password = (char*)RS_PasswordRead();
+	if( !password || !strlen( rs_authUser->string ) )
+		return;
+
+	Q_strncpyz( message, va( "%s|", rs_authTime->string ), sizeof( message ) );
+	Q_strncatz( message, password, sizeof( message ) );
+
+	sha256( (const unsigned char*)message, strlen( message ), digest );
+	token = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, NULL );
+	trap_Cvar_ForceSet( rs_authToken->name, token );
+	free( token );
+}
+
+/**
+ * RS_CG_SLogin
+ * Handler for server login command. Login the user with existing credentials.
+ * @return void
+ */
+void RS_CG_SLogin( void )
+{
+	RS_CG_GenToken();
+	trap_Cmd_ExecuteText( EXEC_NOW, va( "__login \"%s\" \"%s\" \"%s\"", rs_authUser->string, rs_authToken->string, rs_authTime->string ) );
+}
+
+/**
  * RS_CG_Login
  * Save the user name and password
  * @param user Username
@@ -108,54 +146,26 @@ void RS_PasswordWrite( const char *password )
  */
 void RS_CG_Login( const char *user, const char *pass )
 {
-	if( user[0] == '\0' || pass[0] == '\0' )
-	{
-		CG_Printf( "Invalid username or password\n" );
-		return;
-	}
-
 	trap_Cvar_ForceSet( rs_authUser->name, user );
 	RS_PasswordWrite( pass );
+	RS_CG_GenToken();
 
-	// Regenerate the token
-	if( strlen( rs_authMessage->string ) )
-		RS_CG_GenToken( rs_authMessage->string );
+	trap_Cmd_ExecuteText( EXEC_NOW, va( "__login \"%s\" \"%s\" \"%s\"", rs_authUser->string, rs_authToken->string, rs_authTime->string ) );
 }
 
 /**
- * RS_CG_GenToken
- * Generate the auth token for the current salt/user/pass values
+ * RS_CG_Register
+ * Register the given username, password, email
+ * @param user Username
+ * @param pass User's raw password
+ * @param email Email address
  * @return void
  */
-void RS_CG_GenToken( const char *salt )
+void RS_CG_Register( const char *user, const char *pass, const char *email )
 {
-	static char message[MAX_STRING_CHARS];
-	unsigned char digest[SHA256_DIGEST_SIZE];
-	char *token, *password;
+	trap_Cvar_ForceSet( rs_authUser->name, user );
+	RS_PasswordWrite( pass );
+	trap_Cvar_ForceSet( rs_authToken->name, RS_PasswordRead() );
 
-	// Save the server message for future login attempts
-	trap_Cvar_ForceSet( rs_authMessage->name, salt );
-
-	password = (char*)RS_PasswordRead();
-	if( !password || !strlen( rs_authUser->string ) )
-	{
-		trap_Cvar_ForceSet( rs_authToken->name, "" );
-		return;
-	}
-
-	// Special case for register
-	// put the hashed pass directly in authToken
-	if( !strcmp( salt, "REGISTER" ) )
-	{
-		trap_Cvar_ForceSet( rs_authToken->name, password );
-		return;
-	}
-
-	Q_strncpyz( message, va( "%s|", salt ), sizeof( message ) - 1 );
-	Q_strncatz( message, password, sizeof( message ) - 1 );
-
-	sha256( (const unsigned char*)message, strlen( message ), digest );
-	token = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, NULL );
-	trap_Cvar_ForceSet( rs_authToken->name, token );
-	free( token );
+	trap_Cmd_ExecuteText( EXEC_NOW, va( "__register \"%s\" \"%s\" \"%s\"", rs_authUser->string, rs_authToken->string, email ) );
 }

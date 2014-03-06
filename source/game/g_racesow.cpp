@@ -246,15 +246,19 @@ void RS_AuthRegister_Done( stat_query_t *query, qboolean success, void *customp 
  * @param client The client being authenticated
  * @param name The player's auth name
  * @param pass The player's pre-hashed password
+ * @param email The player's email address
  * @param nick The player's nick to protect
  * @return void
  */
-void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *nick )
+void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *email, const char *nick )
 {
 	stat_query_t *query;
-	char url[MAX_STRING_CHARS], *b64name, *b64nick;
+	char url[MAX_STRING_CHARS], *b64name, *b64email, *b64nick;
 
-	if( !name || !strlen( name ) || !pass || !strlen( pass ) || !nick || !strlen( nick ) )
+	if( !name || !strlen( name ) ||
+		!pass || !strlen( pass ) ||
+		!email || !strlen( email ) ||
+		!nick || !strlen( nick ) )
 		return;
 
 	// Make the URL
@@ -265,13 +269,16 @@ void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, con
 
 	// Form the query and query parameters
 	b64nick = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
+	b64email = (char*)base64_encode( (unsigned char *)email, strlen( email ), NULL );
 	query = rs_sqapi->CreateQuery( url, qfalse );
+	rs_sqapi->SetField( query, "email", b64email );
 	rs_sqapi->SetField( query, "nick", b64nick );
 	rs_sqapi->SetField( query, "cToken", pass );
 
 	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->SetCallback( query, RS_AuthRegister_Done, (void*)client );
 	rs_sqapi->Send( query );
+	free( b64email );
 	free( b64nick );
 	query = NULL;
 }

@@ -488,12 +488,9 @@ static void CG_SC_RaceDemoCancel( void )
 	CG_SC_RaceDemo( RS_RACEDEMO_CANCEL, 0 );
 }
 
-static void CG_SC_UpdateToken( void )
+static void CG_SC_RaceLogin( void )
 {
-	if( !trap_Cmd_Argc() )
-		return;
-
-	RS_CG_GenToken( trap_Cmd_Argv( 1 ) );
+	RS_CG_SLogin();
 }
 // !racesow
 
@@ -874,7 +871,7 @@ static const svcmd_t cg_svcmds[] =
 	{ "dstart", CG_SC_RaceDemoStart }, //racesow
 	{ "dstop", CG_SC_RaceDemoStop }, //racesow
 	{ "dcancel", CG_SC_RaceDemoCancel }, //racesow
-	{ "utoken", CG_SC_UpdateToken }, //racesow
+	{ "slogin", CG_SC_RaceLogin }, // racesow
 	{ "cmd", CG_SC_ExecuteText },
 
 	{ NULL }
@@ -1045,6 +1042,17 @@ static void CG_Cmd_RSLogin_f( void )
 
 	RS_CG_Login( trap_Cmd_Argv( 1 ), trap_Cmd_Argv( 2 ) );
 }
+
+static void CG_Cmd_RSRegister_f( void )
+{
+	if( trap_Cmd_Argc() != 4 )
+	{
+		CG_Printf( "Usage: register <user> <pass> <email>\n" );
+		return;
+	}
+
+	RS_CG_Register( trap_Cmd_Argv( 1 ), trap_Cmd_Argv( 2 ), trap_Cmd_Argv( 3 ) );
+}
 // !racesow
 
 // ======================================================================
@@ -1085,7 +1093,8 @@ static const cgcmd_t cgcmds[] =
 	{ "weapprev", CG_Cmd_PrevWeapon_f, true },
 	{ "weaplast", CG_Cmd_LastWeapon_f, true },
 	{ "viewpos", CG_Viewpos_f, true },
-	{ "login", CG_Cmd_RSLogin_f, true }, //racesow
+	{ "login", CG_Cmd_RSLogin_f, false }, // racesow
+	{ "register", CG_Cmd_RSRegister_f, false }, // racesow
 	{ "players", NULL, false },
 	{ "spectators", NULL, false },
 
