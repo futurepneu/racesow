@@ -60,6 +60,7 @@ cvar_t *cg_showPlayerTrails;
 cvar_t *cg_playerTrailsAlpha;
 cvar_t *cg_playerTrailsColor;
 cvar_t *cg_playerTrailsSize;
+cvar_t *rs_raceReport;
 cvar_t *rs_autoRaceDemo;
 cvar_t *rs_autoRaceScreenshot;
 cvar_t *rs_ignoreTeleEffect;
@@ -631,6 +632,7 @@ static void CG_RegisterVariables( void )
 	cg_playerTrailsAlpha = trap_Cvar_Get( "cg_playerTrailsAlpha", "1.0", CVAR_ARCHIVE );
 	cg_playerTrailsColor = trap_Cvar_Get( "cg_playerTrailsColor", "0.0 1.0 0.0", CVAR_ARCHIVE );
 	cg_playerTrailsSize = trap_Cvar_Get( "cg_playerTrailsSize", "1.5", CVAR_ARCHIVE );
+	rs_raceReport = trap_Cvar_Get( "rs_raceReport", "1", CVAR_USERINFO | CVAR_ARCHIVE );
 	rs_autoRaceDemo = trap_Cvar_Get( "rs_autoRaceDemo", "0", CVAR_ARCHIVE );
 	rs_autoRaceScreenshot = trap_Cvar_Get( "rs_autoRaceScreenshot", "0", CVAR_ARCHIVE );
 	rs_ignoreTeleEffect = trap_Cvar_Get( "rs_ignoreTeleEffect", "0", CVAR_ARCHIVE );
