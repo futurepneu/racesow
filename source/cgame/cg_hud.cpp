@@ -1466,7 +1466,7 @@ static bool CG_LFuncDrawTimer( struct cg_layoutnode_s *commandnode, struct cg_la
 	sec = milli/10;
 	milli -= sec*10;
 	// we want MM:SS:m
-	Q_snprintfz( time, sizeof( time ), "%02d:%02d.%1d", min, sec, milli );
+	Q_snprintfz( time, sizeof( time ), "%02d:%02d.%02d", min, sec, milli );
 	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, time, layout_cursor_font, layout_cursor_color );
 	return true;
 }
