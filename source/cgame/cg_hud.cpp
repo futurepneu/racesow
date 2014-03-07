@@ -1461,12 +1461,14 @@ static bool CG_LFuncDrawTimer( struct cg_layoutnode_s *commandnode, struct cg_la
 		return true;
 
 	// stat is in milliseconds/100.0f
-	min = milli/600;
-	milli -= min*600;
-	sec = milli/10;
-	milli -= sec*10;
+	// racesow - milliseconds / 10.0f
+	min = milli/6000;
+	milli -= min*6000;
+	sec = milli/100;
+	milli -= sec*100;
 	// we want MM:SS:m
 	Q_snprintfz( time, sizeof( time ), "%02d:%02d.%02d", min, sec, milli );
+	// !racesow
 	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, time, layout_cursor_font, layout_cursor_color );
 	return true;
 }
