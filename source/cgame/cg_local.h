@@ -1005,6 +1005,7 @@ extern cvar_t *cg_showPlayerTrails;
 extern cvar_t *cg_playerTrailsColor;
 extern cvar_t *cg_playerTrailsAlpha;
 extern cvar_t *cg_playerTrailsSize;
+extern cvar_t *rs_diffref;
 extern cvar_t *rs_raceReport;
 extern cvar_t *rs_autoRaceDemo;
 extern cvar_t *rs_autoRaceScreenshot;
