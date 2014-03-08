@@ -352,6 +352,7 @@ static edict_t *W_Fire_TossProjectile( edict_t *self, vec3_t start, vec3_t angle
 	//projectile->s.modelindex = trap_ModelIndex ("models/objects/projectile/plasmagun/proj_plasmagun2.md3");
 	projectile->s.modelindex = 0;
 	projectile->r.owner = self;
+	projectile->s.ownerNum = ENTNUM( self ); // racesow
 	projectile->touch = W_Touch_Projectile; //generic one. Should be replaced after calling this func
 	projectile->nextThink = level.time + timeout;
 	projectile->think = G_FreeEdict;

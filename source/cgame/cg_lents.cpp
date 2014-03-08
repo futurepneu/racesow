@@ -723,6 +723,11 @@ void CG_NewGrenadeTrail( centity_t *cent )
 			alpha = 1.0f;
 		}
 
+		// racesow
+		if( cg_raceGhosts->integer && (unsigned int)cent->current.ownerNum != cg.predictedPlayerState.POVnum )
+			alpha *= cg_raceGhostsAlpha->value;
+		// !racesow
+
 		clamp( alpha, 0.0f, 1.0f );
 		le = CG_AllocSprite( LE_SCALE_ALPHA_FADE, cent->trailOrigin, radius, 10,
 			1.0f, 1.0f, 1.0f, alpha,
@@ -765,6 +770,11 @@ static void CG_RocketFireTrail( centity_t *cent )
 	if( cent->localEffects[LOCALEFFECT_ROCKETFIRE_LAST_DROP] + trailTime < cg.time )
 	{
 		cent->localEffects[LOCALEFFECT_ROCKETFIRE_LAST_DROP] = cg.time;
+
+		// racesow
+		if( cg_raceGhosts->integer && (unsigned int)cent->current.ownerNum != cg.predictedPlayerState.POVnum )
+			alpha *= cg_raceGhostsAlpha->value;
+		// !racesow
 
 		clamp( alpha, 0.0f, 1.0f );
 		le = CG_AllocSprite( LE_INVERSESCALE_ALPHA_FADE, cent->trailOrigin, radius, 4,
@@ -818,6 +828,11 @@ void CG_NewRocketTrail( centity_t *cent )
 			radius = 3 + crandom();
 			alpha = 1.0f;
 		}
+
+		// racesow
+		if( cg_raceGhosts->integer && (unsigned int)cent->current.ownerNum != cg.predictedPlayerState.POVnum )
+			alpha *= cg_raceGhostsAlpha->value;
+		// !racesow
 
 		clamp( alpha, 0.0f, 1.0f );
 		le = CG_AllocSprite( LE_SCALE_ALPHA_FADE, cent->trailOrigin, radius, 10, 
