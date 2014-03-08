@@ -1147,6 +1147,12 @@ void CG_EntityEvent( entity_state_t *ent, int ev, int parm, bool predicted )
 	if( viewer && ( ev < PREDICTABLE_EVENTS_MAX ) && ( predicted != cg.view.playerPrediction ) )
 		return;
 
+	// racesow
+	if( ev > EV_BLOOD && ev < EV_FREE2 // catch all explosion events
+		&& cg_raceGhosts->integer && (unsigned int)ent->ownerNum != cg.predictedPlayerState.POVnum )
+		return;
+	// !racesow
+
 	switch( ev )
 	{
 	case EV_NONE:
