@@ -1766,6 +1766,8 @@ void Pmove( pmove_t *pmove )
 	// clear all pmove local vars
 	memset( &pml, 0, sizeof( pml ) );
 
+	VectorCopy( pm->playerState->pmove.origin, pm->playerState->pmove.previous_origin ); // racesow
+	VectorCopy( pm->playerState->pmove.velocity, pm->playerState->pmove.previous_velocity ); // racesow
 	VectorCopy( pm->playerState->pmove.origin, pml.origin );
 	VectorCopy( pm->playerState->pmove.velocity, pml.velocity );
 

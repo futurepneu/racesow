@@ -131,6 +131,8 @@ typedef struct
 
 	float origin[3];			// 12.3
 	float velocity[3];			// 12.3
+	float previous_origin[3];	// racesow
+	float previous_velocity[3];	// racesow
 
 	int pm_flags;				// ducked, jump_held, etc
 	int pm_time;				// each unit = 8 ms
