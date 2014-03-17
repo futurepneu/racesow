@@ -258,6 +258,7 @@ qboolean GS_SnapInitialPosition( vec3_t origin, vec3_t mins, vec3_t maxs, int pa
 //==============================================================
 
 #define STEPSIZE 18
+#define WJHEIGHT 9 // racesow
 enum {
 	GS_DEFAULTBUNNY,
 	GS_CLASSICBUNNY,

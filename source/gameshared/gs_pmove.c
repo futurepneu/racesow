@@ -1207,7 +1207,7 @@ static void PM_CheckWallJump( void )
 
 		point[0] = pml.origin[0];
 		point[1] = pml.origin[1];
-		point[2] = pml.origin[2] - STEPSIZE;
+		point[2] = pml.origin[2] - WJHEIGHT;
 
 		// don't walljump if our height is smaller than a step 
 		// unless the player is moving faster than dash speed and upwards
