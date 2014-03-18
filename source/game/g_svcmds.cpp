@@ -369,7 +369,7 @@ void G_AddServerCommands( void )
 	if( dedicated->integer )
 		trap_Cmd_AddCommand( "say", Cmd_ConsoleSay_f );
 	trap_Cmd_AddCommand( "kick", Cmd_ConsoleKick_f );
-	trap_Cmd_AddCommand( "cancelvote", G_Cancelvote_f ); // racesow
+	trap_Cmd_AddCommand( "cancelvote", G_CallVotes_Reset ); // racesow
 
 	// match controls
 	trap_Cmd_AddCommand( "match", Cmd_Match_f );

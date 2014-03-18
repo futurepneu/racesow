@@ -2369,6 +2369,8 @@ void G_Cancelvote_f( edict_t *ent, bool admin )
 		G_PrintMsg( NULL, "Callvote has been canceled\n");
 		return;
 	}
+
+	G_PrintMsg( ent, "%sError:%s You do not have permission to cancel the vote\n", S_COLOR_ORANGE, S_COLOR_WHITE );
 }
 // !racesow
 
