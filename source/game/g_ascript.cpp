@@ -2967,6 +2967,11 @@ static unsigned int asFunc_RS_GetTime()
 	return (unsigned int)time(NULL);
 }
 
+static void asFunc_RS_Cancelvote( edict_t *ent, bool admin )
+{
+	G_Cancelvote_f( ent, admin );
+}
+
 static void asFunc_RS_AuthRegister( gclient_t *client, asstring_t *name, asstring_t *pass, asstring_t *email, asstring_t *nick )
 {
 	RS_AuthRegister( client, name->buffer, pass->buffer, email->buffer, nick->buffer );
@@ -3381,6 +3386,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "bool RS_ResetPjState( int playerNum )", asFUNCTION(asFunc_RS_ResetPjState), NULL },
 	{ "bool RS_RenameClient( Client @client, const String &name )", asFUNCTION(asFunc_RS_RenameClient), NULL },
 	{ "uint RS_GetTime()", asFUNCTION(asFunc_RS_GetTime), NULL },
+	{ "void RS_Cancelvote( Entity @ent, bool admin )", asFUNCTION(asFunc_RS_Cancelvote), NULL },
 	{ "void RS_AuthRegister( Client @client, const String &name, const String &pass, const String &email, const String &nick )", asFUNCTION(asFunc_RS_AuthRegister), NULL },
 	{ "void RS_AuthPlayer( Client @client, const String &name, const String &ctoken, int authTime, int mapId )", asFUNCTION(asFunc_RS_AuthPlayer), NULL },
 	{ "void RS_AuthNick( Client @client, const String &nick )", asFUNCTION(asFunc_RS_AuthNick), NULL },

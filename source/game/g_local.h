@@ -702,7 +702,7 @@ void G_CallVotes_CmdVote( edict_t *ent );
 void G_CallVotes_Think( void );
 void G_CallVote_Cmd( edict_t *ent );
 void G_OperatorVote_Cmd( edict_t *ent );
-void G_Cancelvote_f( void ); // racesow
+void G_Cancelvote_f( edict_t *ent, bool admin ); // racesow
 void G_RegisterGametypeScriptCallvote( const char *name, const char *usage, const char *type, const char *help );
 http_response_code_t G_CallVotes_WebRequest( http_query_method_t method, const char *resource, 
 	const char *query_string, char **content, size_t *content_length );
