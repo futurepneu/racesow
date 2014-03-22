@@ -814,7 +814,7 @@ static void old_teleporter_touch( edict_t *self, edict_t *other, cplane_t *plane
 	// teleport the player
 	//
 
-	VectorCopy( other->r.client->ps.pmove.previous_velocity, velocity ); // racesow - use last frame's velocity
+	VectorCopy( other->r.client->old_pmove.velocity, velocity ); // racesow - use old pmove velocity
 
 	velocity[2] = 0; // ignore vertical velocity
 	speed = VectorLengthFast( velocity );
