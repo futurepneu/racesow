@@ -948,7 +948,8 @@ static void CG_AddGenericEnt( centity_t *cent )
 	}
 
 	// racesow
-	if( cent->type > ET_GIB && cent->type < ET_SPRITE && (unsigned int)cent->current.ownerNum != cg.predictedPlayerState.POVnum )
+	if( cg_raceGhosts->integer && cent->type > ET_GIB && cent->type < ET_SPRITE
+		&& (unsigned int)cent->current.ownerNum != cg.predictedPlayerState.POVnum )
 	{
 		CG_AddShellEffects( &cent->ent, EF_RACEGHOST );
 		return;
