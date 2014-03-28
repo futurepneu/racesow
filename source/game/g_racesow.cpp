@@ -1,11 +1,4 @@
 #include "g_local.h"
-#include "g_as_local.h"
-#include "../qcommon/cjson.h"
-#include "../matchmaker/mm_query.h"
-#include "../qalgo/base64.h"
-#include "../qalgo/sha2.h"
-
-#define RS_MAPLIST_ITEMS 20
 
 stat_query_api_t *rs_sqapi;
 
@@ -36,9 +29,6 @@ cvar_t *rs_gunblade_minKnockback;
 cvar_t *rs_gunblade_maxKnockback;
 cvar_t *rs_gunblade_splash;
 cvar_t *rs_splashfrac;
-void RS_Init( void );
-void RS_Shutdown( void );
-void RS_removeProjectiles( edict_t *owner );
 
 /**
  * RS_Init

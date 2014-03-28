@@ -1,4 +1,10 @@
 #include "g_as_local.h"
+#include "../qcommon/cjson.h"
+#include "../matchmaker/mm_query.h"
+#include "../qalgo/base64.h"
+#include "../qalgo/sha2.h"
+
+#define RS_MAPLIST_ITEMS 20
 
 extern cvar_t *rs_statsEnabled;
 extern cvar_t *rs_grenade_minKnockback;
