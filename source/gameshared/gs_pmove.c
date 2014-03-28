@@ -780,16 +780,16 @@ static void PM_Move( void )
 		else
 			pml.velocity[2] -= pm->playerState->pmove.gravity * pml.frametime;
 
-		if( !pml.velocity[0] && !pml.velocity[1] )
-			return;
-
-		PM_StepSlideMove();
-
 		// racesow - if player is walking: clear prejump counters
 		float hspeed = VectorLengthFast( tv( pml.velocity[0], pml.velocity[1], 0 ) );
 		if( hspeed < DEFAULT_PLAYERSPEED_RACE + 5.0f )
 			RS_ResetPjState( pm->playerState->playerNum );
 		// !racesow
+
+		if( !pml.velocity[0] && !pml.velocity[1] )
+			return;
+
+		PM_StepSlideMove();
 	}
 	else if( ( pm->playerState->pmove.stats[PM_STAT_FEATURES] & PMFEAT_AIRCONTROL ) 
 		&& !( pm->playerState->pmove.stats[PM_STAT_FEATURES] & PMFEAT_FWDBUNNY ) )
