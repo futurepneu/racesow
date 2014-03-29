@@ -134,6 +134,9 @@ void Com_FreePureList( purelist_t **purelist );
 
 #define SNAP_MAX_DEMO_META_DATA_SIZE	16*1024
 
+// define this 0 to disable compression of demo files
+#define SNAP_DEMO_GZ					FS_GZ
+
 void SNAP_ParseBaseline( msg_t *msg, entity_state_t *baselines );
 void SNAP_SkipFrame( msg_t *msg, struct snapshot_s *header );
 struct snapshot_s *SNAP_ParseFrame( msg_t *msg, struct snapshot_s *lastFrame, int *suppressCount, struct snapshot_s *backup, entity_state_t *baselines, int showNet );
@@ -153,8 +156,9 @@ void SNAP_RecordDemoMessage( int demofile, msg_t *msg, int offset );
 int SNAP_ReadDemoMessage( int demofile, msg_t *msg );
 void SNAP_BeginDemoRecording( int demofile, unsigned int spawncount, unsigned int snapFrameTime, 
 								const char *sv_name, unsigned int sv_bitflags, purelist_t *purelist, 
-								char *configstrings, entity_state_t *baselines, unsigned int baseTime );
-void SNAP_StopDemoRecording( int demofile, const char *meta_data, size_t meta_data_realsize );
+								char *configstrings, entity_state_t *baselines );
+void SNAP_StopDemoRecording( int demofile );
+void SNAP_WriteDemoMetaData( const char *filename, const char *meta_data, size_t meta_data_realsize );
 size_t SNAP_ClearDemoMeta( char *meta_data, size_t meta_data_max_size );
 size_t SNAP_SetDemoMetaKeyValue( char *meta_data, size_t meta_data_max_size, size_t meta_data_realsize,
 							  const char *key, const char *value );
@@ -633,6 +637,7 @@ const char *NET_ErrorString( void );
 void	    NET_SetErrorString( const char *format, ... );
 void		NET_SetErrorStringFromLastError( const char *function );
 void	    NET_ShowIP( void );
+int			NET_SetSocketNoDelay( socket_t *socket, int nodelay );
 
 const char *NET_SocketTypeToString( socket_type_t type );
 const char *NET_SocketToString( const socket_t *socket );
@@ -706,7 +711,7 @@ FILESYSTEM
 ==============================================================
 */
 
-#define FS_NOTIFT_NEWPAKS	0x01
+#define FS_NOTIFY_NEWPAKS	0x01
 
 typedef void (*fs_read_cb)(int filenum, const void *buf, size_t numb, float progress, void *customp);
 typedef void (*fs_done_cb)(int filenum, int status, void *customp);
@@ -745,6 +750,9 @@ int	    FS_Seek( int file, int offset, int whence );
 int	    FS_Eof( int file );
 int	    FS_Flush( int file );
 qboolean FS_IsUrl( const char *url );
+
+void	FS_SetCompressionLevel( int file, int level );
+int		FS_GetCompressionLevel( int file );
 
 // file loading
 int	    FS_LoadFileExt( const char *path, void **buffer, void *stack, size_t stackSize, const char *filename, int fileline );

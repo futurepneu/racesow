@@ -260,6 +260,7 @@ typedef struct
 	socket_t socket_loopback;
 #ifdef TCP_ALLOW_CONNECT
 	socket_t socket_tcp;
+	socket_t socket_tcp6;
 #endif
 
 	char mapcmd[MAX_TOKEN_CHARS];       // ie: *intro.cin+base
@@ -544,3 +545,4 @@ void SV_Web_Init( void );
 void SV_Web_Frame( void );
 void SV_Web_Shutdown( void );
 qboolean SV_Web_Running( void );
+const char *SV_Web_UpstreamBaseUrl( void );

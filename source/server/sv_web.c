@@ -1068,7 +1068,6 @@ void SV_Web_Frame( void )
 		return;
 	}
 
-	sv_web_upstream_is_set = qfalse;
 	sv_web_upstream_is_set = sv_http_upstream_ip->string[0] != '\0' && sv_http_upstream_baseurl->string[0] != '\0';
 	NET_StringToAddress( sv_http_upstream_ip->string, &sv_web_upstream_addr );
 
@@ -1187,6 +1186,14 @@ void SV_Web_Shutdown( void )
 	sv_http_initialized = qfalse;
 }
 
+/*
+* SV_Web_UpstreamBaseUrl
+*/
+const char *SV_Web_UpstreamBaseUrl( void )
+{
+	return sv_http_upstream_baseurl->string;
+}
+
 #else
 
 /*
@@ -1216,6 +1223,14 @@ void SV_Web_Shutdown( void )
 qboolean SV_Web_Running( void )
 {
 	return qfalse;
+}
+
+/*
+* SV_Web_UpstreamBaseUrl
+*/
+const char *SV_Web_UpstreamBaseUrl( void )
+{
+	return "";
 }
 
 #endif // HTTP_SUPPORT

@@ -52,16 +52,14 @@ namespace WSWUI {
 		std::string		gametype;
 		std::string		modname;
 		bool			instagib;
+		bool			race;
 		int				skilllevel;
 		bool			password;
 		bool			mm;
 		bool			tv;
 		unsigned int 	ping;
 		unsigned int 	ping_retries;
-		mutable bool	favorite;
-
-		// Keep which refresh it's part of
-		int refresh_batch;
+		bool			favorite;
 
 		// TODO: batches.. just ignore the batch mechanism for now
 

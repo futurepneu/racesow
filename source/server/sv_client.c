@@ -328,8 +328,9 @@ static void SV_New_f( client_t *client )
 			sv_bitflags |= SV_BITFLAGS_RELIABLE;
 		if( SV_Web_Running() )
 		{
+			const char *baseurl = SV_Web_UpstreamBaseUrl();
 			sv_bitflags |= SV_BITFLAGS_HTTP;
-			if( sv_http_upstream_baseurl->string[0] )
+			if( baseurl[0] )
 				sv_bitflags |= SV_BITFLAGS_HTTP_BASEURL;
 		}
 		MSG_WriteByte( &tmpMessage, sv_bitflags );

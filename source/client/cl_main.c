@@ -354,14 +354,13 @@ static void CL_Connect( const char *servername, socket_type_t type, netadr_t *ad
 
 #ifdef TCP_ALLOW_CONNECT
 	case SOCKET_TCP:
-		socketaddress.type = NA_IP;
-		socketaddress.ip[0] = socketaddress.ip[1] = socketaddress.ip[2] = socketaddress.ip[3] = 0;
-		socketaddress.port = 0;
+		NET_InitAddress( &socketaddress, address->type );
 		if( !NET_OpenSocket( &cls.socket_tcp, SOCKET_TCP, &socketaddress, qfalse ) )
 		{
 			Com_Error( ERR_FATAL, "Couldn't open the TCP socket\n" ); // FIXME
 			return;
 		}
+		NET_SetSocketNoDelay( &cls.socket_tcp, 1 );
 		cls.socket = &cls.socket_tcp;
 		cls.reliable = qtrue;
 		break;
@@ -2092,7 +2091,7 @@ static void CL_InitLocal( void )
 	Cmd_AddCommand( "stop", CL_Stop_f );
 	Cmd_AddCommand( "quit", CL_Quit_f );
 	Cmd_AddCommand( "connect", CL_Connect_f );
-#if defined(TCP_ALLOW_CONNECT)
+#if defined(TCP_ALLOW_CONNECT) && defined(TCP_ALLOW_CONNECT_CLIENT)
 	Cmd_AddCommand( "tcpconnect", CL_TCPConnect_f );
 #endif
 	Cmd_AddCommand( "reconnect", CL_Reconnect_f );
@@ -2767,7 +2766,7 @@ static void CL_CheckForUpdateHeaderCb( const char *buf, void *privatep )
 		while (*str && (*str == ' ')) { str++; }
 
 		val = str;
-		while (*str && (*str != '\r') && (*str != '\n') && (*str != '\n')) { str++; }
+		while (*str && (*str != '\r') && (*str != '\n')) { str++; }
 		val_size = str - val;
 
 		if( val_size > 0 ) {
