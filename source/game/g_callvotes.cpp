@@ -2135,6 +2135,14 @@ static void G_CallVote( edict_t *ent, bool isopcall )
 		return;
 	}
 
+	// racesow - Player cannot callvote if vmuted
+	if( ent->r.client->muted & 2 )
+	{
+		G_PrintMsg( ent, "%sYou are votemuted\n", S_COLOR_RED );
+		return;
+	}
+	// !racesow
+
 	votename = trap_Cmd_Argv( 1 );
 	if( !votename || !votename[0] )
 	{
