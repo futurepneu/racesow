@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 static float RS_RaceGhostsVolume( bool owner, float baseVolume )
 {
-	if( cg_raceGhosts->integer && !owner )
+	if( !owner )
 	{
 		float fvol = cg_raceGhostsVolume->value;
 		clamp( fvol, 0.0f, 1.0f );
