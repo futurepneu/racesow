@@ -2088,6 +2088,32 @@ void G_CallVotes_Think( void )
 	}
 }
 
+// racesow
+
+/**
+ * Check in AngelScript for permission to call the vote
+ * @return  Whether the vote is valid
+ */
+static bool G_CallVotes_CheckPermission( void )
+{
+	char argsString[MAX_STRING_CHARS];
+	callvotedata_t* vote = &callvoteState.vote;
+	int i;
+
+	if( !vote || !vote->callvote || !vote->caller )
+		return qfalse;
+
+	Q_snprintfz( argsString, MAX_STRING_CHARS, "\"%s\"", vote->callvote->name );
+	for( i = 0; i < vote->argc; i++ )
+	{
+		Q_strncatz( argsString, " ", MAX_STRING_CHARS );
+		Q_strncatz( argsString, va( " \"%s\"", vote->argv[i] ), MAX_STRING_CHARS );
+	}
+
+	return GT_asCallGameCommand( vote->caller->r.client, "callvotecheckpermission", argsString, vote->argc + 1 );
+}
+// !racesow
+
 /*
 * G_CallVote
 */
@@ -2214,6 +2240,14 @@ static void G_CallVote( edict_t *ent, bool isopcall )
 		G_CallVotes_Reset(); // free the args
 		return;
 	}
+
+	// racesow - Check for permission in AS
+	if( !G_CallVotes_CheckPermission() )
+	{
+		G_CallVotes_Reset();
+		return;
+	}
+	// !racesow
 
 	//we're done. Proceed launching the election
 	for( i = 0; i < gs.maxclients; i++ )
