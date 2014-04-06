@@ -1123,7 +1123,8 @@ static void CG_DrawWeaponIcons( int x, int y, int offx, int offy, int iw, int ih
 
 	for( i = 0; i < WEAP_TOTAL-1; i++ )
 	{
-		if( ( cg.predictedPlayerState.inventory[WEAP_GUNBLADE+i] || cg.predictedPlayerState.inventory[AMMO_GUNBLADE+i] || cg.predictedPlayerState.inventory[AMMO_WEAK_GUNBLADE+i] ) )
+		if( cg.predictedPlayerState.inventory[WEAP_GUNBLADE+i] ||
+			( !GS_InfiniteAmmo() && ( cg.predictedPlayerState.inventory[AMMO_GUNBLADE+i] || cg.predictedPlayerState.inventory[AMMO_WEAK_GUNBLADE+i] ) ) )
 			n++;
 	}
 
