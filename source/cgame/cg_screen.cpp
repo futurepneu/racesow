@@ -308,7 +308,7 @@ void CG_ScreenInit( void )
 	cg_scoreboardFontFamily = trap_Cvar_Get( "cg_scoreboardFontFamily", DEFAULT_SCOREBOARD_FONT_FAMILY, CVAR_ARCHIVE );
 	cg_scoreboardMonoFontFamily = trap_Cvar_Get( "cg_scoreboardMonoFontFamily", DEFAULT_SCOREBOARD_MONO_FONT_FAMILY, CVAR_ARCHIVE );
 	cg_scoreboardFontSize = trap_Cvar_Get( "cg_scoreboardFontSize", STR_TOSTR( DEFAULT_SCOREBOARD_FONT_SIZE ), CVAR_ARCHIVE );
-	cg_scoreboardWidthScale = trap_Cvar_Get( "cg_scoreboardWidthScale", "1.0", CVAR_ARCHIVE );
+	cg_scoreboardWidthScale = trap_Cvar_Get( "cg_scoreboardWidthScale", "1.5", CVAR_ARCHIVE ); // racesow - default to 1.5 instead of 1.0
 
 	cg_showAcceleration = trap_Cvar_Get( "cg_showAcceleration", "1", CVAR_ARCHIVE ); // racesow
 
