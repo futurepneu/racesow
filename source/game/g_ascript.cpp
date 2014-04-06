@@ -1813,7 +1813,7 @@ static void objectGameClient_setPMoveMaxSpeed( float speed, gclient_t *self )
 	if( speed < 0.0f )
 		self->ps.pmove.stats[PM_STAT_MAXSPEED] = DEFAULT_PLAYERSPEED;
 	else
-		self->ps.pmove.stats[PM_STAT_MAXSPEED] = ( (int)speed & 0xFFFF );
+		self->ps.pmove.stats[PM_STAT_MAXSPEED] = ( (int)( speed + 0.5f ) & 0xFFFF );
 }
 
 static float objectGameClient_getPMoveMaxSpeed( gclient_t *self )
@@ -1826,7 +1826,7 @@ static void objectGameClient_setPMoveJumpSpeed( float speed, gclient_t *self )
 	if( speed < 0.0f )
 		self->ps.pmove.stats[PM_STAT_JUMPSPEED] = DEFAULT_JUMPSPEED;
 	else
-		self->ps.pmove.stats[PM_STAT_JUMPSPEED] = ( (int)speed & 0xFFFF );
+		self->ps.pmove.stats[PM_STAT_JUMPSPEED] = ( (int)( speed + 0.5f ) & 0xFFFF );
 }
 
 static float objectGameClient_getPMoveJumpSpeed( gclient_t *self )
@@ -1839,7 +1839,7 @@ static void objectGameClient_setPMoveDashSpeed( float speed, gclient_t *self )
 	if( speed < 0.0f )
 		self->ps.pmove.stats[PM_STAT_DASHSPEED] = DEFAULT_DASHSPEED;
 	else
-		self->ps.pmove.stats[PM_STAT_DASHSPEED] = ( (int)speed & 0xFFFF );
+		self->ps.pmove.stats[PM_STAT_DASHSPEED] = ( (int)( speed + 0.5f ) & 0xFFFF );
 }
 
 static float objectGameClient_getPMoveDashSpeed( gclient_t *self )
