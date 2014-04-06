@@ -273,8 +273,8 @@ void CG_ScreenInit( void )
 	cg_debugLoading =	trap_Cvar_Get( "cg_debugLoading", "0", CVAR_ARCHIVE );
 	cg_weaponlist =		trap_Cvar_Get( "cg_weaponlist", "1", CVAR_ARCHIVE );
 
-	cg_crosshair =		trap_Cvar_Get( "cg_crosshair", "1", CVAR_ARCHIVE );
-	cg_crosshair_size =	trap_Cvar_Get( "cg_crosshair_size", "32", CVAR_ARCHIVE );
+	cg_crosshair =		trap_Cvar_Get( "cg_crosshair", "3", CVAR_ARCHIVE ); // racesow 
+	cg_crosshair_size =	trap_Cvar_Get( "cg_crosshair_size", "16", CVAR_ARCHIVE ); // racesow
 	cg_crosshair_color =	trap_Cvar_Get( "cg_crosshair_color", "255 255 255", CVAR_ARCHIVE );
 	cg_crosshair_damage_color =	trap_Cvar_Get( "cg_crosshair_damage_color", "255 0 0", CVAR_ARCHIVE );
 	cg_crosshair_color->modified = qtrue;
@@ -303,7 +303,7 @@ void CG_ScreenInit( void )
 	cg_showPlayerNames_barWidth =   trap_Cvar_Get( "cg_showPlayerNames_barWidth", "8", CVAR_ARCHIVE );
 	cg_showTeamMates =	    trap_Cvar_Get( "cg_showTeamMates", "1", CVAR_ARCHIVE );
 
-	cg_showPressedKeys = trap_Cvar_Get( "cg_showPressedKeys", "0", CVAR_ARCHIVE );
+	cg_showPressedKeys = trap_Cvar_Get( "cg_showPressedKeys", "2", CVAR_ARCHIVE ); // racesow - default to showing only in spec
 
 	cg_scoreboardFontFamily = trap_Cvar_Get( "cg_scoreboardFontFamily", DEFAULT_SCOREBOARD_FONT_FAMILY, CVAR_ARCHIVE );
 	cg_scoreboardMonoFontFamily = trap_Cvar_Get( "cg_scoreboardMonoFontFamily", DEFAULT_SCOREBOARD_MONO_FONT_FAMILY, CVAR_ARCHIVE );
