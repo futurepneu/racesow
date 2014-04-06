@@ -1131,9 +1131,12 @@ static void CG_DrawWeaponIcons( int x, int y, int offx, int offy, int iw, int ih
 
 	for( i = j = 0; i < WEAP_TOTAL-1; i++ )
 	{
-		// if player doesnt have this weapon, skip it
-		if( !( cg.predictedPlayerState.inventory[WEAP_GUNBLADE+i] || cg.predictedPlayerState.inventory[AMMO_GUNBLADE+i] || cg.predictedPlayerState.inventory[AMMO_WEAK_GUNBLADE+i] ) )
+		// racesow - only consider ammo count if not infinite ammo
+		// Skip weapon if player doesn't have it
+		if( !cg.predictedPlayerState.inventory[WEAP_GUNBLADE+i] ||
+			( !GS_InfiniteAmmo() && ( !cg.predictedPlayerState.inventory[AMMO_GUNBLADE+i] || !cg.predictedPlayerState.inventory[AMMO_WEAK_GUNBLADE+i] ) ) )
 			continue;
+		// !racesow
 
 		selected_weapon = CG_IsWeaponSelected( WEAP_GUNBLADE+i );
 		if( !selected_weapon )
@@ -1183,6 +1186,11 @@ static void CG_DrawWeaponAmmos( int x, int y, int offx, int offy, int fontsize, 
 
 	if( !cg_weaponlist || !cg_weaponlist->integer )
 		return;
+
+	// racesow
+	if( GS_InfiniteAmmo() )
+		return;
+	// !racesow
 
 	if( ammotype == 1 )
 		startammo = AMMO_GUNBLADE;
