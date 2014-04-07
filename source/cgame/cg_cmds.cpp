@@ -363,7 +363,7 @@ static bool CG_SC_RaceDemoRename( const char *src, const char *dst )
 {
 	const char *baseDirectory = "demos",
 		*srcPath = va( "%s/%s", baseDirectory, src ),
-		*dstPath = va( "%s/%s", baseDirectory, dst, APP_DEMO_EXTENSION_STR );
+		*dstPath = va( "%s/%s%s", baseDirectory, dst, APP_DEMO_EXTENSION_STR );
 	int file;
 
 	if( !trap_FS_MoveFile( srcPath, dstPath ) )
@@ -371,6 +371,7 @@ static bool CG_SC_RaceDemoRename( const char *src, const char *dst )
 		// workaround to create the path
 		trap_FS_FOpenFile( dstPath, &file, FS_WRITE );
 		trap_FS_FCloseFile( file );
+		trap_FS_RemoveFile( dstPath );
 
 		if( !trap_FS_MoveFile( srcPath, dstPath ) )
 			return false;
