@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectName>qfusion</ProjectName>
+    <ProjectName>racesow</ProjectName>
     <ProjectGuid>{6C704AF6-412B-46F5-BAEA-F868C71C9187}</ProjectGuid>
-    <RootNamespace>qfusion</RootNamespace>
+    <RootNamespace>racesow</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
