@@ -1011,7 +1011,6 @@ extern cvar_t *cg_raceGhostsVolume;
 extern cvar_t *rs_diffref;
 extern cvar_t *rs_raceReport;
 extern cvar_t *rs_autoRaceDemo;
-extern cvar_t *rs_autoRaceScreenshot;
 extern cvar_t *rs_ignoreTeleEffect;
 void CG_AddLinearTrail( centity_t *cent, float lifetime );
 // !racesow

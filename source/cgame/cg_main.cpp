@@ -64,7 +64,6 @@ cvar_t *cg_raceGhostsVolume;
 cvar_t *rs_diffref;
 cvar_t *rs_raceReport;
 cvar_t *rs_autoRaceDemo;
-cvar_t *rs_autoRaceScreenshot;
 cvar_t *rs_ignoreTeleEffect;
 // !racesow
 
@@ -638,8 +637,6 @@ static void CG_RegisterVariables( void )
 	rs_diffref = trap_Cvar_Get( "rs_diffref", "server", CVAR_USERINFO | CVAR_ARCHIVE );
 	rs_raceReport = trap_Cvar_Get( "rs_raceReport", "1", CVAR_USERINFO | CVAR_ARCHIVE );
 	rs_autoRaceDemo = trap_Cvar_Get( "rs_autoRaceDemo", "1", CVAR_ARCHIVE );
-	rs_maxRaceDemo = trap_Cvar_Get( "rs_maxRaceDemo", "5", CVAR_ARCHIVE );
-	rs_autoRaceScreenshot = trap_Cvar_Get( "rs_autoRaceScreenshot", "0", CVAR_ARCHIVE );
 	rs_ignoreTeleEffect = trap_Cvar_Get( "rs_ignoreTeleEffect", "1", CVAR_ARCHIVE );
 	// !racesow
 	

@@ -454,9 +454,6 @@ static void CG_SC_RaceDemo( int action, unsigned int raceTime )
                 if( autorecording && raceTime > 0 )
                 {
                         realname = CG_SC_RaceDemoName( raceTime );
-                        if( rs_autoRaceScreenshot->integer )
-                                trap_Cmd_ExecuteText( EXEC_NOW, va( "screenshot %s/%s silent",
-                                                directory, realname ) );
                         if( rs_autoRaceDemo->integer )
                                 CG_SC_RaceDemoRename( va( "%s/%s", directory, demoname ),
                                                 va( "%s/%s", directory, realname ) );
