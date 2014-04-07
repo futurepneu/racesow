@@ -197,9 +197,9 @@ static inline void trap_FS_FCloseFile( int file )
 	CGAME_IMPORT.FS_FCloseFile( file );
 }
 
-static inline void trap_FS_RemoveFile( const char *filename )
+static inline bool trap_FS_RemoveFile( const char *filename )
 {
-	CGAME_IMPORT.FS_RemoveFile( filename );
+	return CGAME_IMPORT.FS_RemoveFile( filename ) == qtrue;
 }
 
 static inline int trap_FS_GetFileList( const char *dir, const char *extension, char *buf, size_t bufsize, int start, int end )
