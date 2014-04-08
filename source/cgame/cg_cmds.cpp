@@ -437,10 +437,9 @@ static bool CG_SC_RaceDemoRename( const char *src, const char *dst )
  */
 static void CG_SC_RaceDemoPurge( void )
 {
-	char *buffer, *demoDir;
-	char *s;
-	char path[256];
-	size_t length, bufSize;
+	char *demoDir, *s;
+	char buffer[2048], path[256];
+	size_t length;
 	int i, numdemos;
 
 	// keep all demos if rs_autoRaceDemo < 1
@@ -448,19 +447,13 @@ static void CG_SC_RaceDemoPurge( void )
 		return;
 
 	demoDir = va( "demos/%s", CG_SC_RaceDemoPath() );
-	numdemos = trap_FS_GetFileListExt( demoDir, APP_DEMO_EXTENSION_STR, NULL, &bufSize, 0, 0 );
+	numdemos = trap_FS_GetFileList( demoDir, APP_DEMO_EXTENSION_STR, buffer, sizeof( buffer ), 0, 0 );
 
 	if( !numdemos )
 		return;
 
-	buffer = ( char* )CG_Malloc( bufSize );
-	trap_FS_GetFileList( demoDir, APP_DEMO_EXTENSION_STR, buffer, bufSize, 0, 0 );
-
 	if( numdemos <= rs_autoRaceDemo->integer )
-	{
-		CG_Free( buffer );
 		return;
-	}
 
 	s = buffer;
 	for( i = 0; i < numdemos; i++, s += length + 1 )
@@ -471,14 +464,13 @@ static void CG_SC_RaceDemoPurge( void )
 			continue;
 
 		Q_snprintfz( path, sizeof( path ), "%s/%s", demoDir, s );
+		CG_Printf( "Removing file %s\n", path );
 		if( !trap_FS_RemoveFile( path ) )
 		{
 			CG_Printf( "Error, couldn't remove file: %s\n", path );
 			continue;
 		}
 	}
-
-	CG_Free( buffer );
 }
 
 enum {
