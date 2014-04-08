@@ -130,6 +130,7 @@ typedef struct
 	int ( *FS_Flush )( int file );
 	void ( *FS_FCloseFile )( int file );
 	qboolean ( *FS_RemoveFile )( const char *filename );
+	int ( *FS_GetFileListExt )( const char *dir, const char *extension, char *buf, size_t *bufsize, int start, int end );
 	int ( *FS_GetFileList )( const char *dir, const char *extension, char *buf, size_t bufsize, int start, int end );
 	const char *( *FS_FirstExtension )( const char *filename, const char *extensions[], int num_extensions );
 	qboolean ( *FS_IsPureFile )( const char *filename );

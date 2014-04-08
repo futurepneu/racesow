@@ -202,6 +202,11 @@ static inline bool trap_FS_RemoveFile( const char *filename )
 	return CGAME_IMPORT.FS_RemoveFile( filename ) == qtrue;
 }
 
+static inline int trap_FS_GetFileListExt( const char *dir, const char *extension, char *buf, size_t *bufsize, int start, int end )
+{
+	return CGAME_IMPORT.FS_GetFileListExt( dir, extension, buf, bufsize, start, end );
+}
+
 static inline int trap_FS_GetFileList( const char *dir, const char *extension, char *buf, size_t bufsize, int start, int end )
 {
 	return CGAME_IMPORT.FS_GetFileList( dir, extension, buf, bufsize, start, end );
