@@ -439,47 +439,44 @@ enum {
 };
 
 /**
- * CG_SC_RaceDemo
  * Handles starting/stopping/renaming demos
- * @param action The action to perform
+ * @param action   The action to perform
  * @param raceTime The time of the race
+ * @param pbest    True if the record is a player's personal best
  */
-static void CG_SC_RaceDemo( int action, unsigned int raceTime )
+static void CG_SC_RaceDemo( int action, unsigned int raceTime, bool pbest )
 {                                                                                
         const char *realname;
         static bool autorecording = false;
 
         // filter out autorecord commands when playing a demo
-        if( cgs.demoPlaying )
+        if( cgs.demoPlaying || !rs_autoRaceDemo->integer )
                 return;
 
         switch( action )
         {
         case RS_RACEDEMO_START:
-                if( rs_autoRaceDemo->integer )
-                {
-                        trap_Cmd_ExecuteText( EXEC_NOW, "stop silent" );
-                        trap_Cmd_ExecuteText( EXEC_NOW, va( "record %s silent", RS_RACEDEMO_TEMPFILE ) );
-                }
-                autorecording = true;
-                break;
-        case RS_RACEDEMO_STOP:
-                if( rs_autoRaceDemo->integer )
-                        trap_Cmd_ExecuteText( EXEC_NOW, "stop silent" );
+            trap_Cmd_ExecuteText( EXEC_NOW, "stop silent" );
+            trap_Cmd_ExecuteText( EXEC_NOW, va( "record %s silent", RS_RACEDEMO_TEMPFILE ) );
+            autorecording = true;
+            break;
 
-                if( autorecording && raceTime > 0 )
-                {
-                        realname = va( "%s/%s", CG_SC_RaceDemoPath(), CG_SC_RaceDemoName( raceTime ) );
-                        if( rs_autoRaceDemo->integer )
-                                CG_SC_RaceDemoRename( RS_RACEDEMO_TEMPFILE, va( "%s/%s", RS_RACEDEMO_BASEDIR, realname ) );
-                }
-                autorecording = false;
-                break;
-	case RS_RACEDEMO_CANCEL:
-                if( rs_autoRaceDemo->integer )
-                        trap_Cmd_ExecuteText( EXEC_NOW, "stop cancel silent" );
-                autorecording = false;
-                break;
+        case RS_RACEDEMO_STOP:
+            trap_Cmd_ExecuteText( EXEC_NOW, "stop silent" );
+
+            if( autorecording && raceTime > 0 &&
+            	( pbest || rs_autoRaceDemo->integer == -2 ) )
+            {
+                realname = va( "%s/%s", CG_SC_RaceDemoPath(), CG_SC_RaceDemoName( raceTime ) );
+                CG_SC_RaceDemoRename( RS_RACEDEMO_TEMPFILE, va( "%s/%s", RS_RACEDEMO_BASEDIR, realname ) );
+            }
+            autorecording = false;
+            break;
+
+		case RS_RACEDEMO_CANCEL:
+            trap_Cmd_ExecuteText( EXEC_NOW, "stop cancel silent" );
+            autorecording = false;
+            break;
         }
 }
 
@@ -488,17 +485,18 @@ static void CG_SC_RaceDemo( int action, unsigned int raceTime )
  */
 static void CG_SC_RaceDemoStart( void )
 {
-	CG_SC_RaceDemo( RS_RACEDEMO_START, 0 );
+	CG_SC_RaceDemo( RS_RACEDEMO_START, 0 , false );
 }
 
 static void CG_SC_RaceDemoStop( void )
 {
-	CG_SC_RaceDemo( RS_RACEDEMO_STOP, atoi( trap_Cmd_Argv( 1 ) ) );
+	bool pbest = atoi( trap_Cmd_Argv( 2 ) ) == 1;
+	CG_SC_RaceDemo( RS_RACEDEMO_STOP, atoi( trap_Cmd_Argv( 1 ) ), pbest );
 }
 
 static void CG_SC_RaceDemoCancel( void )
 {
-	CG_SC_RaceDemo( RS_RACEDEMO_CANCEL, 0 );
+	CG_SC_RaceDemo( RS_RACEDEMO_CANCEL, 0, false );
 }
 
 static void CG_SC_RaceLogin( void )
