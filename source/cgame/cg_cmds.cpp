@@ -432,6 +432,55 @@ static bool CG_SC_RaceDemoRename( const char *src, const char *dst )
 	return true;
 }
 
+/**
+ * Purge old race demos on a map according to rs_autoRaceDemo
+ */
+static void CG_SC_RaceDemoPurge( void )
+{
+	char *buffer, *demoDir;
+	char *s;
+	char path[256];
+	size_t length, bufSize;
+	int i, numdemos;
+
+	// keep all demos if rs_autoRaceDemo < 1
+	if( rs_autoRaceDemo->integer < 1 )
+		return;
+
+	demoDir = va( "demos/%s", CG_SC_RaceDemoPath() );
+	numdemos = trap_FS_GetFileListExt( demoDir, APP_DEMO_EXTENSION_STR, NULL, &bufSize, 0, 0 );
+
+	if( !numdemos )
+		return;
+
+	buffer = ( char* )CG_Malloc( bufSize );
+	trap_FS_GetFileList( demoDir, APP_DEMO_EXTENSION_STR, buffer, bufSize, 0, 0 );
+
+	if( numdemos <= rs_autoRaceDemo->integer )
+	{
+		CG_Free( buffer );
+		return;
+	}
+
+	s = buffer;
+	for( i = 0; i < numdemos; i++, s += length + 1 )
+	{
+		length = strlen( s );
+
+		if( i < rs_autoRaceDemo->integer )
+			continue;
+
+		Q_snprintfz( path, sizeof( path ), "%s/%s", demoDir, s );
+		if( !trap_FS_RemoveFile( path ) )
+		{
+			CG_Printf( "Error, couldn't remove file: %s\n", path );
+			continue;
+		}
+	}
+
+	CG_Free( buffer );
+}
+
 enum {
 	RS_RACEDEMO_START = 0,
 	RS_RACEDEMO_STOP,
@@ -469,6 +518,7 @@ static void CG_SC_RaceDemo( int action, unsigned int raceTime, bool pbest )
             {
                 realname = va( "%s/%s", CG_SC_RaceDemoPath(), CG_SC_RaceDemoName( raceTime ) );
                 CG_SC_RaceDemoRename( RS_RACEDEMO_TEMPFILE, realname );
+                CG_SC_RaceDemoPurge();
             }
             autorecording = false;
             break;
