@@ -353,36 +353,33 @@ static const char *CG_SC_AutoRecordName( void )
 }
 
 // racesow
+
+#define RS_RACEDEMO_BASEDIR "autorecord"
+#define RS_RACEDEMO_TEMPFILE RS_RACEDEMO_BASEDIR "/currentrace.rec"
+
 /**
- * CG_SC_RaceDemoRename
- * Rename the demo file at demos/src to demos/dst.ext
- * @param src Relative path to source file (including extension)
- * @param dst Relative path to target (excluding extension)
+ * Generate the path for autorecorded demos
+ * @return  Path for demos: `<gametype>/<map>`
  */
-static bool CG_SC_RaceDemoRename( const char *src, const char *dst )
+static const char *CG_SC_RaceDemoPath( void )
 {
-	const char *baseDirectory = "demos",
-		*srcPath = va( "%s/%s", baseDirectory, src ),
-		*dstPath = va( "%s/%s%s", baseDirectory, dst, APP_DEMO_EXTENSION_STR );
-	int file;
+	static char path[MAX_STRING_CHARS];
+	char mapname[MAX_CONFIGSTRING_CHARS];
 
-	if( !trap_FS_MoveFile( srcPath, dstPath ) )
-	{
-		// workaround to create the path
-		trap_FS_FOpenFile( dstPath, &file, FS_WRITE );
-		trap_FS_FCloseFile( file );
-		trap_FS_RemoveFile( dstPath );
+	// lowercase mapname
+	Q_strncpyz( mapname, cgs.configStrings[CS_MAPNAME], sizeof( mapname ) );
+	Q_strlwr( mapname );
 
-		if( !trap_FS_MoveFile( srcPath, dstPath ) )
-			return false;
-	}
-	return true;
+
+	Q_snprintfz( path, sizeof( path ), "%s/%s",	gs.gametypeName, mapname );
+
+	return path;
 }
 
 /**
- * CG_SC_RaceDemoName
- * Generate the demoname for a race
- * @param raceTime The time of the race
+ * Generate the demo filename for a race (excluding extension)
+ * @param  raceTime The time of the race
+ * @return          Filename for the race demo
  */
 static const char *CG_SC_RaceDemoName( unsigned int raceTime )
 {
@@ -404,13 +401,35 @@ static const char *CG_SC_RaceDemoName( unsigned int raceTime )
 
 	// make file path
 	// "gametype/map/map_time_random"
-	Q_snprintfz( name, sizeof( name ), "%s/%s/%s_%02u-%02u-%02u-%003u_%04i",
-		gs.gametypeName,
-		mapname, mapname,
-		hour, min, sec, milli, (int)brandom( 0, 9999 )
-		);
+	Q_snprintfz( name, sizeof( name ), "%s_%02u-%02u-%02u-%003u_%04i",
+		mapname, hour, min, sec, milli, (int)brandom( 0, 9999 ) );
 
 	return name;
+}
+
+/**
+ * CG_SC_RaceDemoRename
+ * Rename the demo file at demos/src to demos/dst.ext
+ * @param src Relative path to source file (including extension)
+ * @param dst Relative path to target (excluding extension)
+ */
+static bool CG_SC_RaceDemoRename( const char *src, const char *dst )
+{
+	const char *srcPath = va( "demos/%s", src ),
+		*dstPath = va( "demos/%s%s", dst, APP_DEMO_EXTENSION_STR );
+	int file;
+
+	if( !trap_FS_MoveFile( srcPath, dstPath ) )
+	{
+		// workaround to create the path
+		trap_FS_FOpenFile( dstPath, &file, FS_WRITE );
+		trap_FS_FCloseFile( file );
+		trap_FS_RemoveFile( dstPath );
+
+		if( !trap_FS_MoveFile( srcPath, dstPath ) )
+			return false;
+	}
+	return true;
 }
 
 enum {
@@ -427,9 +446,7 @@ enum {
  */
 static void CG_SC_RaceDemo( int action, unsigned int raceTime )
 {                                                                                
-        const char *demoname = "currentrace.rec",
-		*directory = "autorecord",
-		*realname;
+        const char *realname;
         static bool autorecording = false;
 
         // filter out autorecord commands when playing a demo
@@ -442,8 +459,7 @@ static void CG_SC_RaceDemo( int action, unsigned int raceTime )
                 if( rs_autoRaceDemo->integer )
                 {
                         trap_Cmd_ExecuteText( EXEC_NOW, "stop silent" );
-                        trap_Cmd_ExecuteText( EXEC_NOW, va( "record %s/%s silent",
-                                        directory, demoname ) );
+                        trap_Cmd_ExecuteText( EXEC_NOW, va( "record %s silent", RS_RACEDEMO_TEMPFILE ) );
                 }
                 autorecording = true;
                 break;
@@ -453,10 +469,9 @@ static void CG_SC_RaceDemo( int action, unsigned int raceTime )
 
                 if( autorecording && raceTime > 0 )
                 {
-                        realname = CG_SC_RaceDemoName( raceTime );
+                        realname = va( "%s/%s", CG_SC_RaceDemoPath(), CG_SC_RaceDemoName( raceTime ) );
                         if( rs_autoRaceDemo->integer )
-                                CG_SC_RaceDemoRename( va( "%s/%s", directory, demoname ),
-                                                va( "%s/%s", directory, realname ) );
+                                CG_SC_RaceDemoRename( RS_RACEDEMO_TEMPFILE, va( "%s/%s", RS_RACEDEMO_BASEDIR, realname ) );
                 }
                 autorecording = false;
                 break;
