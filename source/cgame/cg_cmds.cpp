@@ -371,7 +371,7 @@ static const char *CG_SC_RaceDemoPath( void )
 	Q_strlwr( mapname );
 
 
-	Q_snprintfz( path, sizeof( path ), "%s/%s",	gs.gametypeName, mapname );
+	Q_snprintfz( path, sizeof( path ), "%s/%s/%s", RS_RACEDEMO_BASEDIR, gs.gametypeName, mapname );
 
 	return path;
 }
@@ -468,7 +468,7 @@ static void CG_SC_RaceDemo( int action, unsigned int raceTime, bool pbest )
             	( pbest || rs_autoRaceDemo->integer == -2 ) )
             {
                 realname = va( "%s/%s", CG_SC_RaceDemoPath(), CG_SC_RaceDemoName( raceTime ) );
-                CG_SC_RaceDemoRename( RS_RACEDEMO_TEMPFILE, va( "%s/%s", RS_RACEDEMO_BASEDIR, realname ) );
+                CG_SC_RaceDemoRename( RS_RACEDEMO_TEMPFILE, realname );
             }
             autorecording = false;
             break;
