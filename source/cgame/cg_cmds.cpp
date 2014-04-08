@@ -464,7 +464,6 @@ static void CG_SC_RaceDemoPurge( void )
 			continue;
 
 		Q_snprintfz( path, sizeof( path ), "%s/%s", demoDir, s );
-		CG_Printf( "Removing file %s\n", path );
 		if( !trap_FS_RemoveFile( path ) )
 		{
 			CG_Printf( "Error, couldn't remove file: %s\n", path );
