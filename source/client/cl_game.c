@@ -433,7 +433,6 @@ void CL_GameModule_Init( void )
 	import.FS_Flush = FS_Flush;
 	import.FS_FCloseFile = FS_FCloseFile;
 	import.FS_RemoveFile = FS_RemoveFile;
-	import.FS_GetFileListExt = FS_GetFileListExt;
 	import.FS_GetFileList = FS_GetFileList;
 	import.FS_FirstExtension = FS_FirstExtension;
 	import.FS_IsPureFile = FS_IsPureFile;
