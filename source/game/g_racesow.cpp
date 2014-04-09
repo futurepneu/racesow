@@ -527,27 +527,44 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
 
 void RS_QueryMaps_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	int error;
+	edict_t *ent;
+	int playerNum, start, i, j;
+	cJSON *data, *node, *tag;
+
 	gclient_t *client = (gclient_t *)customp;
-	asIScriptContext *ctx;
+	playerNum = (int)( client - game.clients );
 
-	if( !level.gametype.queryMapsDone )
-		return;
-	
-	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
-
-	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.queryMapsDone) );
-	if( error < 0 )
+	if( playerNum < 0 || playerNum >= gs.maxclients )
 		return;
 
-	// Set the parameters
-	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
-	ctx->SetArgObject( 1, client );
-	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
-	
-	error = ctx->Execute();
-	if( G_ExecutionErrorReport( error ) )
-		GT_asShutdownScript();
+	ent = &game.edicts[ playerNum + 1 ];
+
+	if( rs_sqapi->GetStatus( query ) != 200 )
+	{
+		G_PrintMsg( ent, "%sError:%s Maplist query failed\n", 
+					S_COLOR_RED, S_COLOR_WHITE );
+		return;
+	}
+
+	// We assume the response is properly formed
+	data = (cJSON*)rs_sqapi->GetRoot( query );
+	start = cJSON_GetObjectItem( data, "start" )->valueint;
+
+	node = cJSON_GetObjectItem( data, "maps" )->child;
+	for( i = 0; node != NULL; i++, node=node->next )
+	{
+		// Print the row
+		G_PrintMsg( ent, "%s# %d%s: %-25s ",
+			S_COLOR_ORANGE, start + i + 1, S_COLOR_WHITE,
+			cJSON_GetObjectItem( node, "name" )->valuestring );
+
+		tag = cJSON_GetObjectItem( node, "tags" )->child;
+		for( j = 0; tag != NULL; j++, tag=tag->next )
+		{
+			G_PrintMsg( ent, "%s%s", ( j == 0 ? "" : ", " ), tag->valuestring );
+		}
+		G_PrintMsg( ent, "\n" );
+	}
 }
 
 void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int page )
