@@ -515,7 +515,7 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( "api/race/", qtrue );
-	rs_sqapi->SetField( query, "map", "Y29sZHJ1bg==" );
+	rs_sqapi->SetField( query, "map", b64name );
 	rs_sqapi->SetField( query, "limit", va( "%d", limit ) );
 
 	RS_SignQuery( query, (int)time( NULL ) );
