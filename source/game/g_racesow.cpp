@@ -208,27 +208,6 @@ static void RS_SignQuery( stat_query_t *query, int uTime )
  */
 void RS_AuthRegister_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	int error;
-	gclient_t *client = (gclient_t *)customp;
-	asIScriptContext *ctx;
-
-	if( !level.gametype.authPlayerDone )
-		return;
-
-	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
-
-	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.authRegisterDone) );
-	if( error < 0 )
-		return;
-
-	// Set the parameters
-	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
-	ctx->SetArgObject( 1, client );
-	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
-
-	error = ctx->Execute();
-	if( G_ExecutionErrorReport( error ) )
-		GT_asShutdownScript();
 }
 
 /**
@@ -282,27 +261,6 @@ void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, con
  */
 void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	int error;
-	gclient_t *client = (gclient_t *)customp;
-	asIScriptContext *ctx;
-
-	if( !level.gametype.authPlayerDone )
-		return;
-
-	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
-
-	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.authPlayerDone) );
-	if( error < 0 )
-		return;
-
-	// Set the parameters
-	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
-	ctx->SetArgObject( 1, client );
-	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
-
-	error = ctx->Execute();
-	if( G_ExecutionErrorReport( error ) )
-		GT_asShutdownScript();
 }
 
 /**
@@ -349,27 +307,6 @@ void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, int
  */
 void RS_AuthNick_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	int error;
-	gclient_t *client = (gclient_t *)customp;
-	asIScriptContext *ctx;
-
-	if( !level.gametype.authNickDone )
-		return;
-
-	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
-
-	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.authNickDone) );
-	if( error < 0 )
-		return;
-
-	// Set the parameters
-	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
-	ctx->SetArgObject( 1, client );
-	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
-
-	error = ctx->Execute();
-	if( G_ExecutionErrorReport( error ) )
-		GT_asShutdownScript();
 }
 
 /**
@@ -399,25 +336,6 @@ void RS_AuthNick( gclient_t *client, const char *nick )
  */
 void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	int error;
-	asIScriptContext *ctx;
-
-	if( !level.gametype.authMapDone )
-		return;
-
-	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
-
-	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.authMapDone) );
-	if( error < 0 )
-		return;
-
-	// Set the parameters
-	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
-	ctx->SetArgObject( 1, rs_sqapi->GetRoot( query ) );
-
-	error = ctx->Execute();
-	if( G_ExecutionErrorReport( error ) )
-		GT_asShutdownScript();
 }
 
 /**
@@ -450,27 +368,6 @@ void RS_AuthMap()
  */
 void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	int error;
-	gclient_t *client = (gclient_t *)customp;
-	asIScriptContext *ctx;
-
-	if( !level.gametype.reportRaceDone )
-		return;
-
-	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
-
-	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.reportRaceDone) );
-	if( error < 0 )
-		return;
-
-	// Set the parameters
-	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
-	ctx->SetArgObject( 1, client );
-	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
-
-	error = ctx->Execute();
-	if( G_ExecutionErrorReport( error ) )
-		GT_asShutdownScript();
 }
 
 /**
@@ -562,27 +459,52 @@ void RS_ReportPlayer( const char *name, int mapId, int playTime, int races )
  */
 void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	int error;
+	int count, playerNum, i;
+	rs_racetime_t top, racetime, timediff;
+	cJSON *data, *node;
+	char *mapname;
+
 	gclient_t *client = (gclient_t *)customp;
-	asIScriptContext *ctx;
+	playerNum = (int)( client - game.clients );
 
-	if( !level.gametype.queryTopDone )
+	if( playerNum < 0 || playerNum >= gs.maxclients )
 		return;
 
-	ctx = angelExport->asAcquireContext( GAME_AS_ENGINE() );
-
-	error = ctx->Prepare( static_cast<asIScriptFunction *>(level.gametype.queryTopDone) );
-	if( error < 0 )
+	if( rs_sqapi->GetStatus( query ) != 200 )
+	{
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sError:%s Top query failed\n", 
+					S_COLOR_RED, S_COLOR_WHITE );
 		return;
+	}
 
-	// Set the parameters
-	ctx->SetArgDWord( 0, rs_sqapi->GetStatus( query ) );
-	ctx->SetArgObject( 1, client );
-	ctx->SetArgObject( 2, rs_sqapi->GetRoot( query ) );
+	// We assume the response is properly formed
+	data = (cJSON*)rs_sqapi->GetRoot( query );
+	count = cJSON_GetObjectItem( data, "count" )->valueint;
+	mapname = cJSON_GetObjectItem( data, "map" )->valuestring;
 
-	error = ctx->Execute();
-	if( G_ExecutionErrorReport( error ) )
-		GT_asShutdownScript();
+	G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sTop %d times on map %s\n",
+	 			S_COLOR_ORANGE, count, mapname );
+
+	node = cJSON_GetObjectItem( data, "races" )->child;
+	if( node )
+		RS_Racetime( cJSON_GetObjectItem( node, "time" )->valueint, &top );
+
+	for( i = 0; node != NULL; i++, node=node->next )
+	{
+		// Calculate the racetime and difftime from top for each record
+		RS_Racetime( cJSON_GetObjectItem( node, "time" )->valueint, &racetime );
+		RS_Racetime( racetime.timedelta - top.timedelta, &timediff );
+
+		// Print the row
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%d. %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s%s %s%s %s\n",
+			S_COLOR_WHITE, i + 1,
+			S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
+			( top.timedelta == racetime.timedelta ? S_COLOR_YELLOW : S_COLOR_RED ), 
+			( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli / 10,
+			S_COLOR_WHITE, cJSON_GetObjectItem( node, "playerName" )->valuestring,
+			S_COLOR_WHITE, cJSON_GetObjectItem( node, "created" )->valuestring,
+			( i == 0 ? cJSON_GetObjectItem( data, "oneliner" )->valuestring : "" ) );
+	}
 }
 
 
@@ -593,7 +515,7 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( "api/race/", qtrue );
-	rs_sqapi->SetField( query, "map", b64name );
+	rs_sqapi->SetField( query, "map", "Y29sZHJ1bg==" );
 	rs_sqapi->SetField( query, "limit", va( "%d", limit ) );
 
 	RS_SignQuery( query, (int)time( NULL ) );

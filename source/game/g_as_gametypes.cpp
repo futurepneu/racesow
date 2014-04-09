@@ -495,56 +495,6 @@ static bool G_asInitializeGametypeScript( asIScriptModule *asModule )
 		funcCount++;
 
 	// racesow
-	fdeclstr = "void RS_AuthRegister_Done( int status, Client @client, Json @data )";
-	level.gametype.authRegisterDone = asModule->GetFunctionByDecl( fdeclstr );
-	if( !level.gametype.authRegisterDone )
-	{
-		if( developer->integer || sv_cheats->integer )
-			G_Printf( "* The function '%s' was not present in the script.\n", fdeclstr );
-	}
-	else
-		funcCount++;
-
-	fdeclstr = "void RS_AuthPlayer_Done( int status, Client @client, Json @data )";
-	level.gametype.authPlayerDone = asModule->GetFunctionByDecl( fdeclstr );
-	if( !level.gametype.authPlayerDone )
-	{
-		if( developer->integer || sv_cheats->integer )
-			G_Printf( "* The function '%s' was not present in the script.\n", fdeclstr );
-	}
-	else
-		funcCount++;
-
-	fdeclstr = "void RS_AuthNick_Done( int status, Client @client, Json @data )";
-	level.gametype.authNickDone = asModule->GetFunctionByDecl( fdeclstr );
-	if( !level.gametype.authNickDone )
-	{
-		if( developer->integer || sv_cheats->integer )
-			G_Printf( "* The function '%s' was not present in the script.\n", fdeclstr );
-	}
-	else
-		funcCount++;
-
-	fdeclstr = "void RS_AuthMap_Done( int status, Json @data )";
-	level.gametype.authMapDone = asModule->GetFunctionByDecl( fdeclstr );
-	if( !level.gametype.authMapDone )
-	{
-		if( developer->integer || sv_cheats->integer )
-			G_Printf( "* The function '%s' was not present in the script.\n", fdeclstr );
-	}
-	else
-		funcCount++;
-
-	fdeclstr = "void RS_ReportRace_Done( int status, Client @client, Json @data )";
-	level.gametype.reportRaceDone = asModule->GetFunctionByDecl( fdeclstr );
-	if( !level.gametype.reportRaceDone )
-	{
-		if( developer->integer || sv_cheats->integer )
-			G_Printf( "* The function '%s' was not present in the script.\n", fdeclstr );
-	}
-	else
-		funcCount++;
-
 	fdeclstr = "void RS_QueryTop_Done( int status, Client @client, Json @data )";
 	level.gametype.queryTopDone = asModule->GetFunctionByDecl( fdeclstr );
 	if( !level.gametype.queryTopDone )

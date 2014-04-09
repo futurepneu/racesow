@@ -24,7 +24,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "q_comref.h"
 #include "q_collision.h"
 #include "gs_public.h"
-#include "gs_racesow.h" // racesow
 
 //===============================================================
 //		WARSOW player AAboxes sizes
