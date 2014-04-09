@@ -1914,6 +1914,19 @@ static void objectGameClient_SetRaceTime( int sector, unsigned int time, gclient
 	G_SetRaceTime( &game.edicts[ playerNum + 1 ], sector, time );
 }
 
+static rs_authplayer_t *objectGameClient_getAuth( gclient_t *self )
+{
+	int playerNum;
+
+	playerNum = (int)( self - game.clients );
+	assert( playerNum >= 0 && playerNum < gs.maxclients );
+
+	if( playerNum < 0 || playerNum >= gs.maxclients )
+		return NULL;
+
+	return &authplayers[playerNum];
+}
+
 static const asFuncdef_t gameclient_Funcdefs[] =
 {
 	ASLIB_FUNCDEF_NULL
@@ -1963,6 +1976,7 @@ static const asMethod_t gameclient_Methods[] =
 	{ ASLIB_FUNCTION_DECL(bool, get_chaseActive, () const ), asFUNCTION(objectGameClient_GetChaseActive), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, newRaceRun, ( int numSectors )), asFUNCTION(objectGameClient_NewRaceRun), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, setRaceTime, ( int sector, uint time )), asFUNCTION(objectGameClient_SetRaceTime), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(RS_PlayerAuth @, getAuth, ()), asFUNCTION(objectGameClient_getAuth), asCALL_CDECL_OBJLAST }, // racesow
 
 	ASLIB_METHOD_NULL
 };
@@ -2537,7 +2551,63 @@ static const asClassDescriptor_t asGameEntityClassDescriptor =
 	NULL, NULL					/* string factory hack */
 };
 
-//=======================================================================
+//= racesow =============================================================
+
+static asstring_t *objectRSPlayer_getName( rs_authplayer_t *self )
+{
+	return angelExport->asStringFactoryBuffer( self->name, strlen(self->name) );
+}
+
+static asstring_t *objectRSPlayer_getNick( rs_authplayer_t *self )
+{
+	return angelExport->asStringFactoryBuffer( self->nick, strlen(self->nick) );
+}
+
+static const asFuncdef_t rsplayer_Funcdefs[] =
+{
+	ASLIB_FUNCDEF_NULL
+};
+
+static const asBehavior_t rsplayer_ObjectBehaviors[] =
+{
+	ASLIB_BEHAVIOR_NULL
+};
+
+static const asMethod_t rsplayer_Methods[] =
+{
+	{ ASLIB_FUNCTION_DECL(const String @, getName, () const), asFUNCTION(objectRSPlayer_getName), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(const String @, getNick, () const), asFUNCTION(objectRSPlayer_getNick), asCALL_CDECL_OBJLAST },
+
+	ASLIB_METHOD_NULL
+};
+
+static const asProperty_t rsplayer_Properties[] =
+{
+	{ ASLIB_PROPERTY_DECL(Client @, client), ASLIB_FOFFSET(rs_authplayer_t, client) },
+	{ ASLIB_PROPERTY_DECL(int, status), ASLIB_FOFFSET(rs_authplayer_t, status) },
+	{ ASLIB_PROPERTY_DECL(int, nickStatus), ASLIB_FOFFSET(rs_authplayer_t, nickStatus) },
+	{ ASLIB_PROPERTY_DECL(int, id), ASLIB_FOFFSET(rs_authplayer_t, id) },
+	{ ASLIB_PROPERTY_DECL(int, failTime), ASLIB_FOFFSET(rs_authplayer_t, failTime) },
+	{ ASLIB_PROPERTY_DECL(int, playTime), ASLIB_FOFFSET(rs_authplayer_t, playTime) },
+	{ ASLIB_PROPERTY_DECL(int, races), ASLIB_FOFFSET(rs_authplayer_t, races) },
+
+	ASLIB_PROPERTY_NULL
+};
+
+static const asClassDescriptor_t asPlayerAuthClassDescriptor =
+{
+	"RS_PlayerAuth",			/* name */
+	asOBJ_REF|asOBJ_NOCOUNT,	/* object type flags */
+	sizeof( rs_authplayer_t ),	/* size */
+	rsplayer_Funcdefs,			/* funcdefs */
+	rsplayer_ObjectBehaviors,	/* object behaviors */
+	rsplayer_Methods,			/* methods */
+	rsplayer_Properties,		/* properties */
+
+	NULL, NULL					/* string factory hack */
+};
+
+//== !racesow ===========================================================
 
 
 static const asClassDescriptor_t * const asClassesDescriptors[] = 
@@ -2551,6 +2621,7 @@ static const asClassDescriptor_t * const asClassesDescriptors[] =
 	&asBotClassDescriptor,
 	&asGameClientDescriptor,
 	&asGameEntityClassDescriptor,
+	&asPlayerAuthClassDescriptor, // racesow
 
 	NULL
 };
