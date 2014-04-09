@@ -20,7 +20,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "g_local.h"
 #include "g_as_local.h"
-#include "../qcommon/cjson.h" // racesow
 #include "g_racesow.h" // racesow
 
 angelwrap_api_t *angelExport = NULL;
@@ -587,21 +586,6 @@ static const asEnumVal_t asMiscelaneaEnumVals[] =
 	ASLIB_ENUM_VAL_NULL
 };
 
-// racesow
-static const asEnumVal_t asJsonEnumVals[] =
-{
-	ASLIB_ENUM_VAL( cJSON_False ),
-	ASLIB_ENUM_VAL( cJSON_True ),
-	ASLIB_ENUM_VAL( cJSON_NULL ),
-	ASLIB_ENUM_VAL( cJSON_Number ),
-	ASLIB_ENUM_VAL( cJSON_String ),
-	ASLIB_ENUM_VAL( cJSON_Array ),
-	ASLIB_ENUM_VAL( cJSON_Object ),
-
-	ASLIB_ENUM_VAL_NULL
-};
-// !racesow
-
 //=======================================================================
 
 static const asEnum_t asEnums[] =
@@ -635,8 +619,6 @@ static const asEnum_t asEnums[] =
 	{ "meaningsofdeath_e", asMeaningsOfDeathEnumVals },
 	{ "takedamage_e", asDamageEnumVals },
 	{ "miscelanea_e", asMiscelaneaEnumVals },
-
-	{ "json_e", asJsonEnumVals }, // racesow
 
 	ASLIB_ENUM_VAL_NULL
 };
@@ -2556,89 +2538,7 @@ static const asClassDescriptor_t asGameEntityClassDescriptor =
 	NULL, NULL					/* string factory hack */
 };
 
-//= racesow =============================================================
-
-static asstring_t *objectJson_getName( cJSON *self )
-{
-	return angelExport->asStringFactoryBuffer( self->string, self->string ? strlen(self->string) : 0 );
-}
-
-static asstring_t *objectJson_getString( cJSON *self )
-{
-	return angelExport->asStringFactoryBuffer( self->valuestring, self->valuestring ? strlen(self->valuestring) : 0 );
-}
-
-static int objectJson_getSize( cJSON *self )
-{
-	if( self->type != cJSON_Object && self->type != cJSON_Array )
-		return 0;
-
-	return cJSON_GetArraySize( self );
-}
-
-static cJSON *objectJson_getObjectItem( asstring_t *name, cJSON *self )
-{
-	if( self->type != cJSON_Object )
-		return NULL;
-
-	return cJSON_GetObjectItem( self, name->buffer );
-}
-
-static cJSON *objectJson_getArrayItem( int index, cJSON *self )
-{
-	if( self->type != cJSON_Array )
-		return NULL;
-
-	return cJSON_GetArrayItem( self, index );
-}
-
-static const asFuncdef_t json_Funcdefs[] =
-{
-	ASLIB_FUNCDEF_NULL
-};
-
-static const asBehavior_t json_ObjectBehaviors[] =
-{
-	ASLIB_BEHAVIOR_NULL
-};
-
-static const asMethod_t json_Methods[] =
-{
-	{ ASLIB_FUNCTION_DECL(const String @, getName, () const), asFUNCTION(objectJson_getName), asCALL_CDECL_OBJLAST },
-	{ ASLIB_FUNCTION_DECL(const String @, getString, () const), asFUNCTION(objectJson_getString), asCALL_CDECL_OBJLAST },
-	{ ASLIB_FUNCTION_DECL(int, getSize, ()), asFUNCTION(objectJson_getSize), asCALL_CDECL_OBJLAST },
-	{ ASLIB_FUNCTION_DECL(Json @, getItem, (const String &name)), asFUNCTION(objectJson_getObjectItem), asCALL_CDECL_OBJLAST },
-	{ ASLIB_FUNCTION_DECL(Json @, getItem, (int index)), asFUNCTION(objectJson_getArrayItem), asCALL_CDECL_OBJLAST },
-
-	ASLIB_METHOD_NULL
-};
-
-static const asProperty_t json_Properties[] =
-{
-	{ ASLIB_PROPERTY_DECL(int, type), ASLIB_FOFFSET(cJSON, type) },
-	{ ASLIB_PROPERTY_DECL(int, valueint), ASLIB_FOFFSET(cJSON, valueint) },
-	{ ASLIB_PROPERTY_DECL(float, value), ASLIB_FOFFSET(cJSON, valuedouble) },
-	{ ASLIB_PROPERTY_DECL(Json, @next), ASLIB_FOFFSET(cJSON, next) },
-	{ ASLIB_PROPERTY_DECL(Json, @prev), ASLIB_FOFFSET(cJSON, prev) },
-	{ ASLIB_PROPERTY_DECL(Json, @child), ASLIB_FOFFSET(cJSON, child) },
-
-	ASLIB_PROPERTY_NULL
-};
-
-static const asClassDescriptor_t asJsonClassDescriptor =
-{
-	"Json",						/* name */
-	asOBJ_REF|asOBJ_NOCOUNT,	/* object type flags */
-	sizeof( cJSON ),			/* size */
-	json_Funcdefs,				/* funcdefs */
-	json_ObjectBehaviors,		/* object behaviors */
-	json_Methods,				/* methods */
-	json_Properties,			/* properties */
-
-	NULL, NULL					/* string factory hack */
-};
-
-//= !racesow ============================================================
+//=======================================================================
 
 
 static const asClassDescriptor_t * const asClassesDescriptors[] = 
@@ -2652,7 +2552,6 @@ static const asClassDescriptor_t * const asClassesDescriptors[] =
 	&asBotClassDescriptor,
 	&asGameClientDescriptor,
 	&asGameEntityClassDescriptor,
-	&asJsonClassDescriptor, // racesow
 
 	NULL
 };
