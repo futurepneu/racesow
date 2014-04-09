@@ -21,6 +21,7 @@ typedef struct rs_authplayer_s
 	qstatus_t nickStatus;		/**< status of the nickname query */
 	char name[MAX_NAME_CHARS];	/**< username */
 	char nick[MAX_NAME_CHARS];	/**< ingame nickname */
+	bool admin;					/**< has admin privleges */
 	int id;						/**< database id for player, 0 for unauthenticated */
 	int failTime;				/**< leveltime to rename the player */
 	int playTime;				/**< time spent playing the map in milliseconds */

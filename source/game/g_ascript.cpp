@@ -2586,6 +2586,7 @@ static const asProperty_t rsplayer_Properties[] =
 	{ ASLIB_PROPERTY_DECL(Client @, client), ASLIB_FOFFSET(rs_authplayer_t, client) },
 	{ ASLIB_PROPERTY_DECL(int, status), ASLIB_FOFFSET(rs_authplayer_t, status) },
 	{ ASLIB_PROPERTY_DECL(int, nickStatus), ASLIB_FOFFSET(rs_authplayer_t, nickStatus) },
+	{ ASLIB_PROPERTY_DECL(bool, admin), ASLIB_FOFFSET(rs_authplayer_t, admin) },
 	{ ASLIB_PROPERTY_DECL(int, id), ASLIB_FOFFSET(rs_authplayer_t, id) },
 	{ ASLIB_PROPERTY_DECL(int, failTime), ASLIB_FOFFSET(rs_authplayer_t, failTime) },
 	{ ASLIB_PROPERTY_DECL(int, playTime), ASLIB_FOFFSET(rs_authplayer_t, playTime) },

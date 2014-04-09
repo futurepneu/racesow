@@ -33,6 +33,7 @@ static void RS_PlayerInfo( rs_authplayer_t *player )
 	G_Printf( "nickStatus: %d\n", player->nickStatus );
 	G_Printf( "name: %s\n", player->name );
 	G_Printf( "nick: %s\n", player->nick );
+	G_Printf( "admin: %d\n", player->admin );
 	G_Printf( "id: %d\n", player->id );
 	G_Printf( "failTime: %d\n", player->failTime );
 	G_Printf( "playTime: %d\n", player->playTime );
