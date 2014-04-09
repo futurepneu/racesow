@@ -57,6 +57,7 @@ void RS_Init( void )
 	rs_splashfrac = trap_Cvar_Get( "rs_splashfrac", "1.3", CVAR_ARCHIVE );
 
 	RS_InitQuery();
+	RS_InitAuth();
 }
 
 /**
@@ -66,6 +67,15 @@ void RS_Init( void )
 void RS_Shutdown( void )
 {
 	RS_ShutdownQuery();
+	RS_ShutdownAuth();
+}
+
+/**
+ * Racesow thinking, called every game frame
+ */
+void RS_Think( void )
+{
+	RS_ThinkAuth();
 }
 
 /**

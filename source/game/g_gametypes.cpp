@@ -1785,6 +1785,8 @@ void G_RunGametype( void )
 
 	G_UpdateScoreBoardMessages();
 
+	RS_Think(); // racesow
+
 	//check gametype specific rules
 	if( game.asEngine != NULL )
 		GT_asCallThinkRules();

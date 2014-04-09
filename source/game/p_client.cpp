@@ -691,6 +691,7 @@ void ClientBegin( edict_t *ent )
 	G_ClientEndSnapFrame( ent ); // make sure all view stuff is valid
 
 	// let the gametype scripts now this client just entered the level
+	RS_PlayerEnter( ent->r.client ); // racesow
 	G_Gametype_ScoreEvent( ent->r.client, "enterGame", NULL );
 }
 
@@ -1299,6 +1300,7 @@ void ClientDisconnect( edict_t *ent, const char *reason )
 	ent->movetype = MOVETYPE_NOCLIP; // allow freefly
 
 	// let the gametype scripts know this client just disconnected
+	RS_PlayerDisconnect( ent->r.client ); // racesow
 	G_Gametype_ScoreEvent( ent->r.client, "disconnect", NULL );
 
 	G_FreeAI( ent );
