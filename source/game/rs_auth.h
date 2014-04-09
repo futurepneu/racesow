@@ -37,3 +37,4 @@ void RS_ThinkAuth( void );
 
 void RS_PlayerEnter( gclient_t *client );
 void RS_PlayerDisconnect( gclient_t *client );
+void RS_PlayerReset( rs_authplayer_t *player );

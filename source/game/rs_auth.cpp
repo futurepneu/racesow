@@ -70,3 +70,16 @@ void RS_PlayerDisconnect( gclient_t *client )
 	rs_authplayer_t *player = &authplayers[playerNum];
 	memset( player, 0, sizeof( rs_authplayer_t ) );
 }
+
+/**
+ * Reset the auth specific fields on a player
+ * @param player The player to reset
+ */
+void RS_PlayerReset( rs_authplayer_t *player )
+{
+	player->id = 0;
+	player->status = QSTATUS_NONE;
+	player->admin = false;
+	player->playTime = 0;
+	player->races = 0;
+}
