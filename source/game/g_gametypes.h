@@ -169,7 +169,6 @@ typedef struct
 	bool mmCompatible;
 
 	// racesow
-	void *queryTopDone;
 	void *queryMapsDone;
 
 	bool autoInactivityRemove;

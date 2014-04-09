@@ -495,16 +495,6 @@ static bool G_asInitializeGametypeScript( asIScriptModule *asModule )
 		funcCount++;
 
 	// racesow
-	fdeclstr = "void RS_QueryTop_Done( int status, Client @client, Json @data )";
-	level.gametype.queryTopDone = asModule->GetFunctionByDecl( fdeclstr );
-	if( !level.gametype.queryTopDone )
-	{
-		if( developer->integer || sv_cheats->integer )
-			G_Printf( "* The function '%s' was not present in the script.\n", fdeclstr );
-	}
-	else
-		funcCount++;
-
 	fdeclstr = "void RS_QueryMaps_Done( int status, Client @client, Json @data )";
 	level.gametype.queryMapsDone = asModule->GetFunctionByDecl( fdeclstr );
 	if( !level.gametype.queryMapsDone )
