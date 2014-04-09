@@ -383,17 +383,12 @@ static const char *CG_SC_RaceDemoPath( void )
  */
 static const char *CG_SC_RaceDemoName( unsigned int raceTime )
 {
-	unsigned int hour, min, sec, milli;
+	rs_racetime_t t;
 	static char name[MAX_STRING_CHARS];
 	char mapname[MAX_CONFIGSTRING_CHARS];
 
-	milli = raceTime;
-	hour = milli / 3600000;
-	milli -= hour * 3600000;
-	min = milli / 60000;
-	milli -= min * 60000;
-	sec = milli / 1000;
-	milli -= sec * 1000;
+	// parse the racetime
+	RS_Racetime( raceTime, &t );
 
 	// lowercase mapname
 	Q_strncpyz( mapname, cgs.configStrings[CS_MAPNAME], sizeof( mapname ) );
@@ -402,7 +397,7 @@ static const char *CG_SC_RaceDemoName( unsigned int raceTime )
 	// make file path
 	// "gametype/map/map_time_random"
 	Q_snprintfz( name, sizeof( name ), "%s_%02u-%02u-%02u-%003u_%04i",
-		mapname, hour, min, sec, milli, (int)brandom( 0, 9999 ) );
+		mapname, t.hour, t.min, t.sec, t.milli, (int)brandom( 0, 9999 ) );
 
 	return name;
 }

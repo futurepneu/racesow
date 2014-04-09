@@ -64,3 +64,22 @@ qboolean RS_QueryPjState(int playerNum)
 		pj_dashes[playerNum] > 1 ||
 		pj_walljumps[playerNum] > 1 );
 }
+
+/**
+ * Calculate the racetime of a race in readable units
+ * Be sure to free the result when done
+ * @param  time     Timedelta in milliseconds
+ * @param  racetime Destination racetime
+ * @return          Void
+ */
+void RS_Racetime( int timedelta, rs_racetime_t *racetime )
+{
+	racetime->timedelta = timedelta;
+	racetime->hour = timedelta / 3600000;
+	timedelta -= racetime->hour * 3600000;
+	racetime->min = timedelta / 60000;
+	timedelta -= racetime->min * 60000;
+	racetime->sec = timedelta / 1000;
+	timedelta -= racetime->sec * 1000;
+	racetime->milli = timedelta;
+}
