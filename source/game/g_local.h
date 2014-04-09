@@ -36,8 +36,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // racesow
 #include "g_racesow.h"
-#include "rs_query.h"
 #include "rs_auth.h"
+#include "rs_query.h"
 #// !racesow
 
 //==================================================================

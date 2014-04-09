@@ -1,3 +1,5 @@
+#include "g_as_local.h"
+
 void RS_InitQuery( void );
 void RS_ShutdownQuery( void );
 

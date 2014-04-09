@@ -1,4 +1,8 @@
 #include "g_local.h"
+#include "../qcommon/cjson.h"
+#include "../matchmaker/mm_query.h"
+#include "../qalgo/base64.h"
+#include "../qalgo/sha2.h"
 
 static stat_query_api_t *rs_sqapi;
 
