@@ -6,7 +6,6 @@
 
 #define RS_MAPLIST_ITEMS 20
 
-extern cvar_t *rs_statsEnabled;
 extern cvar_t *rs_grenade_minKnockback;
 extern cvar_t *rs_grenade_maxKnockback;
 extern cvar_t *rs_grenade_splash;
@@ -36,16 +35,3 @@ void RS_Init( void );
 void RS_Shutdown( void );
 void RS_removeProjectiles( edict_t *owner );
 void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, const vec3_t point, float maxradius, vec3_t pushdir, float *kickFrac, float *dmgFrac );
-
-void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *email, const char *nick );
-void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, int authTime, int mapId );
-void RS_AuthNick( gclient_t *client, const char *nick );
-void RS_AuthMap();
-
-void RS_ReportRace( gclient_t *client, int playerId, int mapId, int time, CScriptArrayInterface *checkpoints );
-void RS_ReportMap( int playTime, int races );
-void RS_ReportPlayer( const char *name, int mapId, int playTime, int races );
-
-void RS_QueryTop( gclient_t *client, const char* mapname, int limit );
-void RS_QueryMaps( gclient_t *client, const char* pattern, const char* tags, int page );
-void RS_QueryRandmap( char* tags[], void *data );

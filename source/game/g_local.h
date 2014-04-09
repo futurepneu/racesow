@@ -35,6 +35,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../matchmaker/mm_rating.h"
 
 #include "g_racesow.h" // racesow
+#include "rs_query.h" // racesow
 
 //==================================================================
 // round(x)==floor(x+0.5f)
