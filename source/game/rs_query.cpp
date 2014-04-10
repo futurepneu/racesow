@@ -27,6 +27,38 @@ void RS_ShutdownQuery( void )
 }
 
 /**
+ * Parse a race record from a database query into a race string
+ * @param  record The json object of the record
+ * @return        String representing the race
+ */
+static char *RS_ParseRace( cJSON *record )
+{
+	static char args[1024];
+	cJSON *node;
+	std::vector<int> argv;
+	int cpNum, cpTime;
+
+	// Parse the world record into a string to hand to angelscript
+	// "racetime cp1 cp2 cp3... cpN"
+	argv.push_back( cJSON_GetObjectItem( record, "time" )->valueint );
+	node = cJSON_GetObjectItem( record, "checkpoints" )->child;
+	for( ; node; node=node->next )
+	{
+		cpNum = cJSON_GetObjectItem( node, "number" )->valueint;
+		cpTime = cJSON_GetObjectItem( node, "time" )->valueint;
+		if( cpNum + 1 >= (int)argv.size() )
+			argv.resize( cpNum + 2 );
+		argv[cpNum + 1] = cpTime;
+	}
+
+	memset( args, 0, sizeof( args ) );
+	for(std::vector<int>::iterator it = argv.begin(); it != argv.end(); ++it)
+		Q_strncatz( args, va( "%d ", *it ), sizeof( args ) - 1 );
+
+	return args;
+}
+
+/**
  * RS_GenToken
  * Generate the server token for the given string
  * @param dst The token string to append to
@@ -204,9 +236,6 @@ void RS_AuthNick( gclient_t *client, const char *nick )
  */
 void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	std::vector<int> argv;
-	char args[1024];
-	int cpNum, cpTime;
 	cJSON *data, *node;
 
 	if( rs_sqapi->GetStatus( query ) != 200 )
@@ -227,28 +256,7 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 	if( node->type != cJSON_Object )
 		return;
 
-	// Parse the world record into a string to hand to angelscript
-	// "racetime cp1 cp2 cp3... cpN"
-	argv.push_back( cJSON_GetObjectItem( node, "time" )->valueint );
-	node = cJSON_GetObjectItem( node, "checkpoints" )->child;
-	for( ; node; node=node->next )
-	{
-		cpNum = cJSON_GetObjectItem( node, "number" )->valueint;
-		cpTime = cJSON_GetObjectItem( node, "time" )->valueint;
-		if( cpNum + 1 >= (int)argv.size() )
-			argv.resize( cpNum + 2 );
-		argv[cpNum + 1] = cpTime;
-	}
-
-	memset( args, 0, sizeof( args ) );
-	for(std::vector<int>::iterator it = argv.begin(); it != argv.end(); ++it)
-	{
-		G_Printf( "args: %s\n", args );		
-		Q_strncatz( args, va( "%d ", *it ), sizeof( args ) - 1 );
-	}
-
-	G_Printf( "args: %s\n", args );
-	G_Gametype_ScoreEvent( NULL, "rs_loadmap", args );
+	G_Gametype_ScoreEvent( NULL, "rs_loadmap", RS_ParseRace( node ) );
 }
 
 /**
