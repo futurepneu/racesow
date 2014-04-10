@@ -1,3 +1,5 @@
+#define MAX_AUTH_CHARS 64
+
 typedef enum
 {
 	QSTATUS_NONE,				/**< no query was sent */
@@ -19,8 +21,8 @@ typedef struct rs_authplayer_s
 	gclient_t *client;			/**< client for the player */
 	qstatus_t status;			/**< status of the inprogress query */
 	qstatus_t nickStatus;		/**< status of the nickname query */
-	char name[MAX_NAME_CHARS];	/**< username */
-	char nick[MAX_NAME_CHARS];	/**< ingame nickname */
+	char name[MAX_AUTH_CHARS];	/**< username */
+	char nick[MAX_NAME_CHARS];	/**< simplified ingame nickname */
 	bool admin;					/**< has admin privleges */
 	int id;						/**< database id for player, 0 for unauthenticated */
 	int failTime;				/**< leveltime to rename the player */

@@ -153,29 +153,64 @@ void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, con
 }
 
 /**
- * AuthPlayer callback function
- * @param query Query calling this function
+ * AuthPlayer callback handler
+ * @param query   Query calling this function
  * @param success True on any response
- * @param customp gclient_t of the client being queried
- * @return void
+ * @param customp rs_authplayer_t of the player being queried
  */
 void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 {
+	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
+	cJSON *data, *node;
+	int playerNum;
+
+	// Did they disconnect?
+	playerNum = (int)( player->client - game.clients );
+	if( playerNum < 0 || playerNum >= gs.maxclients )
+		return;
+
+	RS_PlayerReset( player );
+	if( rs_sqapi->GetStatus( query ) != 200 )
+	{
+		G_PrintMsg( NULL, "%sError:%s %s failed to authenticate as %s\n", 
+					S_COLOR_RED, S_COLOR_WHITE, player->client->netname, player->name );
+		player->status = QSTATUS_FAILED;
+		return;
+	}
+
+	data = (cJSON*)rs_sqapi->GetRoot( query );
+	player->status = QSTATUS_SUCCESS;
+	player->id = cJSON_GetObjectItem( data, "id" )->valueint;
+	player->admin = cJSON_GetObjectItem( data, "admin" )->type == cJSON_True;
+	Q_strncpyz( player->name, cJSON_GetObjectItem( data, "username" )->valuestring, sizeof( player->name ) );
+
+	G_PrintMsg( NULL, "%s%s authenticated as %s\n", player->client->netname, S_COLOR_WHITE, player->name );
+	if( player->admin )
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "You are an admin. Player id: %d\n", player->id );
+	else
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "Player id: %d\n", player->id );
+
+	// Check for a world record
+	node = cJSON_GetObjectItem( data, "record" );
+	if( node->type != cJSON_Object )
+		return;
+	G_Gametype_ScoreEvent( player->client, "rs_loadplayer", RS_ParseRace( node ) );
 }
 
 /**
- * Authenticate a player
- * @param client The client being authenticated
- * @param name The player's auth name
- * @param ctoken The client's signed token
- * @param uTime Unix timestamp tokens were generated with
- * @param mapId Id number of the map to return playerdata for
- * @return void
+ * Authenticate and login a player
+ * @param player Playerauth to authenticate
+ * @param name   Player's login name
+ * @param ctoken Player's authentication token
+ * @param uTime  Unixtimestamp used to sign the token
  */
-void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, int uTime, int mapId )
+void RS_AuthPlayer( rs_authplayer_t *player, const char *name, const char *ctoken, int uTime )
 {
 	stat_query_t *query;
 	char url[MAX_STRING_CHARS], *b64name;
+
+	if( !rs_statsEnabled->integer )
+		return;
 
 	if( !name || !strlen( name ) || !ctoken || !strlen( ctoken ) )
 		return;
@@ -188,12 +223,13 @@ void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, int
 
 	// Form the query and query parameters
 	query = rs_sqapi->CreateQuery( url, qtrue );
-	rs_sqapi->SetField( query, "mid",  va( "%d", mapId ) );
+	rs_sqapi->SetField( query, "mid", va( "%d", authmap.id ) );
 	rs_sqapi->SetField( query, "cToken", ctoken );
 
 	RS_SignQuery( query, uTime );
-	rs_sqapi->SetCallback( query, RS_AuthPlayer_Done, (void*)client );
+	rs_sqapi->SetCallback( query, RS_AuthPlayer_Done, (void*)player );
 	rs_sqapi->Send( query );
+	player->status = QSTATUS_PENDING;
 	query = NULL;
 }
 
