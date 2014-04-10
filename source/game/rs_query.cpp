@@ -100,35 +100,83 @@ static void RS_SignQuery( stat_query_t *query, int uTime )
 }
 
 /**
- * AuthPlayer callback function
- * @param query Query calling this function
+ * Handle callback for register query
+ * @param query   The query calling this function
  * @param success True on any response
- * @param customp gclient_t of the client being queried
- * @return void
+ * @param customp rs_authplayer_t for the player to register
  */
 void RS_AuthRegister_Done( stat_query_t *query, qboolean success, void *customp )
 {
+	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
+	cJSON *data;
+	int playerNum;
+
+	// Did they disconnect?
+	playerNum = (int)( player->client - game.clients );
+	if( playerNum < 0 || playerNum >= gs.maxclients )
+		return;
+	
+	data = (cJSON*)rs_sqapi->GetRoot( query );
+	if( rs_sqapi->GetStatus( query ) != 200 )
+	{
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sError:%s Failed to register\n",
+					S_COLOR_RED, S_COLOR_WHITE );
+		if( data )
+			G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sError:%s %s\n",
+					S_COLOR_RED, S_COLOR_WHITE, cJSON_GetObjectItem( data, "error" )->valuestring );
+		player->status = QSTATUS_FAILED;
+		return;
+	}
+
+	RS_PlayerReset( player );
+	player->status = QSTATUS_SUCCESS;
+	player->id = cJSON_GetObjectItem( data, "id" )->valueint;
+	player->admin = cJSON_GetObjectItem( data, "admin" )->type == cJSON_True;
+	Q_strncpyz( player->name, cJSON_GetObjectItem( data, "username" )->valuestring, sizeof( player->name ) );
+
+	G_PrintMsg( NULL, "%s%s authenticated as %s\n", player->client->netname, S_COLOR_WHITE, player->name );
+	if( player->admin )
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "You are an admin. Player id: %d\n", player->id );
+	else
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "Player id: %d\n", player->id );
 }
 
 /**
- * Register a player
- * @param client The client being authenticated
- * @param name The player's auth name
- * @param pass The player's pre-hashed password
- * @param email The player's email address
- * @param nick The player's nick to protect
- * @return void
+ * Send the query to register a new player
+ * @param player The player being registered
+ * @param name   Username
+ * @param pass   Prehashed password
+ * @param email  Email address
  */
-void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *email, const char *nick )
+void RS_AuthRegister( rs_authplayer_t *player, const char *name, const char *pass, const char *email )
 {
 	stat_query_t *query;
 	char url[MAX_STRING_CHARS], *b64name, *b64email, *b64nick;
+	int playerNum;
+
+	if( !rs_statsEnabled->integer )
+		return;
 
 	if( !name || !strlen( name ) ||
 		!pass || !strlen( pass ) ||
-		!email || !strlen( email ) ||
-		!nick || !strlen( nick ) )
+		!email || !strlen( email ) )
 		return;
+
+	playerNum = (int)( player->client - game.clients );
+	if( playerNum < 0 && playerNum >= gs.maxclients )
+		return;
+	if( player->status == QSTATUS_PENDING )
+	{
+		G_PrintMsg( &game.edicts[playerNum + 1], "%sError: %sPlease wait for your current query to finish\n",
+					S_COLOR_RED, S_COLOR_WHITE );
+		return;
+	}
+	if( player->id )
+	{
+		G_PrintMsg( &game.edicts[playerNum + 1], "%sError: %sYou are already logged in.\n",
+					S_COLOR_RED, S_COLOR_WHITE );
+		return;
+	}
 
 	// Make the URL
 	b64name = (char*)base64_encode( (unsigned char *)name, strlen( name ), NULL );
@@ -137,7 +185,7 @@ void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, con
 	free( b64name );
 
 	// Form the query and query parameters
-	b64nick = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
+	b64nick = (char*)base64_encode( (unsigned char *)player->client->netname, strlen( player->client->netname ), NULL );
 	b64email = (char*)base64_encode( (unsigned char *)email, strlen( email ), NULL );
 	query = rs_sqapi->CreateQuery( url, qfalse );
 	rs_sqapi->SetField( query, "email", b64email );
@@ -145,7 +193,7 @@ void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, con
 	rs_sqapi->SetField( query, "cToken", pass );
 
 	RS_SignQuery( query, (int)time( NULL ) );
-	rs_sqapi->SetCallback( query, RS_AuthRegister_Done, (void*)client );
+	rs_sqapi->SetCallback( query, RS_AuthRegister_Done, (void*)player );
 	rs_sqapi->Send( query );
 	free( b64email );
 	free( b64nick );
@@ -221,7 +269,7 @@ void RS_AuthPlayer( rs_authplayer_t *player, const char *name, const char *ctoke
 		return;
 	if( player->status == QSTATUS_PENDING )
 	{
-		G_PrintMsg( &game.edicts[playerNum + 1], "%sError: %sPlease wait for your current query to finish",
+		G_PrintMsg( &game.edicts[playerNum + 1], "%sError: %sPlease wait for your current query to finish\n",
 					S_COLOR_ORANGE, S_COLOR_WHITE );
 		return;
 	}

@@ -3,7 +3,7 @@
 void RS_InitQuery( void );
 void RS_ShutdownQuery( void );
 
-void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *email, const char *nick );
+void RS_AuthRegister( rs_authplayer_t *player, const char *name, const char *pass, const char *email );
 void RS_AuthPlayer( rs_authplayer_t *player, const char *name, const char *ctoken, int uTime );
 void RS_AuthNick( gclient_t *client, const char *nick );
 void RS_AuthMap( void );
