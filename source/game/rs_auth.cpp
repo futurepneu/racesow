@@ -60,6 +60,9 @@ void RS_PlayerEnter( gclient_t *client )
 	memset( player, 0, sizeof( *player ) );
 	player->client = client;
 	Q_strncpyz( player->nick, client->netname, sizeof( player->nick ) );
+
+	// Ask the player to auto login
+	trap_GameCmd( &game.edicts[playerNum + 1], "slogin" );
 }
 
 
