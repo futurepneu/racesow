@@ -381,9 +381,6 @@ void G_Init( unsigned int seed, unsigned int framemsec, int protocol )
 	// weapon items
 	GS_InitWeapons();
 
-	// racesow
-	RS_Init();
-
 	// init AS engine
 	G_asInitGameModuleEngine();
 }
