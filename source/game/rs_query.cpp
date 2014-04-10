@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "g_local.h"
 #include "../qcommon/cjson.h"
 #include "../matchmaker/mm_query.h"
@@ -202,25 +204,66 @@ void RS_AuthNick( gclient_t *client, const char *nick )
  */
 void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 {
+	std::vector<int> argv;
+	char args[1024];
+	int cpNum, cpTime;
+	cJSON *data, *node;
+
+	if( rs_sqapi->GetStatus( query ) != 200 )
+	{
+		G_Printf( "%sError:%s Failed to query map.\nDisabling statistics reporting.", 
+					S_COLOR_RED, S_COLOR_WHITE );
+		trap_Cvar_ForceSet( rs_statsEnabled->name, "0" );
+		return;
+	}
+
+	// We assume the response is properly formed
+	data = (cJSON*)rs_sqapi->GetRoot( query );
+	authmap.id = cJSON_GetObjectItem( data, "id" )->valueint;
+	G_Printf( "Map id: %d\n", authmap.id );
+
+	// Check for a world record
+	node = cJSON_GetObjectItem( data, "record" );
+	if( node->type != cJSON_Object )
+		return;
+
+	// Parse the world record into a string to hand to angelscript
+	// "racetime cp1 cp2 cp3... cpN"
+	argv.push_back( cJSON_GetObjectItem( node, "time" )->valueint );
+	node = cJSON_GetObjectItem( node, "checkpoints" )->child;
+	for( ; node; node=node->next )
+	{
+		cpNum = cJSON_GetObjectItem( node, "number" )->valueint;
+		cpTime = cJSON_GetObjectItem( node, "time" )->valueint;
+		if( cpNum + 1 >= (int)argv.size() )
+			argv.resize( cpNum + 2 );
+		argv[cpNum + 1] = cpTime;
+	}
+
+	memset( args, 0, sizeof( args ) );
+	for(std::vector<int>::iterator it = argv.begin(); it != argv.end(); ++it)
+	{
+		G_Printf( "args: %s\n", args );		
+		Q_strncatz( args, va( "%d ", *it ), sizeof( args ) - 1 );
+	}
+
+	G_Printf( "args: %s\n", args );
+	G_Gametype_ScoreEvent( NULL, "rs_loadmap", args );
 }
 
 /**
- * Get auth data for the current map
+ * Get map id and world record
  * @return void
  */
-void RS_AuthMap()
+void RS_AuthMap( void )
 {
 	stat_query_t *query;
-	char *b64name, url[MAX_STRING_CHARS];
 
-	// Form the url
-	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
-	Q_strncpyz( url, "api/map/", sizeof( url ) - 1 );
-	Q_strncatz( url, b64name, sizeof( url ) - 1 );
-	free( b64name );
+	if( !rs_statsEnabled->integer )
+		return;
 
 	// Form the query
-	query = rs_sqapi->CreateQuery( url, qtrue );
+	query = rs_sqapi->CreateQuery( va( "api/map/%s", authmap.b64name ), qtrue );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
 
 	RS_SignQuery( query, (int)time( NULL ) );

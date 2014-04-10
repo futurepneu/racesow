@@ -1,4 +1,5 @@
 #include "g_local.h"
+#include "../qalgo/base64.h"
 
 rs_authmap_t authmap;
 rs_authplayer_t *authplayers;
@@ -6,11 +7,16 @@ rs_authplayer_t *authplayers;
 void RS_InitAuth( void )
 {
 	authplayers = ( rs_authplayer_t* )G_Malloc( gs.maxclients * sizeof( authplayers[0] ) );
+	authmap.b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
+
+	// Authenticate the map
+	RS_AuthMap();
 }
 
 void RS_ShutdownAuth( void )
 {
 	G_Free( authplayers );
+	free( authmap.b64name );
 }
 
 void RS_ThinkAuth( void )

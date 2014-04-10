@@ -6,7 +6,7 @@ void RS_ShutdownQuery( void );
 void RS_AuthRegister( gclient_t *client, const char *name, const char *pass, const char *email, const char *nick );
 void RS_AuthPlayer( gclient_t *client, const char *name, const char *ctoken, int authTime, int mapId );
 void RS_AuthNick( gclient_t *client, const char *nick );
-void RS_AuthMap();
+void RS_AuthMap( void );
 
 void RS_ReportRace( gclient_t *client, int playerId, int mapId, int time, CScriptArrayInterface *checkpoints );
 void RS_ReportMap( int playTime, int races );

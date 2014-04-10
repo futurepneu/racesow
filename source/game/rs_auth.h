@@ -8,7 +8,7 @@ typedef enum
 
 typedef struct rs_authmap_s
 {
-	qstatus_t status;			/**< status of current query */
+	char *b64name;				/**< Base64 encoded name of the map */
 	int id;						/**< database id of the map */
 	int playTime;				/**< time playing the map in milliseconds */
 	int races;					/**< number of races finished */
