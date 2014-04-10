@@ -208,12 +208,23 @@ void RS_AuthPlayer( rs_authplayer_t *player, const char *name, const char *ctoke
 {
 	stat_query_t *query;
 	char url[MAX_STRING_CHARS], *b64name;
+	int playerNum;
 
 	if( !rs_statsEnabled->integer )
 		return;
 
 	if( !name || !strlen( name ) || !ctoken || !strlen( ctoken ) )
 		return;
+
+	playerNum = (int)( player->client - game.clients );
+	if( playerNum < 0 && playerNum >= gs.maxclients )
+		return;
+	if( player->status == QSTATUS_PENDING )
+	{
+		G_PrintMsg( &game.edicts[playerNum + 1], "%sError: %sPlease wait for your current query to finish",
+					S_COLOR_ORANGE, S_COLOR_WHITE );
+		return;
+	}
 
 	// Make the URL
 	b64name = (char*)base64_encode( (unsigned char *)name, strlen( name ), NULL );
