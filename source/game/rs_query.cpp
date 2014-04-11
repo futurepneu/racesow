@@ -627,7 +627,8 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 
 void RS_QueryRandmap_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	char **mapname = (char**)customp;
+	static char mapname[MAX_STRING_CHARS];
+	char **votedata = (char**)customp;
 	cJSON *data = (cJSON*)rs_sqapi->GetRoot( query );
 
 	// invalid response?
@@ -649,17 +650,19 @@ void RS_QueryRandmap_Done( stat_query_t *query, qboolean success, void *customp 
 
 	// copy the mapname
 	cJSON *map = cJSON_GetObjectItem( cJSON_GetObjectItem( data, "maps" )->child, "name" );
-	Q_strncpyz( *mapname, map->valuestring, MAX_STRING_CHARS );
+	Q_strncpyz( mapname, map->valuestring, sizeof( mapname ) );
 
 	// do we have the map or is it the current map?
-	if( !trap_ML_FilenameExists( *mapname ) || !Q_stricmp( *mapname, level.mapname ) )
+	if( !trap_ML_FilenameExists( mapname ) || !Q_stricmp( mapname, level.mapname ) )
 	{
 		G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
 		G_CallVotes_Reset();
 		return;
 	}
 
-	G_PrintMsg( NULL, "Randmap picked: %s\n", *mapname );
+	// Save the mapname
+	*votedata = mapname;
+	G_PrintMsg( NULL, "Randmap picked: %s\n", mapname );
 }
 
 void RS_QueryRandmap( char* tags[], void *data )
@@ -670,10 +673,7 @@ void RS_QueryRandmap( char* tags[], void *data )
 
 	// Format the tags
 	while( *tags )
-	{
 		cJSON_AddItemToArray( arr, cJSON_CreateString( *tags++ ) );
-		G_Printf( "%s\n", *tags++ );
-	}
 	b64tags = cJSON_Print( arr );
 	b64tags = (char*)base64_encode( (unsigned char *)b64tags, strlen( b64tags ), NULL );
 

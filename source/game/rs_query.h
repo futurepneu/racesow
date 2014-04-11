@@ -1,5 +1,7 @@
 #include "g_as_local.h"
 
+extern cvar_t *rs_statsEnabled;
+
 void RS_InitQuery( void );
 void RS_ShutdownQuery( void );
 

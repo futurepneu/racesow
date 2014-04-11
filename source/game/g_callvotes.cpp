@@ -357,11 +357,18 @@ static http_response_code_t G_VoteMapWebRequest( http_query_method_t method, con
 
 static bool G_VoteRandmapValidate( callvotedata_t *vote, bool first )
 {
+	if( !first )
+		return true;
+
+	if( !rs_statsEnabled->integer )
+	{
+		G_PrintMsg( vote->caller, "%sError: %sNo database backend\n", S_COLOR_RED, S_COLOR_WHITE );
+		return false;
+	}
+
 	if( first )
 	{
-		vote->data = G_Malloc( MAX_STRING_CHARS );
 		RS_QueryRandmap( vote->argv, &vote->data );
-		return true;
 	}
 
 	return true;
@@ -370,6 +377,9 @@ static bool G_VoteRandmapValidate( callvotedata_t *vote, bool first )
 static void G_VoteRandmapPassed( callvotedata_t *vote )
 {
 	Q_strncpyz( level.forcemap, Q_strlwr( (char*)vote->data ), sizeof( level.forcemap ) );
+	// vote->data points to a static char[] in rs_query
+	// Set to null here to prevent trying to free it later
+	vote->data = NULL;
 	G_EndMatch();
 }
 // !racesow
