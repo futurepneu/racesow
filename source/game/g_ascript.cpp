@@ -2563,6 +2563,12 @@ static asstring_t *objectRSPlayer_getNick( rs_authplayer_t *self )
 	return angelExport->asStringFactoryBuffer( self->nick, strlen(self->nick) );
 }
 
+static void objectRSPlayer_incrementRace( rs_authplayer_t *self )
+{
+	self->races++;
+	authmap.races++;
+}
+
 static void objectRSPlayer_login( asstring_t *name, asstring_t *ctoken, int uTime, rs_authplayer_t *self )
 {
 	RS_AuthPlayer( self, name->buffer, ctoken->buffer, uTime );
@@ -2599,6 +2605,7 @@ static const asMethod_t rsplayer_Methods[] =
 {
 	{ ASLIB_FUNCTION_DECL(const String @, getName, () const), asFUNCTION(objectRSPlayer_getName), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(const String @, getNick, () const), asFUNCTION(objectRSPlayer_getNick), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(void, incrementRace, ( void )), asFUNCTION(objectRSPlayer_incrementRace), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, login, ( String &name, String &ctoken, int uTime )), asFUNCTION(objectRSPlayer_login), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, register, ( String &name, String &pass, String &email )), asFUNCTION(objectRSPlayer_register), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, reportRace, ( int rtime, array<int> &checkpoints )), asFUNCTION(objectRSPlayer_reportRace), asCALL_CDECL_OBJLAST },
