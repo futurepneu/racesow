@@ -77,6 +77,7 @@ void RS_PlayerDisconnect( gclient_t *client )
 		return;
 
 	rs_authplayer_t *player = &authplayers[playerNum];
+	RS_ReportPlayer( player );
 	memset( player, 0, sizeof( rs_authplayer_t ) );
 }
 
@@ -86,6 +87,10 @@ void RS_PlayerDisconnect( gclient_t *client )
  */
 void RS_PlayerReset( rs_authplayer_t *player )
 {
+	// update statistics if needed
+	RS_ReportPlayer( player );
+
+	// Clear all the stats
 	player->id = 0;
 	player->status = QSTATUS_NONE;
 	player->admin = false;

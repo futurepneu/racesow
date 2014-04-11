@@ -443,29 +443,36 @@ void RS_ReportMap( int playTime, int races )
 }
 
 /**
- * Report Player data
- * @param name Auth name of the player to report
- * @param mapId ID number of the map reporting on
- * @param playTime
- * @param races
- * @param client
+ * Report player statistics to the database
+ * @param player The player to report
  */
-void RS_ReportPlayer( const char *name, int mapId, int playTime, int races )
+void RS_ReportPlayer( rs_authplayer_t *player )
 {
 	stat_query_t *query;
 	char *b64name, url[MAX_STRING_CHARS];
 
+	if( !rs_statsEnabled->integer )
+		return;
+
+	// Not authenticated
+	if( !player->id )
+		return;
+
 	// Make the URL
-	b64name = (char*)base64_encode( (unsigned char *)name, strlen( name ), NULL );
+	b64name = (char*)base64_encode( (unsigned char *)player->name, strlen( player->name ), NULL );
 	Q_strncpyz( url, "api/player/", sizeof( url ) - 1 );
 	Q_strncatz( url, b64name, sizeof( url ) - 1 );
 	free( b64name );
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( url, qfalse );
-	rs_sqapi->SetField( query, "mid", va( "%d", mapId ) );
-	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
-	rs_sqapi->SetField( query, "races", va( "%d", races ) );
+	rs_sqapi->SetField( query, "mid", va( "%d", authmap.id ) );
+	rs_sqapi->SetField( query, "playTime", va( "%d", player->playTime ) );
+	rs_sqapi->SetField( query, "races", va( "%d", player->races ) );
+
+	// reset the fields
+	player->playTime = 0;
+	player->races = 0;
 
 	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->Send( query );
