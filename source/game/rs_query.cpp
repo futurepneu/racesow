@@ -231,7 +231,12 @@ void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 	player->id = cJSON_GetObjectItem( data, "id" )->valueint;
 	player->admin = cJSON_GetObjectItem( data, "admin" )->type == cJSON_True;
 	Q_strncpyz( player->name, cJSON_GetObjectItem( data, "username" )->valuestring, sizeof( player->name ) );
+	Q_strncpyz( player->nick, cJSON_GetObjectItem( data, "simplified" )->valuestring, sizeof( player->nick ) );
 
+	// Update protected nick
+	RS_PlayerUserinfoChanged( player, NULL );
+
+	// Notify of login
 	G_PrintMsg( NULL, "%s%s authenticated as %s\n", player->client->netname, S_COLOR_WHITE, player->name );
 	if( player->admin )
 		G_PrintMsg( &game.edicts[ playerNum + 1 ], "You are an admin. Player id: %d\n", player->id );
@@ -295,30 +300,84 @@ void RS_AuthPlayer( rs_authplayer_t *player, const char *name, const char *ctoke
 
 /**
  * AuthNick callback function
- * @param query Query calling this function
+ * @param query   Query calling this function
  * @param success True on any response
- * @param customp The gclient_t client to nick check
- * @return void
+ * @param customp rs_authplayer_t player to nick check
  */
 void RS_AuthNick_Done( stat_query_t *query, qboolean success, void *customp )
 {
+	static char simpName[MAX_NAME_CHARS];
+	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
+	cJSON *data;
+	int playerNum;
+
+	// Did they disconnect?
+	playerNum = (int)( player->client - game.clients );
+	if( playerNum < 0 || playerNum >= gs.maxclients )
+		return;
+
+	if( rs_sqapi->GetStatus( query ) != 200 )
+	{
+		// Query failed, give them benefit of the doubt
+		player->failTime = 0;
+		player->nickStatus = QSTATUS_SUCCESS;
+		return;
+	}
+
+	data = ((cJSON*)rs_sqapi->GetRoot( query ))->child;
+
+	// Did they change name before the query returned?
+	Q_strncpyz( simpName, COM_RemoveColorTokens( player->client->netname ), sizeof( simpName ) );
+	if( Q_stricmp( simpName, data->string ) )
+	{
+		RS_PlayerUserinfoChanged( player, NULL );
+		return;
+	}
+
+	// Update players latest nick
+	Q_strncpyz( player->last, simpName, sizeof( player->last ) );
+
+	// Is it protected?
+	if( data->type == cJSON_True )
+	{
+		player->failTime = game.realtime + ( 1000 * RS_NICK_TIMEOUT );
+		player->thinkTime = game.realtime;
+		player->nickStatus = QSTATUS_SUCCESS;
+		return;
+	}
+
+	// Not protected, deactivate the timer
+	player->failTime = 0;
+	player->thinkTime = 0;
+	player->nickStatus = QSTATUS_SUCCESS;
 }
 
 /**
  * Validate a given nickname
- * @return void
+ * @param player The player to check nickstatus for
+ * @param nick   The simplified nickname to check
  */
-void RS_AuthNick( gclient_t *client, const char *nick )
+void RS_AuthNick( rs_authplayer_t *player, char *nick )
 {
 	stat_query_t *query;
-	char *b64name = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
+	char *b64name;
 
+	if( !rs_statsEnabled->integer )
+		return;
+
+	// If a player changes nick while a query is inprogress
+	// The callback will start another query when finished
+	if( player->nickStatus == QSTATUS_PENDING )
+		return;
+
+	b64name = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
 	query = rs_sqapi->CreateQuery( va( "api/nick/%s", b64name ), qtrue );
 	free( b64name );
 
 	RS_SignQuery( query, (int)time( NULL ) );
-	rs_sqapi->SetCallback( query, RS_AuthNick_Done, (void*)client );
+	rs_sqapi->SetCallback( query, RS_AuthNick_Done, (void*)player );
 	rs_sqapi->Send( query );
+	player->nickStatus = QSTATUS_PENDING;
 	query = NULL;
 }
 

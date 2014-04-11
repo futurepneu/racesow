@@ -2951,19 +2951,6 @@ static bool asFunc_RS_ResetPjState( int playerNum )
 	return true;
 }
 
-static bool asFunc_RS_RenameClient( gclient_t *client, asstring_t *name )
-{
-	edict_t *ent = objectGameClient_GetEntity( client );
-
-	if( Info_SetValueForKey( client->userinfo, "name", name->buffer ) && ent )
-	{
-		ClientUserinfoChanged( ent, client->userinfo );
-		return true;
-	}
-
-	return false;
-}
-
 static void asFunc_RS_Cancelvote( edict_t *ent, bool admin )
 {
 	G_Cancelvote_f( ent, admin );
@@ -3346,7 +3333,6 @@ static const asglobfuncs_t asGlobFuncs[] =
 	// racesow
 	{ "bool RS_QueryPjState( int playerNum )", asFUNCTION(asFunc_RS_QueryPjState), NULL },
 	{ "bool RS_ResetPjState( int playerNum )", asFUNCTION(asFunc_RS_ResetPjState), NULL },
-	{ "bool RS_RenameClient( Client @client, const String &name )", asFUNCTION(asFunc_RS_RenameClient), NULL },
 	{ "void RS_Cancelvote( Entity @ent, bool admin )", asFUNCTION(asFunc_RS_Cancelvote), NULL },
 	{ "void RS_QueryTop( Client @client, String @mapname, int limit )", asFUNCTION(asFunc_RS_QueryTop), NULL },
 	{ "void RS_QueryMaps( Client @client, const String &pattern, const String &tags, int page )", asFUNCTION(asFunc_RS_QueryMaps), NULL },

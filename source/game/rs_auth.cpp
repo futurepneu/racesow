@@ -23,11 +23,71 @@ void RS_ShutdownAuth( void )
 void RS_ThinkAuth( void )
 {
 	rs_authplayer_t *player;
+	edict_t *ent;
+	int remaining, playerNum;
+
 	for( player = authplayers; player < authplayers + gs.maxclients; player++ )
 	{
-		if( player->client && player->client->team != TEAM_SPECTATOR )
+		if( !player->client )
+			continue;
+
+		if( player->client->team != TEAM_SPECTATOR )
 			player->playTime += game.frametime;
+
+		// Protected nick status
+		if( player->thinkTime && player->thinkTime < game.realtime )
+		{
+			remaining = ( 500 + (int)player->failTime - (int)game.realtime ) / 1000;
+			playerNum = (int)( player->client - game.clients );
+			ent = PLAYERENT( playerNum );
+
+			if( remaining < 1 && ent )
+			{
+				// Timed out, rename the client
+				Info_SetValueForKey( player->client->userinfo, "name", "Player" );
+				ClientUserinfoChanged( ent, player->client->userinfo );
+				player->thinkTime = 0;
+				player->failTime = 0;
+			}
+			else
+			{
+				// Send a warning and set next think time
+				G_PrintMsg( &game.edicts[playerNum + 1], "%sWarning: %s%s%s is protected, please change your name within %d seconds\n",
+					S_COLOR_ORANGE, S_COLOR_WHITE, player->client->netname, S_COLOR_WHITE, remaining );
+
+				if( remaining > 5 )
+					player->thinkTime = game.realtime + 5000;
+				else
+					player->thinkTime = game.realtime + 1000;
+			}
+		}
 	}
+}
+
+/**
+ * Check if a player already failed a validation with this name
+ * @param client  The client to check
+ * @param name    The name the client wants to use
+ * @return        True if the player is allowed to rename to 'name'
+ */
+bool RS_SetName( gclient_t *client, const char *name )
+{
+	rs_authplayer_t *player;
+	static char simpNew[MAX_NAME_CHARS];
+
+	int playerNum = (int)( client - game.clients );
+	if( playerNum < 0 && playerNum >= gs.maxclients )
+		return false;
+
+	player = &authplayers[playerNum];
+	Q_strncpyz( simpNew, COM_RemoveColorTokens( name ), sizeof( simpNew ) );
+
+	// Player authed as this nick, give them permission
+	if( !Q_stricmp( simpNew, player->nick ) )
+		return true;
+
+	// Dont let a player change to the last name they queried
+	return Q_stricmp( simpNew, player->last ) != 0;
 }
 
 /**
@@ -40,6 +100,7 @@ static void RS_PlayerInfo( rs_authplayer_t *player )
 	G_Printf( "nickStatus: %d\n", player->nickStatus );
 	G_Printf( "name: %s\n", player->name );
 	G_Printf( "nick: %s\n", player->nick );
+	G_Printf( "last: %s\n", player->last );
 	G_Printf( "admin: %d\n", player->admin );
 	G_Printf( "id: %d\n", player->id );
 	G_Printf( "failTime: %d\n", player->failTime );
@@ -60,10 +121,12 @@ void RS_PlayerEnter( gclient_t *client )
 	rs_authplayer_t *player = &authplayers[playerNum];
 	memset( player, 0, sizeof( *player ) );
 	player->client = client;
-	Q_strncpyz( player->nick, client->netname, sizeof( player->nick ) );
 
 	// Ask the player to auto login
 	trap_GameCmd( &game.edicts[playerNum + 1], "slogin" );
+
+	// Send first nick query
+	RS_PlayerUserinfoChanged( player, NULL );
 }
 
 
@@ -97,4 +160,43 @@ void RS_PlayerReset( rs_authplayer_t *player )
 	player->admin = false;
 	player->playTime = 0;
 	player->races = 0;
+	player->nick[0] = '\0';
+}
+
+/**
+ * Player's userinfo changed
+ * Check for nickname changes and update protectednick
+ * @param player  Player who changed info
+ * @param oldname Name before the userinfo change
+ */
+void RS_PlayerUserinfoChanged( rs_authplayer_t *player, char *oldname )
+{
+	static char simpOld[MAX_NAME_CHARS], simpNew[MAX_NAME_CHARS];
+	static int num;
+
+	if( !player->client )
+		return;
+
+	Q_strncpyz( simpNew, COM_RemoveColorTokens( player->client->netname ), sizeof( simpNew ) );
+	Q_strlwr( simpNew );
+
+	// Did they actually change nick?
+	if( oldname )
+	{
+		Q_strncpyz( simpOld, COM_RemoveColorTokens( oldname ), sizeof( simpOld ) ); 
+		if( !Q_stricmp( simpOld, simpNew ) )
+			return;
+	}
+
+	if( !Q_stricmp( simpNew, player->nick ) ||		// Are they already authd with this nickname?
+		!Q_stricmp( simpNew, "player" )	||			// Are they named player?
+		sscanf( simpNew, "player(%d)", &num ) )
+	{
+		player->failTime = 0;
+		player->thinkTime = 0;
+		return;
+	}
+
+	// Not authenticated with new name, check if name is protected
+	RS_AuthNick( player, simpNew );
 }

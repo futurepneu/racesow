@@ -767,6 +767,12 @@ static void G_SetName( edict_t *ent, const char *original_name )
 	if( !original_name )
 		original_name = "";
 
+	// racesow - ask permission to change name
+	G_Printf( "Setname %d\n", RS_SetName( ent->r.client, original_name ) );
+	if( !RS_SetName( ent->r.client, original_name ) )
+		return;
+	// !racesow
+
 	Q_strncpyz( name, original_name, sizeof( name ) );
 
 	c_ascii = G_SanitizeUserString( name, sizeof( name ) );
@@ -1164,6 +1170,7 @@ void ClientUserinfoChanged( edict_t *ent, char *userinfo )
 
 	G_UpdatePlayerInfoString( PLAYERNUM( ent ) );
 
+	RS_PlayerUserinfoChanged( &authplayers[PLAYERNUM( ent )], oldname ); // racesow
 	G_Gametype_ScoreEvent( cl, "userinfochanged", oldname );
 }
 
