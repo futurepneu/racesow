@@ -25,6 +25,7 @@ void RS_ThinkAuth( void )
 	rs_authplayer_t *player;
 	edict_t *ent;
 	int remaining, playerNum;
+	bool maptime = false;
 
 	for( player = authplayers; player < authplayers + gs.maxclients; player++ )
 	{
@@ -32,7 +33,14 @@ void RS_ThinkAuth( void )
 			continue;
 
 		if( player->client->team != TEAM_SPECTATOR )
+		{
 			player->playTime += game.frametime;
+			if( !maptime )
+			{
+				authmap.playTime += game.frametime;
+				maptime = true;
+			}
+		}
 
 		// Protected nick status
 		if( player->thinkTime && player->thinkTime < game.realtime )
