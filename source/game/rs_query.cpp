@@ -598,7 +598,7 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
 
 	if( !rs_statsEnabled->integer )
 	{
-		G_PrintMsg( ent, "%sError:%s No database connected\n", 
+		G_PrintMsg( &game.edicts[playerNum +1], "%sError:%s No database connected\n", 
 					S_COLOR_RED, S_COLOR_WHITE );
 		return;
 	}
@@ -666,7 +666,7 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 
 	if( !rs_statsEnabled->integer )
 	{
-		G_PrintMsg( ent, "%sError:%s No database connected\n", 
+		G_PrintMsg( &game.edicts[playerNum +1], "%sError:%s No database connected\n", 
 					S_COLOR_RED, S_COLOR_WHITE );
 		return;
 	}
