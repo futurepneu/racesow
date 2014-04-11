@@ -2573,6 +2573,18 @@ static void objectRSPlayer_register( asstring_t *name, asstring_t *pass, asstrin
 	RS_AuthRegister( self, name->buffer, pass->buffer, email->buffer );
 }
 
+static void objectRSPlayer_reportRace( int rtime, CScriptArrayInterface &checkpoints, rs_authplayer_t *self )
+{
+	int i;
+	int cpNum = checkpoints.GetSize();
+	int cp[cpNum];
+
+	for( i = 0; i < cpNum; i++ )
+		cp[i] = *((int*)checkpoints.At( i ));
+
+	RS_ReportRace( self, rtime, cp, cpNum );
+}
+
 static const asFuncdef_t rsplayer_Funcdefs[] =
 {
 	ASLIB_FUNCDEF_NULL
@@ -2589,6 +2601,7 @@ static const asMethod_t rsplayer_Methods[] =
 	{ ASLIB_FUNCTION_DECL(const String @, getNick, () const), asFUNCTION(objectRSPlayer_getNick), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, login, ( String &name, String &ctoken, int uTime )), asFUNCTION(objectRSPlayer_login), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, register, ( String &name, String &pass, String &email )), asFUNCTION(objectRSPlayer_register), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(void, reportRace, ( int rtime, array<int> &checkpoints )), asFUNCTION(objectRSPlayer_reportRace), asCALL_CDECL_OBJLAST },
 
 	ASLIB_METHOD_NULL
 };

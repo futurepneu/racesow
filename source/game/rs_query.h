@@ -8,7 +8,7 @@ void RS_AuthPlayer( rs_authplayer_t *player, const char *name, const char *ctoke
 void RS_AuthNick( gclient_t *client, const char *nick );
 void RS_AuthMap( void );
 
-void RS_ReportRace( gclient_t *client, int playerId, int mapId, int time, CScriptArrayInterface *checkpoints );
+void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum );
 void RS_ReportMap( int playTime, int races );
 void RS_ReportPlayer( const char *name, int mapId, int playTime, int races );
 

@@ -383,27 +383,34 @@ void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 }
 
 /**
- * Report Race data
+ * Report a race to the database
+ * @param player      Player who made the record
+ * @param rtime       Time of the race
+ * @param cp          Checkpoints of the race
+ * @param cpNum       Number of checkpoints
  */
-void RS_ReportRace( gclient_t *client, int playerId, int mapId, int rtime, CScriptArrayInterface *checkpoints )
+void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum )
 {
 	stat_query_t *query;
-	int numCheckpoints = checkpoints->GetSize();
+	int i;
+
+	if( !rs_statsEnabled->integer )
+		return;
 
 	// Use cJSON to format the checkpoint array
 	cJSON *arr = cJSON_CreateArray();
-	for( int i = 0; i < numCheckpoints; i++ )
-		cJSON_AddItemToArray( arr, cJSON_CreateNumber( *((int*)checkpoints->At( i )) ) );
+	for( i = 0; i < cpNum; i++ )
+		cJSON_AddItemToArray( arr, cJSON_CreateNumber( cp[i] ) );
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( "api/race/", qfalse );
-	rs_sqapi->SetField( query, "pid", va( "%d", playerId ) );
-	rs_sqapi->SetField( query, "mid", va( "%d", mapId ) );
+	rs_sqapi->SetField( query, "pid", va( "%d", player->id ) );
+	rs_sqapi->SetField( query, "mid", va( "%d", authmap.id ) );
 	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
 	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
 
 	RS_SignQuery( query, (int)time( NULL ) );
-	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)client );
+	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)player );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
