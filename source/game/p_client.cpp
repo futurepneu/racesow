@@ -768,7 +768,6 @@ static void G_SetName( edict_t *ent, const char *original_name )
 		original_name = "";
 
 	// racesow - ask permission to change name
-	G_Printf( "Setname %d\n", RS_SetName( ent->r.client, original_name ) );
 	if( !RS_SetName( ent->r.client, original_name ) )
 		return;
 	// !racesow
