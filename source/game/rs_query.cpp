@@ -594,6 +594,14 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
 {
 	stat_query_t *query;
 	char *b64name = (char*)base64_encode( (unsigned char *)mapname, strlen( mapname ), NULL );
+	int	playerNum = (int)( client - game.clients );
+
+	if( !rs_statsEnabled->integer )
+	{
+		G_PrintMsg( ent, "%sError:%s No database connected\n", 
+					S_COLOR_RED, S_COLOR_WHITE );
+		return;
+	}
 
 	// Form the query
 	query = rs_sqapi->CreateQuery( "api/race/", qtrue );
@@ -654,6 +662,14 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 	stat_query_t *query;
 	char tagset[1024], *token, *b64tags, *b64pattern;
 	cJSON *arr = cJSON_CreateArray();
+	int	playerNum = (int)( client - game.clients );
+
+	if( !rs_statsEnabled->integer )
+	{
+		G_PrintMsg( ent, "%sError:%s No database connected\n", 
+					S_COLOR_RED, S_COLOR_WHITE );
+		return;
+	}
 
 	// Make the pattern
 	b64pattern = (char*)base64_encode( (unsigned char *)pattern, strlen( pattern ), NULL );
