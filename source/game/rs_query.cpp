@@ -593,9 +593,11 @@ void RS_QueryMaps_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int page )
 {
 	stat_query_t *query;
-	char tagset[1024], *token, *b64tags, *b64pattern = (char*)base64_encode( (unsigned char *)pattern, strlen( pattern ), NULL );
+	char tagset[1024], *token, *b64tags, *b64pattern;
 	cJSON *arr = cJSON_CreateArray();
 
+	// Make the pattern
+	b64pattern = (char*)base64_encode( (unsigned char *)pattern, strlen( pattern ), NULL );
 	// Make the taglist
 	Q_strncpyz( tagset, tags, sizeof( tagset ) );
 	token = strtok( tagset, " " );
