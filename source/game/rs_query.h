@@ -9,7 +9,7 @@ void RS_AuthNick( gclient_t *client, const char *nick );
 void RS_AuthMap( void );
 
 void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum );
-void RS_ReportMap( int playTime, int races );
+void RS_ReportMap( void );
 void RS_ReportPlayer( rs_authplayer_t *player );
 
 void RS_QueryTop( gclient_t *client, const char* mapname, int limit );

@@ -417,25 +417,22 @@ void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum )
 
 /**
  * Report Map data
- * @param playTime Time in milliseconds played on the map
- * @param races Number of races completed on the map
- * @return void
  */
-void RS_ReportMap( int playTime, int races )
+void RS_ReportMap( void )
 {
 	stat_query_t *query;
-	char *b64name, url[MAX_STRING_CHARS];
 
-	// Form the url
-	b64name = (char*)base64_encode( (unsigned char *)level.mapname, strlen( level.mapname ), NULL );
-	Q_strncpyz( url, "api/map/", sizeof( url ) - 1 );
-	Q_strncatz( url, b64name, sizeof( url ) - 1 );
-	free( b64name );
+	if( !rs_statsEnabled->integer )
+		return;
 
 	// Form the query
-	query = rs_sqapi->CreateQuery( url, qfalse );
-	rs_sqapi->SetField( query, "playTime", va( "%d", playTime ) );
-	rs_sqapi->SetField( query, "races", va( "%d", races ) );
+	query = rs_sqapi->CreateQuery( va( "api/map/%s", authmap.b64name ), qfalse );
+	rs_sqapi->SetField( query, "playTime", va( "%d", authmap.playTime ) );
+	rs_sqapi->SetField( query, "races", va( "%d", authmap.races ) );
+
+	// Reset the fields
+	authmap.playTime = 0;
+	authmap.races = 0;
 
 	RS_SignQuery( query, (int)time( NULL ) );
 	rs_sqapi->Send( query );
