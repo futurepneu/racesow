@@ -160,6 +160,14 @@ static void G_VoteMapExtraHelp( edict_t *ent )
 	int nummaps, i, start;
 	size_t length, msglength;
 
+	// racesow - point them to the 'maplist' command
+	if( rs_statsEnabled->integer )
+	{
+		G_PrintMsg( ent, "Use the `maplist` command to see available maps\n" );
+		return;
+	}
+	// !racesow
+
 	// update the maplist
 	trap_ML_Update ();
 
@@ -2508,7 +2516,7 @@ void G_CallVotes_Init( void )
 	callvote->validate = G_VoteMapValidate;
 	callvote->execute = G_VoteMapPassed;
 	callvote->current = G_VoteMapCurrent;
-	callvote->extraHelp = NULL; // racesow - disable G_VoteMapExtraHelp
+	callvote->extraHelp = G_VoteMapExtraHelp;
 	callvote->argument_format = G_LevelCopyString( "<name>" );
 	callvote->argument_type = G_LevelCopyString( "option" );
 	callvote->webRequest = G_VoteMapWebRequest;
