@@ -109,7 +109,7 @@ static void RS_PlayerInfo( rs_authplayer_t *player )
 	G_Printf( "name: %s\n", player->name );
 	G_Printf( "nick: %s\n", player->nick );
 	G_Printf( "last: %s\n", player->last );
-	G_Printf( "admin: %d\n", player->admin );
+	G_Printf( "admin: %d\n", player->admin ? 1 : 0 );
 	G_Printf( "id: %d\n", player->id );
 	G_Printf( "failTime: %d\n", player->failTime );
 	G_Printf( "playTime: %d\n", player->playTime );
@@ -128,6 +128,7 @@ void RS_PlayerEnter( gclient_t *client )
 
 	rs_authplayer_t *player = &authplayers[playerNum];
 	memset( player, 0, sizeof( *player ) );
+	RS_PlayerReset( player );
 	player->client = client;
 
 	// Ask the player to auto login
