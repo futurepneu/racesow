@@ -49,6 +49,7 @@ int playerbox_gib_viewheight = 8;
 #define PM_AIRCONTROL_BOUNCE_DELAY 200
 #define PM_OVERBOUNCE		1.01f
 #define PM_FORWARD_ACCEL_TIMEDELAY 0 // delay before the forward acceleration kicks in
+#define PM_FLYMOVE_SPEED 10000 // racesow - maximum specfly speed
 
 //===============================================================
 
@@ -1342,10 +1343,15 @@ static void PM_FlyMove( qboolean doclip )
 	vec3_t end;
 	trace_t	trace;
 
-	maxspeed = pml.maxPlayerSpeed * 1.5;
-
-	if( pm->cmd.buttons & BUTTON_SPECIAL )
-		maxspeed *= 2;
+	// racesow - Increase maxspeed for accelerating
+	speed = VectorLength( pml.velocity );
+	if( speed < pml.maxPlayerSpeed )
+		maxspeed = pml.maxPlayerSpeed * 1.5f;
+	else
+		maxspeed = speed + 50.0f;
+	if( maxspeed > PM_FLYMOVE_SPEED )
+		maxspeed = PM_FLYMOVE_SPEED;
+	// !racesow
 
 	// friction
 	speed = VectorLength( pml.velocity );
@@ -1357,7 +1363,7 @@ static void PM_FlyMove( qboolean doclip )
 	{
 		drop = 0;
 
-		friction = pm_friction * 1.5; // extra friction
+		friction = pm_friction * 0.1f; // racesow - old frictino 1.5
 		control = speed < pm_decelerate ? pm_decelerate : speed;
 		drop += control * friction * pml.frametime;
 
@@ -1367,7 +1373,10 @@ static void PM_FlyMove( qboolean doclip )
 			newspeed = 0;
 		newspeed /= speed;
 
-		VectorScale( pml.velocity, newspeed, pml.velocity );
+		// racesow - only apply friction if special held without a movement key
+		if( pml.forwardPush == 0 && pml.sidePush == 0 && pm->cmd.buttons & BUTTON_SPECIAL)
+			VectorScale( pml.velocity, newspeed, pml.velocity );
+		// !racesow
 	}
 
 	// accelerate
@@ -1376,8 +1385,21 @@ static void PM_FlyMove( qboolean doclip )
 
 	if( pm->cmd.buttons & BUTTON_SPECIAL )
 	{
-		fmove *= 2;
-		smove *= 2;
+		// racesow - constantly accelerate w/ +special
+		float fdot, sdot;
+
+		fdot = DotProduct( pml.forward, pml.velocity );
+		if( fmove * fdot > 0 )
+			fmove = 2 * ( pml.forwardPush + fdot );
+		else
+			fmove = fdot > ( pml.forwardPush * 2 ) ? fdot : pml.forwardPush * 2;
+
+		sdot = DotProduct( pml.right, pml.velocity );
+		if( smove * sdot > 0 )
+			smove = 2 * ( pml.sidePush + sdot );
+		else
+			smove = sdot > ( pml.sidePush * 2 ) ? sdot : pml.sidePush * 2;		
+		// !racesow
 	}
 
 	VectorNormalize( pml.forward );
@@ -1390,16 +1412,6 @@ static void PM_FlyMove( qboolean doclip )
 	VectorCopy( wishvel, wishdir );
 	wishspeed = VectorNormalize( wishdir );
 
-
-	// clamp to server defined max speed
-	//
-	if( wishspeed > maxspeed )
-	{
-		wishspeed = maxspeed/wishspeed;
-		VectorScale( wishvel, wishspeed, wishvel );
-		wishspeed = maxspeed;
-	}
-
 	currentspeed = DotProduct( pml.velocity, wishdir );
 	addspeed = wishspeed - currentspeed;
 	if( addspeed > 0 )
@@ -1411,6 +1423,12 @@ static void PM_FlyMove( qboolean doclip )
 		for( i = 0; i < 3; i++ )
 			pml.velocity[i] += accelspeed*wishdir[i];
 	}
+
+	// racesow - clamp after acceleration
+	speed = VectorNormalize( pml.velocity );
+	speed = speed > maxspeed ? maxspeed : speed;
+	VectorScale( wishdir, speed, pml.velocity );
+	// !racesow
 
 	if( doclip )
 	{
