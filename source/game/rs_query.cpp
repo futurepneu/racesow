@@ -230,7 +230,6 @@ void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 	player->status = QSTATUS_SUCCESS;
 	player->id = cJSON_GetObjectItem( data, "id" )->valueint;
 	player->admin = cJSON_GetObjectItem( data, "admin" )->type == cJSON_True;
-	Q_strncpyz( player->name, cJSON_GetObjectItem( data, "username" )->valuestring, sizeof( player->name ) );
 	Q_strncpyz( player->nick, cJSON_GetObjectItem( data, "simplified" )->valuestring, sizeof( player->nick ) );
 
 	// Update protected nick
@@ -278,6 +277,9 @@ void RS_AuthPlayer( rs_authplayer_t *player, const char *name, const char *ctoke
 					S_COLOR_ORANGE, S_COLOR_WHITE );
 		return;
 	}
+
+	// Save the users login name
+	Q_strncpyz( player->name, name, sizeof( player->name ) );
 
 	// Make the URL
 	b64name = (char*)base64_encode( (unsigned char *)name, strlen( name ), NULL );
