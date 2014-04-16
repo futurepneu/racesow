@@ -68,6 +68,25 @@ static void CG_SC_ChatPrint( void )
 		trap_S_StartGlobalSound( CG_MediaSfx( cgs.media.sfxChat ), CHAN_AUTO, 1.0f );
 }
 
+// racesow
+static void CG_SC_Privsay( void )
+{
+	const char *in = atoi( trap_Cmd_Argv( 1 ) ) ? "<<<" : ">>>";
+	const int who = atoi( trap_Cmd_Argv( 2 ) );
+	const char *name = (who && who == bound(1, who, MAX_CLIENTS) ? cgs.clientInfo[who-1].name : NULL);
+	const char *text = trap_Cmd_Argv( 3 );
+	const cvar_t *filter = (cgs.tv ? cg_chatFilterTV : cg_chatFilter);
+
+	if( !name || filter->integer & 1 || rs_chatBlocked[who-1] )
+		return;
+
+	CG_LocalPrint( false, "%s%s %s %s%s\n", name, S_COLOR_RED, in, S_COLOR_GREEN, text );
+
+	if( cg_chatBeep->integer )
+		trap_S_StartGlobalSound( CG_MediaSfx( cgs.media.sfxChat ), CHAN_AUTO, 1.0f );
+}
+// !racesow
+
 /*
 * CG_SC_TVChatPrint
 */
@@ -905,6 +924,7 @@ static const svcmd_t cg_svcmds[] =
 	{ "pr", CG_SC_Print },
 	{ "ch", CG_SC_ChatPrint },
 	{ "tch", CG_SC_ChatPrint },
+	{ "pch", CG_SC_Privsay }, // racesow
 	{ "tvch", CG_SC_TVChatPrint },
 	{ "cp", CG_SC_CenterPrint },
 	{ "obry", CG_SC_Obituary },
