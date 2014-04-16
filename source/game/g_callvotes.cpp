@@ -1950,12 +1950,11 @@ static void G_CallVotes_CheckState( void )
 		if( ( ent->r.svflags & SVF_FAKECLIENT ) || ent->r.client->isTV )
 			continue;
 
-		// racesow - ignore inactive players unless they have voted
+		// ignore inactive players unless they have voted
 		if( ent->r.client->level.last_activity && 
 			ent->r.client->level.last_activity + ( g_inactivity_maxtime->value * 1000 ) < level.time &&
 			clientVoted[PLAYERNUM( ent )] == VOTED_NOTHING )
 			continue;
-		// !racesow
 
 		voters++;
 		if( clientVoted[PLAYERNUM( ent )] == VOTED_YES )
