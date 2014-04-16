@@ -51,6 +51,11 @@ static void CG_SC_ChatPrint( void )
 	if( filter->integer & (teamonly ? 2 : 1) )
 		return;
 
+	// racesow
+	if( rs_chatBlocked[who-1] )
+		return;
+	// !racesow
+
 	if( !name )
 		CG_LocalPrint( false, S_COLOR_GREEN "console: %s\n", text );
 	else if( teamonly )
@@ -1100,6 +1105,40 @@ static void CG_Cmd_RSRegister_f( void )
 
 	RS_CG_Register( trap_Cmd_Argv( 1 ), trap_Cmd_Argv( 2 ), trap_Cmd_Argv( 3 ) );
 }
+
+/**
+ * Toggle blocking/unblocking chat messages from a given player
+ */
+static void CG_Cmd_RSChatBlock_f( void )
+{
+	int i, target, argc = trap_Cmd_Argc();
+
+	// Called without arguments, print blocked players
+	if( argc == 1 )
+	{
+		CG_Printf( "Blocked Players:\n" );
+		for( target = 0; target < gs.maxclients; target++ )
+		{
+			if( !rs_chatBlocked[target] || !cgs.clientInfo[target].cleanname )
+				continue;
+			CG_Printf( "%d %s\n", target, cgs.clientInfo[target].name );
+		}
+		return;
+	}
+
+	// Block all players give as playernums in arguments
+	for( i = 1; i < argc; i++ )
+	{
+		target = atoi( trap_Cmd_Argv( i ) );
+		if( target < 0 || target > gs.maxclients || !cgs.clientInfo[target].cleanname[0] )
+			continue;
+
+		rs_chatBlocked[target] = !rs_chatBlocked[target];
+		CG_Printf( "%sPlayer %s%s was %s\n",
+					S_COLOR_WHITE, cgs.clientInfo[target].name , S_COLOR_WHITE,
+					rs_chatBlocked[target] ? "blocked" : "unblocked" );
+	}
+}
 // !racesow
 
 // ======================================================================
@@ -1228,6 +1267,7 @@ static const cgcmd_t cgcmds[] =
 	{ "viewpos", CG_Viewpos_f, true },
 	{ "login", CG_Cmd_RSLogin_f, false }, // racesow
 	{ "register", CG_Cmd_RSRegister_f, false }, // racesow
+	{ "block", CG_Cmd_RSChatBlock_f, false }, // racesow
 	{ "players", NULL, false },
 	{ "spectators", NULL, false },
 

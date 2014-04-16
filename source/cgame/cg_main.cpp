@@ -1086,6 +1086,7 @@ void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int 
 */
 void CG_Shutdown( void )
 {
+	CG_ChatShutdown(); // racesow
 	CG_DemocamShutdown();
 	CG_ScreenShutdown();
 	CG_UnregisterCGameCommands();

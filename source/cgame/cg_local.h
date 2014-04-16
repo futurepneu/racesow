@@ -1080,8 +1080,10 @@ void CG_LaserBeamEffect( centity_t *cent );
 // cg_chat.c
 //
 extern cvar_t *con_chatCGame;
+extern bool *rs_chatBlocked; // racesow
 
 void CG_InitChat( cg_gamechat_t *chat );
+void CG_ChatShutdown( void ); // racesow
 void CG_StackChatString( cg_gamechat_t *chat, const char *str );
 void CG_DrawChat( cg_gamechat_t *chat, int x, int y, char *fontName, struct qfontface_s *font, 
 				 int width, int height, int padding_x, int padding_y, vec4_t backColor, struct shader_s *backShader );

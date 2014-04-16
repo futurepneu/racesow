@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cg_local.h"
 
 cvar_t *con_chatCGame;
+bool *rs_chatBlocked; // racesow
 
 /*
 ** CG_InitChat
@@ -30,8 +31,20 @@ void CG_InitChat( cg_gamechat_t *chat )
 	con_chatCGame = trap_Cvar_Get( "con_chatCGame", "0", CVAR_READONLY );
 	trap_Cvar_ForceSet( con_chatCGame->name, "0" );
 
+	rs_chatBlocked = ( bool* )CG_Malloc( gs.maxclients ); // racesow
+	memset( rs_chatBlocked, 0, sizeof( *rs_chatBlocked ) ); // racesow
 	memset( chat, 0, sizeof( *chat ) );
 }
+
+// racesow
+/**
+ * CG_ShutdownChat
+ */
+void CG_ChatShutdown( void )
+{
+	CG_Free( rs_chatBlocked );
+}
+// !racesow
 
 /*
 ** CG_StackChatString
