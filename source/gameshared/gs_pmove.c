@@ -1054,7 +1054,11 @@ static void PM_CheckJump( void )
 		pm->playerState->pmove.pm_flags |= PMF_JUMP_HELD;
 
 	pm->groundentity = -1;
-	GS_ClipVelocity( pml.velocity, pml.groundplane.normal, pml.velocity, PM_OVERBOUNCE ); // racesow - Always clip against the ground when jumping
+
+	// racesow - Clip against the ground when jumping if moving that direction
+	if( pml.velocity[0] * pml.groundplane.normal[0] + pml.velocity[1] * pml.groundplane.normal[1] > 0 )
+		GS_ClipVelocity( pml.velocity, pml.groundplane.normal, pml.velocity, PM_OVERBOUNCE );
+	// racesow
 
 	//if( gs.module == GS_MODULE_GAME ) GS_Printf( "upvel %f\n", pml.velocity[2] );
 	if( pml.velocity[2] > 100 )
