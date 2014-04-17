@@ -652,7 +652,7 @@ static void CG_RegisterVariables( void )
 	hand =		    trap_Cvar_Get( "hand", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 	handicap =		trap_Cvar_Get( "handicap", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 	clan =		    trap_Cvar_Get( "clan", "", CVAR_USERINFO | CVAR_ARCHIVE );
-	cg_oldMovement =	trap_Cvar_Get( "cg_oldMovement", "1", CVAR_USERINFO | CVAR_ARCHIVE ); // racesow - old movement ftw!
+	cg_oldMovement =	trap_Cvar_Get( "cg_oldMovement", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 	cg_noAutohop =	trap_Cvar_Get( "cg_noAutohop", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 	cg_fov =	    trap_Cvar_Get( "fov", "100", CVAR_USERINFO | CVAR_ARCHIVE );
 	cg_zoomSens =	    trap_Cvar_Get( "zoomsens", "0", CVAR_ARCHIVE );
@@ -672,7 +672,7 @@ static void CG_RegisterVariables( void )
 	cg_gunbob =		trap_Cvar_Get( "cg_gunbob", "1", CVAR_ARCHIVE );
 
 	cg_gun_fov =		trap_Cvar_Get( "cg_gun_fov", "90", CVAR_ARCHIVE );
-	cg_gun_alpha =		trap_Cvar_Get( "cg_gun_alpha", "0.5", CVAR_ARCHIVE ); // racesow
+	cg_gun_alpha =		trap_Cvar_Get( "cg_gun_alpha", "1", CVAR_ARCHIVE );
 	cg_weaponFlashes =	trap_Cvar_Get( "cg_weaponFlashes", "2", CVAR_ARCHIVE );
 
 	// wsw
@@ -691,8 +691,8 @@ static void CG_RegisterVariables( void )
 	cg_rocketFireTrailAlpha =	trap_Cvar_Get( "cg_rocketFireTrailAlpha", "0.45", CVAR_ARCHIVE );
 	cg_grenadeTrailAlpha =	trap_Cvar_Get( "cg_grenadeTrailAlpha", "0.5", CVAR_ARCHIVE );
 	cg_bloodTrailAlpha =	trap_Cvar_Get( "cg_bloodTrailAlpha", "1.0", CVAR_ARCHIVE );
-	cg_explosionsRing =	trap_Cvar_Get( "cg_explosionsRing", "1", CVAR_ARCHIVE ); // racesow - default 1
-	cg_explosionsDust =    trap_Cvar_Get( "cg_explosionsDust", "1", CVAR_ARCHIVE ); // racesow - default 1
+	cg_explosionsRing =	trap_Cvar_Get( "cg_explosionsRing", "0", CVAR_ARCHIVE );
+	cg_explosionsDust =    trap_Cvar_Get( "cg_explosionsDust", "0", CVAR_ARCHIVE );
 	cg_gibs =		trap_Cvar_Get( "cg_gibs", "1", CVAR_ARCHIVE );
 	cg_outlineModels =	trap_Cvar_Get( "cg_outlineModels", "1", CVAR_ARCHIVE );
 	cg_outlineWorld =	trap_Cvar_Get( "cg_outlineWorld", "0", CVAR_ARCHIVE );
@@ -706,7 +706,7 @@ static void CG_RegisterVariables( void )
 	cg_simpleItems =	trap_Cvar_Get( "cg_simpleItems", "0", CVAR_ARCHIVE );
 	cg_simpleItemsSize =	trap_Cvar_Get( "cg_simpleItemsSize", "12", CVAR_ARCHIVE );
 	cg_particles =		trap_Cvar_Get( "cg_particles", "1", CVAR_ARCHIVE );
-	cg_showhelp =		trap_Cvar_Get( "cg_showhelp", "0", CVAR_ARCHIVE ); // racesow - default 0
+	cg_showhelp =		trap_Cvar_Get( "cg_showhelp", "1", CVAR_ARCHIVE );
 	cg_predictLaserBeam =	trap_Cvar_Get( "cg_predictLaserBeam", "1", CVAR_ARCHIVE );
 	cg_showSelfShadow =	trap_Cvar_Get( "cg_showSelfShadow", "0", CVAR_ARCHIVE );
 
@@ -715,7 +715,7 @@ static void CG_RegisterVariables( void )
 
 	cg_damage_kick =	trap_Cvar_Get( "cg_damage_kick", "0", CVAR_ARCHIVE );
 	cg_damage_indicator =	trap_Cvar_Get( "cg_damage_indicator", "1", CVAR_ARCHIVE );
-	cg_damage_indicator_time =	trap_Cvar_Get( "cg_damage_indicator_time", "10", CVAR_ARCHIVE ); // racesow - default to 10
+	cg_damage_indicator_time =	trap_Cvar_Get( "cg_damage_indicator_time", "50", CVAR_ARCHIVE );
 	cg_pickup_flash =	trap_Cvar_Get( "cg_pickup_flash", "0", CVAR_ARCHIVE );
 
 	cg_weaponAutoSwitch =	trap_Cvar_Get( "cg_weaponAutoSwitch", "2", CVAR_ARCHIVE );
@@ -726,8 +726,8 @@ static void CG_RegisterVariables( void )
 	cg_laserBeamSubdivisions = trap_Cvar_Get( "cg_laserBeamSubdivisions", "10", CVAR_ARCHIVE );
 	cg_projectileAntilagOffset = trap_Cvar_Get( "cg_projectileAntilagOffset", "1.0", CVAR_ARCHIVE );
 
-	cg_raceGhosts =		trap_Cvar_Get( "cg_raceGhosts", "1", CVAR_ARCHIVE ); // racesow - default to 1
-	cg_raceGhostsAlpha =	trap_Cvar_Get( "cg_raceGhostsAlpha", "0.5", CVAR_ARCHIVE ); // racesow - default to 0.5
+	cg_raceGhosts =		trap_Cvar_Get( "cg_raceGhosts", "0", CVAR_ARCHIVE );
+	cg_raceGhostsAlpha =	trap_Cvar_Get( "cg_raceGhostsAlpha", "0.25", CVAR_ARCHIVE );
 
 	cg_chatBeep =		trap_Cvar_Get( "cg_chatBeep", "1", CVAR_ARCHIVE );
 	cg_chatFilter =		trap_Cvar_Get( "cg_chatFilter", "0", CVAR_ARCHIVE );
