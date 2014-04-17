@@ -25,16 +25,12 @@ struct SArrayCache;
 class CScriptArray
 {
 public:
-	// Set the memory functions that should be used by all CScriptArrays
-	static void SetMemoryFunctions(asALLOCFUNC_t allocFunc, asFREEFUNC_t freeFunc);
+	CScriptArray(asIObjectType *ot, void *initBuf); // Called from script when initialized with list
+	CScriptArray(asUINT length, asIObjectType *ot);
+	CScriptArray(asUINT length, void *defVal, asIObjectType *ot);
+	CScriptArray(const CScriptArray &other);
+	virtual ~CScriptArray();
 
-	// Factory functions
-	static CScriptArray *Create(asIObjectType *ot);
-	static CScriptArray *Create(asIObjectType *ot, asUINT length);
-	static CScriptArray *Create(asIObjectType *ot, asUINT length, void *defaultValue);
-	static CScriptArray *Create(asIObjectType *ot, void *listBuffer);
-
-	// Memory management
 	void AddRef() const;
 	void Release() const;
 
@@ -43,35 +39,21 @@ public:
 	int            GetArrayTypeId() const;
 	int            GetElementTypeId() const;
 
-	// Get the current size
-	asUINT GetSize() const;
-
-	// Returns true if the array is empty
-	bool   IsEmpty() const;
-
-	// Pre-allocates memory for elements
 	void   Reserve(asUINT maxElements);
-
-	// Resize the array
 	void   Resize(asUINT numElements);
+	asUINT GetSize() const;
+	bool   IsEmpty() const;
 
 	// Get a pointer to an element. Returns 0 if out of bounds
 	void       *At(asUINT index);
 	const void *At(asUINT index) const;
 
-	// Set value of an element. 
-	// The value arg should be a pointer to the value that will be copied to the element.
-	// Remember, if the array holds handles the value parameter should be the 
-	// address of the handle. The refCount of the object will also be incremented
+	// Set value of an element
 	void  SetValue(asUINT index, void *value);
 
-	// Copy the contents of one array to another (only if the types are the same)
 	CScriptArray &operator=(const CScriptArray&);
-
-	// Compare two arrays
 	bool operator==(const CScriptArray &) const;
 
-	// Array manipulation
 	void InsertAt(asUINT index, void *value);
 	void RemoveAt(asUINT index);
 	void InsertLast(void *value);
@@ -101,13 +83,6 @@ protected:
 	SArrayBuffer     *buffer;
 	int               elementSize;
 	int               subTypeId;
-
-	// Constructors
-	CScriptArray(asIObjectType *ot, void *initBuf); // Called from script when initialized with list
-	CScriptArray(asUINT length, asIObjectType *ot);
-	CScriptArray(asUINT length, void *defVal, asIObjectType *ot);
-	CScriptArray(const CScriptArray &other);
-	virtual ~CScriptArray();
 
 	bool  Less(const void *a, const void *b, bool asc, asIScriptContext *ctx, SArrayCache *cache);
 	void *GetArrayItemPointer(int index);

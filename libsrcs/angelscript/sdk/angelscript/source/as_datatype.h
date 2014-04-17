@@ -66,7 +66,6 @@ public:
 
 	static asCDataType CreatePrimitive(eTokenType tt, bool isConst);
 	static asCDataType CreateObject(asCObjectType *ot, bool isConst);
-	static asCDataType CreateAuto(bool isConst);
 	static asCDataType CreateObjectHandle(asCObjectType *ot, bool isConst);
 	static asCDataType CreateFuncDef(asCScriptFunction *ot);
 	static asCDataType CreateNullHandle();
@@ -82,15 +81,13 @@ public:
 	bool IsPrimitive()      const;
 	bool IsObject()         const;
 	bool IsReference()      const {return isReference;}
-	bool IsAuto()           const {return isAuto;}
-	bool IsReadOnly()       const;
+	bool IsReadOnly()       const; 
 	bool IsIntegerType()    const;
 	bool IsUnsignedType()   const;
 	bool IsFloatType()      const;
 	bool IsDoubleType()     const;
 	bool IsBooleanType()    const;
 	bool IsObjectHandle()   const {return isObjectHandle;}
-	bool IsHandleToAuto()   const {return isAuto && isObjectHandle;}
 	bool IsHandleToConst()  const;
 	bool IsArrayType()      const;
 	bool IsEnumType()       const;
@@ -140,8 +137,7 @@ protected:
 	bool isReadOnly:1;
 	bool isObjectHandle:1;
 	bool isConstHandle:1;
-	bool isAuto:1;
-	char dummy:3;
+	char dummy:4;
 };
 
 END_AS_NAMESPACE
