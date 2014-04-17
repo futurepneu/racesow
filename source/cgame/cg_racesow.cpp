@@ -4,6 +4,7 @@
 
 #define RS_HASH_ITERATIONS 100000
 
+cvar_t *rs_runOnce;
 cvar_t *rs_authTime;
 cvar_t *rs_authUser;
 cvar_t *rs_authToken;
@@ -15,11 +16,15 @@ cvar_t *rs_authToken;
  */
 void RS_CG_Init( void )
 {
+	rs_runOnce = trap_Cvar_Get( "rs_runOnce", "1", CVAR_ARCHIVE );
 	rs_authUser = trap_Cvar_Get( "rs_authUser", "", CVAR_ARCHIVE | CVAR_USERINFO );
 	rs_authTime = trap_Cvar_Get( "rs_authTime", "", CVAR_READONLY | CVAR_USERINFO );
 	rs_authToken = trap_Cvar_Get( "rs_authToken", "", CVAR_READONLY | CVAR_USERINFO );
 	trap_Cvar_ForceSet( rs_authTime->name, "" );
 	trap_Cvar_ForceSet( rs_authToken->name, "" );
+
+	if( rs_runOnce->integer )
+		trap_Cmd_ExecuteText( EXEC_NOW, "exec rs_defaults.cfg" );
 }
 
 /**
