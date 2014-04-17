@@ -220,8 +220,8 @@ void RS_AuthPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 	RS_PlayerReset( player );
 	if( rs_sqapi->GetStatus( query ) != 200 )
 	{
-		G_PrintMsg( NULL, "%sError:%s %s failed to authenticate as %s\n", 
-					S_COLOR_RED, S_COLOR_WHITE, player->client->netname, player->name );
+		G_PrintMsg( NULL, "%sError:%s %s%s failed to authenticate as %s\n", 
+					S_COLOR_RED, S_COLOR_WHITE, player->client->netname, S_COLOR_WHITE, player->name );
 		player->status = QSTATUS_FAILED;
 		return;
 	}
