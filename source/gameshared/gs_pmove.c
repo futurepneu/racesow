@@ -432,6 +432,11 @@ static void PM_StepSlideMove( void )
 		pm->step = ( pml.origin[2] - pml.previous_origin[2] );
 	}
 
+	// racesow - Preserve speed when sliding up ramps
+	if( ISWALKABLEPLANE( &trace.plane ) )
+		VectorCopy( start_v, pml.velocity );
+	// !racesow
+
 	// wsw : jal : The following line is what produces the ramp sliding.
 
 	//!! Special case
