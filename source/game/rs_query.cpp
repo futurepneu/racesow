@@ -595,14 +595,15 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 		RS_Racetime( racetime.timedelta - top.timedelta, &timediff );
 
 		// Print the row
-		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%d. %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s%s %s%s %s\n",
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%d. %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s%s %s%s %s%s\n",
 			S_COLOR_WHITE, i + 1,
 			S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
 			( top.timedelta == racetime.timedelta ? S_COLOR_YELLOW : S_COLOR_RED ), 
 			( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli / 10,
-			S_COLOR_WHITE, cJSON_GetObjectItem( node, "playerName" )->valuestring,
 			S_COLOR_WHITE, cJSON_GetObjectItem( node, "created" )->valuestring,
-			( i == 0 ? cJSON_GetObjectItem( data, "oneliner" )->valuestring : "" ) );
+			S_COLOR_WHITE, cJSON_GetObjectItem( node, "playerName" )->valuestring,
+			( i == 0 ? cJSON_GetObjectItem( data, "oneliner" )->valuestring : "" ),
+			S_COLOR_GREEN );
 	}
 }
 
