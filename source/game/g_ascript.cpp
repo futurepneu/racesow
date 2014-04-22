@@ -2558,6 +2558,11 @@ static asstring_t *objectRSPlayer_getNick( rs_authplayer_t *self )
 	return angelExport->asStringFactoryBuffer( self->nick, strlen(self->nick) );
 }
 
+static void objectRSPlayer_setNick( asstring_t *nick, rs_authplayer_t *self )
+{
+	RS_ReportNick( self, nick->buffer );
+}
+
 static void objectRSPlayer_incrementRace( rs_authplayer_t *self )
 {
 	self->races++;
@@ -2589,6 +2594,7 @@ static const asBehavior_t rsplayer_ObjectBehaviors[] =
 static const asMethod_t rsplayer_Methods[] =
 {
 	{ ASLIB_FUNCTION_DECL(const String @, getNick, () const), asFUNCTION(objectRSPlayer_getNick), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(void, setNick, ( const String &nick )), asFUNCTION(objectRSPlayer_setNick), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, incrementRace, ( void )), asFUNCTION(objectRSPlayer_incrementRace), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, reportRace, ( int rtime, array<int> &checkpoints )), asFUNCTION(objectRSPlayer_reportRace), asCALL_CDECL_OBJLAST },
 

@@ -354,6 +354,69 @@ void RS_ReportPlayer( rs_authplayer_t *player )
 }
 
 /**
+ * Callback for ReportNick to notify player of changes
+ * @param query   Query calling this function
+ * @param success True on any response
+ * @param customp Player who updated his nick
+ */
+void RS_ReportNick_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	static char mapname[MAX_STRING_CHARS];
+	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
+	int playerNum = (int)( player->client - game.clients );
+	cJSON *data = (cJSON*)rs_sqapi->GetRoot( query );
+
+	// invalid response?
+	if( !data || rs_sqapi->GetStatus( query ) != 200 )
+	{
+		G_PrintMsg( &game.edicts[ playerNum + 1 ],
+					"%sError: %sFailed to update nickname.\n",
+					S_COLOR_RED, S_COLOR_WHITE );
+
+		if( data && data->child )
+			G_PrintMsg( &game.edicts[ playerNum + 1 ],
+						"%sError: %s%s\n",
+						S_COLOR_RED, S_COLOR_WHITE, data->child->valuestring );
+
+		return;
+	}
+
+	G_PrintMsg( &game.edicts[ playerNum + 1 ],
+				"%sSuccessfully updated your nickname to %s\n",
+				S_COLOR_WHITE, data->child->string );
+}
+
+/**
+ * Update a players registered nickname
+ * @param player The player to update
+ * @param nick   The nickname to update with
+ */
+void RS_ReportNick( rs_authplayer_t *player, const char *nick )
+{
+	stat_query_t *query;
+	char *b64name;
+	
+	if( !rs_statsEnabled->integer )
+		return;
+
+	// Not authenticated
+	if( !player->id )
+		return;
+
+	// Form the query
+	b64name = (char*)base64_encode( (unsigned char *)player->login, strlen( player->login ), NULL );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/nick/%s", rs_statsUrl->string, b64name ), qfalse );
+	free( b64name );
+
+	rs_sqapi->SetField( query, "nick", nick );
+
+	RS_SignQuery( query, (int)time( NULL ) );
+	rs_sqapi->SetCallback( query, RS_ReportNick_Done, (void*)player );
+	rs_sqapi->Send( query );
+	query = NULL;
+}
+
+/**
  * QueryPlayer callback handler
  * @param query   Query calling this function
  * @param success True on any response
