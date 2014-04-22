@@ -65,6 +65,7 @@ cvar_t *rs_diffref;
 cvar_t *rs_raceReport;
 cvar_t *rs_autoRaceDemo;
 cvar_t *rs_ignoreTeleEffect;
+cvar_t *rs_runOnce;
 // !racesow
 
 cvar_t *cg_handOffset;
@@ -638,6 +639,7 @@ static void CG_RegisterVariables( void )
 	rs_raceReport = trap_Cvar_Get( "rs_raceReport", "1", CVAR_USERINFO | CVAR_ARCHIVE );
 	rs_autoRaceDemo = trap_Cvar_Get( "rs_autoRaceDemo", "5", CVAR_ARCHIVE );
 	rs_ignoreTeleEffect = trap_Cvar_Get( "rs_ignoreTeleEffect", "1", CVAR_ARCHIVE );
+	rs_runOnce = trap_Cvar_Get( "rs_runOnce", "1", CVAR_ARCHIVE );
 	// !racesow
 	
 	cg_predict =	    trap_Cvar_Get( "cg_predict", "1", 0 );
@@ -983,7 +985,6 @@ void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int 
 			 unsigned int snapFrameTime, int protocol, int sharedSeed )
 {
 	CG_InitGameShared();
-	RS_CG_Init();
 
 	memset( &cg, 0, sizeof( cg_state_t ) );
 	memset( &cgs, 0, sizeof( cg_static_t ) );

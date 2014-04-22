@@ -558,11 +558,6 @@ static void CG_SC_RaceDemoCancel( void )
 {
 	CG_SC_RaceDemo( RS_RACEDEMO_CANCEL, 0, false );
 }
-
-static void CG_SC_RaceLogin( void )
-{
-	RS_CG_SLogin();
-}
 // !racesow
 
 /*
@@ -943,7 +938,6 @@ static const svcmd_t cg_svcmds[] =
 	{ "dstart", CG_SC_RaceDemoStart }, //racesow
 	{ "dstop", CG_SC_RaceDemoStop }, //racesow
 	{ "dcancel", CG_SC_RaceDemoCancel }, //racesow
-	{ "slogin", CG_SC_RaceLogin }, // racesow
 	{ "cmd", CG_SC_ExecuteText },
 
 	{ NULL }
@@ -1104,28 +1098,6 @@ static void CG_Viewpos_f( void )
 }
 
 // racesow
-static void CG_Cmd_RSLogin_f( void )
-{
-	if( trap_Cmd_Argc() != 3 )
-	{
-		CG_Printf( "Usage: login <user> <pass>\n" );
-		return;
-	}
-
-	RS_CG_Login( trap_Cmd_Argv( 1 ), trap_Cmd_Argv( 2 ) );
-}
-
-static void CG_Cmd_RSRegister_f( void )
-{
-	if( trap_Cmd_Argc() != 4 )
-	{
-		CG_Printf( "Usage: register <user> <pass> <email>\n" );
-		return;
-	}
-
-	RS_CG_Register( trap_Cmd_Argv( 1 ), trap_Cmd_Argv( 2 ), trap_Cmd_Argv( 3 ) );
-}
-
 /**
  * Toggle blocking/unblocking chat messages from a given player
  */
@@ -1285,8 +1257,6 @@ static const cgcmd_t cgcmds[] =
 	{ "weapprev", CG_Cmd_PrevWeapon_f, true },
 	{ "weaplast", CG_Cmd_LastWeapon_f, true },
 	{ "viewpos", CG_Viewpos_f, true },
-	{ "login", CG_Cmd_RSLogin_f, false }, // racesow
-	{ "register", CG_Cmd_RSRegister_f, false }, // racesow
 	{ "block", CG_Cmd_RSChatBlock_f, false }, // racesow
 	{ "players", NULL, false },
 	{ "spectators", NULL, false },
