@@ -180,7 +180,6 @@ void RS_PlayerReset( rs_authplayer_t *player )
 	player->playTime = 0;
 	player->races = 0;
 	player->nick[0] = '\0';
-	player->login[0] = '\0';
 }
 
 /**
