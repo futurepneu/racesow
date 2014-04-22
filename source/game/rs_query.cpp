@@ -535,7 +535,7 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 		player = cJSON_GetObjectItem( node, "player" );
 
 		// Print the row
-		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%d. %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s%s %s%s %s%s\n",
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%d. %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s%s %s%s \"%s\"%s\n",
 			S_COLOR_WHITE, i + 1,
 			S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
 			( top.timedelta == racetime.timedelta ? S_COLOR_YELLOW : S_COLOR_RED ), 
@@ -547,10 +547,11 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 	}
 }
 
-void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
+void RS_QueryTop( gclient_t *client, const char* mapname, int limit, bool old )
 {
 	stat_query_t *query;
-	char *b64name = (char*)base64_encode( (unsigned char *)mapname, strlen( mapname ), NULL );
+	char *url,
+		*b64name = (char*)base64_encode( (unsigned char *)mapname, strlen( mapname ), NULL );
 	int	playerNum = (int)( client - game.clients );
 
 	if( !rs_statsEnabled->integer )
@@ -561,7 +562,12 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit )
 	}
 
 	// Form the query
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/race/", rs_statsUrl->string ), qtrue );
+	if( old )
+		url = va( "%s/oldapi/race", rs_statsUrl->string );
+	else
+		url = va( "%s/api/race", rs_statsUrl->string );
+
+	query = rs_sqapi->CreateRootQuery( url, qtrue );
 	rs_sqapi->SetField( query, "map", b64name );
 	rs_sqapi->SetField( query, "limit", va( "%d", limit ) );
 
