@@ -304,6 +304,39 @@ stat_query_t *StatQuery_CreateQuery( const char *str, qboolean get )
 	return query;
 }
 
+// racesow
+stat_query_t *StatQuery_CreateRootQuery( const char *str, qboolean get )
+{
+	stat_query_t *query;
+
+	assert( str != NULL );
+	if( str == NULL ) {
+		return NULL;
+	}
+
+	query = SQALLOC( sizeof( *query ) );
+	memset( query, 0, sizeof( *query ) );
+
+	query->json_out = cJSON_CreateObject();
+
+	if( str[0] == '/' ) {
+		str += 1;
+	}
+
+	if( !get )
+		query->req = wswcurl_create( str );
+	else
+	{
+		// add in '/', '?' and '\0' = 3
+		query->url = SQALLOC( strlen( str ) + 2 );
+		strcpy( query->url, str );
+		strcat( query->url, "?" );
+	}
+
+	return query;
+}
+// !racesow
+
 void StatQuery_DestroyQuery( stat_query_t *query )
 {
 	// close wswcurl and json_in json_out
@@ -564,7 +597,7 @@ char **StatQuery_GetTokenizedResponse( stat_query_t *query, int *argc )
 }
 
 // racesow
-int *StatQuery_GetStatus( stat_query_t *query )
+int StatQuery_GetStatus( stat_query_t *query )
 {
 	if( !query->req )
 		return -1;
@@ -609,6 +642,7 @@ void StatQuery_Init( void )
 
 	// populate API structure
 	sq_export.CreateQuery = StatQuery_CreateQuery;
+	sq_export.CreateRootQuery = StatQuery_CreateRootQuery; // racesow
 	sq_export.DestroyQuery = StatQuery_DestroyQuery;
 	sq_export.SetCallback = StatQuery_SetCallback;
 	sq_export.Send = StatQuery_Send;
