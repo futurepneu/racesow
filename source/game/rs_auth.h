@@ -22,7 +22,7 @@ typedef struct rs_authplayer_s
 	gclient_t *client;			/**< client for the player */
 	qstatus_t status;			/**< status of the inprogress query */
 	qstatus_t nickStatus;		/**< status of the nickname query */
-	char name[MAX_AUTH_CHARS];	/**< username */
+	char login[MAX_INFO_VALUE];	/**< mm login name of the player */
 	char nick[MAX_NAME_CHARS];	/**< registered ingame nickname for user */
 	char last[MAX_NAME_CHARS];	/**< The last nickname the player tried to use */
 	bool admin;					/**< has admin privleges */

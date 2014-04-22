@@ -24,6 +24,7 @@ void RS_ThinkAuth( void )
 {
 	rs_authplayer_t *player;
 	edict_t *ent;
+	static char simplified[MAX_NAME_CHARS];
 	int remaining, playerNum;
 	bool maptime = false;
 
@@ -48,8 +49,15 @@ void RS_ThinkAuth( void )
 			remaining = ( 500 + (int)player->failTime - (int)game.realtime ) / 1000;
 			playerNum = (int)( player->client - game.clients );
 			ent = PLAYERENT( playerNum );
+			Q_strncpyz( simplified, COM_RemoveColorTokens( player->client->netname ), sizeof( simplified ) );
 
-			if( remaining < 1 && ent )
+			if( !Q_stricmp( simplified, player->nick ) )
+			{
+				// Are they authd with this nickname?
+				player->failTime = 0;
+				player->thinkTime = 0;
+			}
+			else if( remaining < 1 && ent )
 			{
 				// Timed out, rename the client
 				Info_SetValueForKey( player->client->userinfo, "name", "Player" );
@@ -107,7 +115,6 @@ static void RS_PlayerInfo( rs_authplayer_t *player )
 	G_Printf( "client: %d\n", player->client );
 	G_Printf( "status: %d\n", player->status );
 	G_Printf( "nickStatus: %d\n", player->nickStatus );
-	G_Printf( "name: %s\n", player->name );
 	G_Printf( "nick: %s\n", player->nick );
 	G_Printf( "last: %s\n", player->last );
 	G_Printf( "admin: %d\n", player->admin ? 1 : 0 );
@@ -131,9 +138,11 @@ void RS_PlayerEnter( gclient_t *client )
 	memset( player, 0, sizeof( *player ) );
 	RS_PlayerReset( player );
 	player->client = client;
+	Q_strncpyz( player->login, Info_ValueForKey( client->userinfo, "cl_mm_login" ), sizeof( player->login ) );
 
-	// Ask the player to auto login
-	trap_GameCmd( &game.edicts[playerNum + 1], "slogin" );
+	// Fetch player data
+	if( client->mm_session > 0 )
+		RS_QueryPlayer( player );
 
 	// Send first nick query
 	RS_PlayerUserinfoChanged( player, NULL );
@@ -171,6 +180,7 @@ void RS_PlayerReset( rs_authplayer_t *player )
 	player->playTime = 0;
 	player->races = 0;
 	player->nick[0] = '\0';
+	player->login[0] = '\0';
 }
 
 /**
