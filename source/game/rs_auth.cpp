@@ -43,6 +43,14 @@ void RS_ThinkAuth( void )
 			}
 		}
 
+		// send the login queries?
+		if( player->loginTime && player->loginTime < game.realtime )
+		{
+			// Fetch player data
+			if( player->client->mm_session > 0 )
+				RS_QueryPlayer( player );
+		}
+
 		// Protected nick status
 		if( player->thinkTime && player->thinkTime < game.realtime )
 		{
@@ -138,14 +146,16 @@ void RS_PlayerEnter( gclient_t *client )
 	memset( player, 0, sizeof( *player ) );
 	RS_PlayerReset( player );
 	player->client = client;
-	Q_strncpyz( player->login, Info_ValueForKey( client->userinfo, "cl_mm_login" ), sizeof( player->login ) );
 
-	// Fetch player data
 	if( client->mm_session > 0 )
-		RS_QueryPlayer( player );
+	{
+		player->loginTime = game.realtime + 1000;
+		G_Printf( "mmlogin: %s\n", Info_ValueForKey( player->client->userinfo, "cl_mm_login" ) );
+	}
 
 	// Send first nick query
 	RS_PlayerUserinfoChanged( player, NULL );
+	player->loginTime = 0;
 }
 
 
@@ -180,6 +190,7 @@ void RS_PlayerReset( rs_authplayer_t *player )
 	player->playTime = 0;
 	player->races = 0;
 	player->nick[0] = '\0';
+	player->loginTime = 0;
 }
 
 /**
