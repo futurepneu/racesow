@@ -647,19 +647,22 @@ static int SCR_DrawPlayerTab( const char **ptrptr, int team, int x, int y, int p
 
 		case 't': // is a race time. Convert time into MM:SS:mm
 			{
-				unsigned int milli, min, sec;
+				// racesow - 2 decimal time precision
+				unsigned int milli;
+				rs_racetime_t t;
 
 				milli = (unsigned int)( atoi( token ) );
 				if( !milli )
 					Q_snprintfz( string, sizeof( string ), CG_TranslateString( "no time" ) );
 				else
 				{
-					min = milli / 60000;
-					milli -= min * 60000;
-					sec = milli / 1000;
-					milli -= sec * 1000;
-					Q_snprintfz( string, sizeof( string ), va( "%02i:%02i.%03i", min, sec, milli ) );
+					RS_Racetime( milli, &t );
+					if( t.hour )
+						Q_snprintfz( string, sizeof( string ), va( "%i:%02i:%02i.%02i", t.hour, t.min, t.sec, t.milli / 10 ) );
+					else
+						Q_snprintfz( string, sizeof( string ), va( "%02i:%02i.%02i", t.min, t.sec, t.milli / 10 ) );
 				}
+				// !racesow
 			}
 			break;
 		}
