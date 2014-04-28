@@ -1094,12 +1094,19 @@ void GClip_TouchTriggers( edict_t *ent )
 	}
 }
 
-void G_PMoveTouchTriggers( pmove_t *pm )
+// racesow
+/**
+ * Racesow flavored G_PMoveTouchTriggers
+ * @param pm              Player pmove information, marks end of search volume
+ * @param previous_origin Last player location, marks start of search volume
+ */
+void G_PMoveTouchTriggers( pmove_t *pm, vec3_t previous_origin )
 {
-	int i, num;
+	int i, j, num;
 	edict_t	*hit;
-	int touch[MAX_EDICTS];
-	vec3_t mins, maxs;
+	int touch[MAX_EDICTS], touched[MAX_EDICTS], numTouches;
+	vec3_t imins, imaxs, mins, maxs, dir;
+	float distance, traveled;
 	edict_t	*ent;
 
 	if( pm->playerState->POVnum <= 0 || (int)pm->playerState->POVnum > gs.maxclients )
@@ -1131,31 +1138,54 @@ void G_PMoveTouchTriggers( pmove_t *pm )
 
 	GClip_LinkEntity( ent );
 
-	VectorAdd( pm->playerState->pmove.origin, pm->mins, mins );
-	VectorAdd( pm->playerState->pmove.origin, pm->maxs, maxs );
+	VectorAdd( previous_origin, pm->mins, imins );
+	VectorAdd( previous_origin, pm->maxs, imaxs );
+	VectorSubtract( pm->playerState->pmove.origin, previous_origin, dir );
+	distance = VectorNormalize( dir );
+	traveled = 0.0f;
+	numTouches = 0;
 
-	num = GClip_AreaEdicts( mins, maxs, touch, MAX_EDICTS, AREA_TRIGGERS, 0 );
-
-	// be careful, it is possible to have an entity in this
-	// list removed before we get to it (killtriggered)
-	for( i = 0; i < num; i++ )
+	// Slide along the path from start to finish in steps of ~30 units
+	while( traveled < distance )
 	{
-		if( !ent->r.inuse )
-			break;
+		VectorMA( imins, traveled, dir, mins );
+		VectorMA( imaxs, traveled, dir, maxs );
+		num = GClip_AreaEdicts( mins, maxs, touch, MAX_EDICTS, AREA_TRIGGERS, 0 );
 
-		hit = &game.edicts[touch[i]];
-		if( !hit->r.inuse )
-			continue;
+		// Advance traveled for next loop
+		traveled += ( distance - traveled ) < -0.1f ? ( distance - traveled ) : 32.0f;
 
-		if( !hit->touch && !hit->asTouchFunc )
-			continue;
+		// be careful, it is possible to have an entity in this
+		// list removed before we get to it (killtriggered)
+		for( i = 0; i < num; i++ )
+		{
+			if( !ent->r.inuse )
+				break;
 
-		if( !hit->item && !GClip_EntityContact( mins, maxs, hit ) )
-			continue;
+			hit = &game.edicts[touch[i]];
+			if( !hit->r.inuse )
+				continue;
 
-		G_CallTouch( hit, ent, NULL, 0 );
+			if( !hit->touch && !hit->asTouchFunc )
+				continue;
+
+			if( !hit->item && !GClip_EntityContact( mins, maxs, hit ) )
+				continue;
+
+			// Check if we already touched it
+			for( j = 0; j < numTouches; j++ )
+				if( touched[j] == touch[i] )
+					break;
+
+			if( j < numTouches )
+				continue;
+
+			touched[numTouches++] = touch[i];
+			G_CallTouch( hit, ent, NULL, 0 );
+		}
 	}
 }
+// !racesow
 
 /*
 * GClip_FindBoxInRadius
