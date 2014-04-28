@@ -1768,6 +1768,30 @@ static void objectGameClient_setHUDStat( int stat, int value, gclient_t *self )
 	self->ps.stats[ stat ] = ( (short)value & 0xFFFF );
 }
 
+// racesow
+/**
+ * Set a long int into two short int HUD stats
+ * This assumes the 2nd HUD stat is `stat+1`
+ * @param stat  HUD stat to set
+ * @param value value to set
+ * @param self  Client to set for
+ */
+static void objectGameClient_setLongHUDStat( int stat, int value, gclient_t *self )
+{
+	if( !ISGAMETYPESTAT( stat ) || !ISGAMETYPESTAT( stat + 1 ) )
+	{
+		if( stat > 0 && stat < GS_GAMETYPE_STATS_START - 1 )
+			G_Printf( "* WARNING: stat %i is write protected\n", stat );
+		else
+			G_Printf( "* WARNING: %i is not a valid stat\n", stat );
+		return;
+	}
+
+	self->ps.stats[ stat ] = (short)( ( value >> 16 ) & 0xFFFF );
+	self->ps.stats[ stat+1 ] = (short)( value & 0xFFFF );
+}
+// !racesow
+
 static int objectGameClient_getHUDStat( int stat, gclient_t *self )
 {
 	if( stat < 0 && stat >= MAX_STATS )
@@ -1960,6 +1984,7 @@ static const asMethod_t gameclient_Methods[] =
 	{ ASLIB_FUNCTION_DECL(void, addMetaAward, ( const String &in )), asFUNCTION(objectGameClient_addMetaAward), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, execGameCommand, ( const String &in )), asFUNCTION(objectGameClient_execGameCommand), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, setHUDStat, ( int stat, int value )), asFUNCTION(objectGameClient_setHUDStat), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(void, setLongHUDStat, ( int stat, int value )), asFUNCTION(objectGameClient_setLongHUDStat), asCALL_CDECL_OBJLAST }, // racesow
 	{ ASLIB_FUNCTION_DECL(int, getHUDStat, ( int stat ) const), asFUNCTION(objectGameClient_getHUDStat), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, set_pmoveFeatures, ( uint bitmask )), asFUNCTION(objectGameClient_setPMoveFeatures), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, set_pmoveMaxSpeed, ( float speed )), asFUNCTION(objectGameClient_setPMoveMaxSpeed), asCALL_CDECL_OBJLAST },

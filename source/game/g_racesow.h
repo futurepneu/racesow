@@ -30,3 +30,4 @@ void RS_Shutdown( void );
 void RS_Think( void );
 void RS_removeProjectiles( edict_t *owner );
 void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, const vec3_t point, float maxradius, vec3_t pushdir, float *kickFrac, float *dmgFrac );
+void RS_clearHUDStats( gclient_t *client );

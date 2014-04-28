@@ -112,6 +112,18 @@ static int CG_GetStatEnemyTeam( const void *parameter )
 		( ( cg.predictedPlayerState.stats[STAT_TEAM] == TEAM_BETA ) ? TEAM_ALPHA : TEAM_SPECTATOR ) );
 }
 
+// racesow
+static int CG_GetLongStatValue( const void *parameter )
+{
+	int result;
+	assert( (qintptr)parameter >= 0 && (qintptr)( parameter+1 ) < MAX_STATS );
+
+	result = ( cg.predictedPlayerState.stats[(qintptr)parameter] & 0xFFFF ) << 16;
+	result |= ( cg.predictedPlayerState.stats[(qintptr)parameter+1] & 0xFFFF );
+	return result;
+}
+// !racesow
+
 static int CG_GetStatValue( const void *parameter )
 {
 	assert( (qintptr)parameter >= 0 && (qintptr)parameter < MAX_STATS );
@@ -582,11 +594,13 @@ static const reference_numeric_t cg_numeric_references[] =
 	{ "IMAGE_ALPHA", CG_GetStatValue, (void *)STAT_IMAGE_ALPHA },
 	{ "IMAGE_BETA", CG_GetStatValue, (void *)STAT_IMAGE_BETA },
 
-	{ "TIME_SELF", CG_GetRaceStatValue, (void *)STAT_TIME_SELF },
-	{ "TIME_BEST", CG_GetRaceStatValue, (void *)STAT_TIME_BEST },
-	{ "TIME_RECORD", CG_GetRaceStatValue, (void *)STAT_TIME_RECORD },
-	{ "TIME_ALPHA", CG_GetRaceStatValue, (void *)STAT_TIME_ALPHA },
-	{ "TIME_BETA", CG_GetRaceStatValue, (void *)STAT_TIME_BETA },
+	// racesow - Make these long ints
+	{ "TIME_SELF", CG_GetLongStatValue, (void *)STAT_TIME_SELF },
+	{ "TIME_BEST", CG_GetLongStatValue, (void *)STAT_TIME_BEST },
+	{ "TIME_RECORD", CG_GetLongStatValue, (void *)STAT_TIME_RECORD },
+	{ "TIME_ALPHA", CG_GetLongStatValue, (void *)STAT_TIME_ALPHA },
+	{ "TIME_BETA", CG_GetLongStatValue, (void *)STAT_TIME_BETA },
+	// !racesow
 
 	{ "MESSAGE_SELF", CG_GetStatValue, (void *)STAT_MESSAGE_SELF },
 	{ "MESSAGE_OTHER", CG_GetStatValue, (void *)STAT_MESSAGE_OTHER },

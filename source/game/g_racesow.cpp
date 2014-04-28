@@ -95,6 +95,24 @@ void RS_removeProjectiles( edict_t *owner )
 }
 
 /**
+ * Clear racetime hud stats for a player
+ * @param client Client to clear stats for
+ */
+void RS_clearHUDStats( gclient_t *client )
+{
+	client->ps.stats[STAT_TIME_SELF] = 0;
+	client->ps.stats[STAT_TIME_BEST] = 0;
+	client->ps.stats[STAT_TIME_RECORD] = 0;
+	client->ps.stats[STAT_TIME_ALPHA] = 0;
+	client->ps.stats[STAT_TIME_BETA] = 0;	
+	client->ps.stats[STAT_TIME_SELF2] = STAT_NOTSET;
+	client->ps.stats[STAT_TIME_BEST2] = STAT_NOTSET;
+	client->ps.stats[STAT_TIME_RECORD2] = STAT_NOTSET;
+	client->ps.stats[STAT_TIME_ALPHA2] = STAT_NOTSET;
+	client->ps.stats[STAT_TIME_BETA2] = STAT_NOTSET;
+}
+
+/**
  * RS_SplashFrac
  * Racesow version of G_SplashFrac by Weqo
  */

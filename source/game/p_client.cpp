@@ -637,11 +637,7 @@ void G_ClientRespawn( edict_t *self, bool ghost )
 	client->ps.pmove.stats[PM_STAT_NOAUTOATTACK] = 1000;
 
 	// set race stats to invisible
-	client->ps.stats[STAT_TIME_SELF] = STAT_NOTSET;
-	client->ps.stats[STAT_TIME_BEST] = STAT_NOTSET;
-	client->ps.stats[STAT_TIME_RECORD] = STAT_NOTSET;
-	client->ps.stats[STAT_TIME_ALPHA] = STAT_NOTSET;
-	client->ps.stats[STAT_TIME_BETA] = STAT_NOTSET;
+	RS_clearHUDStats( client ); // racesow - clear with our function
 
 	BOT_Respawn( self );
 
