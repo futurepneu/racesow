@@ -100,16 +100,19 @@ void RS_removeProjectiles( edict_t *owner )
  */
 void RS_clearHUDStats( gclient_t *client )
 {
-	client->ps.stats[STAT_TIME_SELF] = 0;
-	client->ps.stats[STAT_TIME_BEST] = 0;
-	client->ps.stats[STAT_TIME_RECORD] = 0;
-	client->ps.stats[STAT_TIME_ALPHA] = 0;
-	client->ps.stats[STAT_TIME_BETA] = 0;	
-	client->ps.stats[STAT_TIME_SELF2] = STAT_NOTSET;
-	client->ps.stats[STAT_TIME_BEST2] = STAT_NOTSET;
-	client->ps.stats[STAT_TIME_RECORD2] = STAT_NOTSET;
-	client->ps.stats[STAT_TIME_ALPHA2] = STAT_NOTSET;
-	client->ps.stats[STAT_TIME_BETA2] = STAT_NOTSET;
+	const short notset_1 = (short)( ( STAT_NOTSET >> 16 ) & 0xFFFF );
+	const short notset_2 = (short)( STAT_NOTSET & 0xFFFF );
+
+	client->ps.stats[STAT_TIME_SELF] = notset_1;
+	client->ps.stats[STAT_TIME_BEST] = notset_1;
+	client->ps.stats[STAT_TIME_RECORD] = notset_1;
+	client->ps.stats[STAT_TIME_ALPHA] = notset_1;
+	client->ps.stats[STAT_TIME_BETA] = notset_1;
+	client->ps.stats[STAT_TIME_SELF2] = notset_2;
+	client->ps.stats[STAT_TIME_BEST2] = notset_2;
+	client->ps.stats[STAT_TIME_RECORD2] = notset_2;
+	client->ps.stats[STAT_TIME_ALPHA2] = notset_2;
+	client->ps.stats[STAT_TIME_BETA2] = notset_2;
 }
 
 /**
