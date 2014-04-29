@@ -8,17 +8,15 @@
 
 static stat_query_api_t *rs_sqapi;
 
+cvar_t *sv_mm_authkey;
 cvar_t *rs_statsEnabled;
 cvar_t *rs_statsUrl;
-cvar_t *rs_statsId;
-cvar_t *rs_statsKey;
 
 void RS_InitQuery( void )
 {
+	sv_mm_authkey = trap_Cvar_Get( "sv_mm_authkey", "", CVAR_ARCHIVE );
 	rs_statsEnabled = trap_Cvar_Get( "rs_statsEnabled", "0", CVAR_ARCHIVE );
 	rs_statsUrl = trap_Cvar_Get( "rs_statsUrl", "", CVAR_ARCHIVE );
-	rs_statsId = trap_Cvar_Get( "rs_statsId", "", CVAR_ARCHIVE );
-	rs_statsKey = trap_Cvar_Get( "rs_statsKey", "", CVAR_ARCHIVE );
 	rs_sqapi = trap_GetStatQueryAPI();
 	if( !rs_sqapi )
 		trap_Cvar_ForceSet( rs_statsEnabled->name, "0" );
@@ -61,44 +59,23 @@ static char *RS_ParseRace( cJSON *record )
 }
 
 /**
- * RS_GenToken
- * Generate the server token for the given string
- * @param dst The token string to append to
- * @param str The message to generate a token for
- * @return void
+ * Sign a query with the generated server token
+ * @param query The query to sign
  */
-static void RS_GenToken( char *token, const char *str )
+static void RS_SignQuery( stat_query_t *query )
 {
+	int uTime = (int)time( NULL );
 	unsigned char digest[SHA256_DIGEST_SIZE];
-	char *digest64,
-		*message = va( "%s|%s", str, rs_statsKey->string );
+	char *digest64, *message = va( "%d|%s", uTime, sv_mm_authkey->string );
 	size_t outlen;
 
+	// Make the auth token
 	sha256( (const unsigned char*)message, strlen( message ), digest );
 	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, &outlen );
 
-	Q_strncatz( token, digest64, MAX_STRING_CHARS );
-	free( digest64 );
-}
-
-/**
- * Sign a query with the generated server token
- * @param query The query to sign
- * @param uTime The time to sign the query with
- */
-static void RS_SignQuery( stat_query_t *query, int uTime )
-{
-	char *token;
-
-	token = (char*)G_Malloc( MAX_STRING_CHARS );
-	Q_strncpyz( token, rs_statsId->string, sizeof( token ) );
-	Q_strncatz( token, ".", sizeof( token ) );
-	RS_GenToken( token, va( "%d", uTime ) );
-
-	rs_sqapi->SetField( query, "sid", rs_statsId->string );
 	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "sToken", token );
-	G_Free( token );
+	rs_sqapi->SetField( query, "sToken", digest64 );
+	free( digest64 );
 }
 
 /**
@@ -177,7 +154,7 @@ void RS_AuthNick( rs_authplayer_t *player, char *nick )
 	query = rs_sqapi->CreateQuery( va( "%s/api/nick/%s", rs_statsUrl->string, b64name ), qtrue );
 	free( b64name );
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_AuthNick_Done, (void*)player );
 	rs_sqapi->Send( query );
 	player->nickStatus = QSTATUS_PENDING;
@@ -231,7 +208,7 @@ void RS_AuthMap( void )
 	query = rs_sqapi->CreateRootQuery( va( "%s/api/map/%s", rs_statsUrl->string, authmap.b64name ), qtrue );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -274,7 +251,7 @@ void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum )
 	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
 	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)player );
 	rs_sqapi->Send( query );
 	query = NULL;
@@ -314,7 +291,7 @@ void RS_ReportMap( const char *tags )
 	authmap.playTime = 0;
 	authmap.races = 0;
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -326,7 +303,7 @@ void RS_ReportMap( const char *tags )
 void RS_ReportPlayer( rs_authplayer_t *player )
 {
 	stat_query_t *query;
-	char *b64name, url[MAX_STRING_CHARS];
+	char *b64name;
 
 	if( !rs_statsEnabled->integer )
 		return;
@@ -348,7 +325,7 @@ void RS_ReportPlayer( rs_authplayer_t *player )
 	player->playTime = 0;
 	player->races = 0;
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -361,7 +338,6 @@ void RS_ReportPlayer( rs_authplayer_t *player )
  */
 void RS_ReportNick_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	static char mapname[MAX_STRING_CHARS];
 	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
 	int playerNum = (int)( player->client - game.clients );
 	cJSON *data = (cJSON*)rs_sqapi->GetRoot( query );
@@ -410,7 +386,7 @@ void RS_ReportNick( rs_authplayer_t *player, const char *nick )
 
 	rs_sqapi->SetField( query, "nick", nick );
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_ReportNick_Done, (void*)player );
 	rs_sqapi->Send( query );
 	query = NULL;
@@ -472,7 +448,7 @@ void RS_QueryPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_QueryPlayer( rs_authplayer_t *player )
 {
 	stat_query_t *query;
-	char url[MAX_STRING_CHARS], *b64name;
+	char *b64name;
 
 	if( !rs_statsEnabled->integer )
 		return;
@@ -484,7 +460,7 @@ void RS_QueryPlayer( rs_authplayer_t *player )
 
 	rs_sqapi->SetField( query, "mid", va( "%d", authmap.id ) );
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_QueryPlayer_Done, (void*)player );
 	rs_sqapi->Send( query );
 	player->status = QSTATUS_PENDING;
@@ -571,7 +547,7 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit, bool old )
 	rs_sqapi->SetField( query, "map", b64name );
 	rs_sqapi->SetField( query, "limit", va( "%d", limit ) );
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_QueryTop_Done, (void*)client );
 	rs_sqapi->Send( query );
 	free( b64name );
@@ -657,7 +633,7 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 	rs_sqapi->SetField( query, "start", va( "%d", page * RS_MAPLIST_ITEMS ) );
 	rs_sqapi->SetField( query, "limit", va( "%d", RS_MAPLIST_ITEMS ) );
 
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_QueryMaps_Done, (void*)client );
 	rs_sqapi->Send( query );
 	free( b64pattern );
@@ -723,7 +699,7 @@ void RS_QueryRandmap( char* tags[], void *data )
 	rs_sqapi->SetField( query, "tags", b64tags );
 	rs_sqapi->SetField( query, "rand", "1" );
 	
-	RS_SignQuery( query, (int)time( NULL ) );
+	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_QueryRandmap_Done, data );
 	rs_sqapi->Send( query );
 	query = NULL;
