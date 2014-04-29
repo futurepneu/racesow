@@ -121,7 +121,7 @@ void SV_InitMaster( void )
 {
 	SV_ResolveMaster();
 
-	svc.lastHeartbeat = HEARTBEAT_SECONDS * 1000; // wait a while before sending first heartbeat
+	svc.lastHeartbeat = 30000; // racesow - first heartbeat after 30 seconds
 }
 
 /*
