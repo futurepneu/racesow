@@ -43,14 +43,6 @@ void RS_ThinkAuth( void )
 			}
 		}
 
-		// send the login queries?
-		if( player->loginTime && player->loginTime < game.realtime )
-		{
-			// Fetch player data
-			if( player->client->mm_session > 0 )
-				RS_QueryPlayer( player );
-		}
-
 		// Protected nick status
 		if( player->thinkTime && player->thinkTime < game.realtime )
 		{
@@ -147,15 +139,8 @@ void RS_PlayerEnter( gclient_t *client )
 	RS_PlayerReset( player );
 	player->client = client;
 
-	if( client->mm_session > 0 )
-	{
-		player->loginTime = game.realtime + 1000;
-		G_Printf( "mmlogin: %s\n", Info_ValueForKey( player->client->userinfo, "cl_mm_login" ) );
-	}
-
 	// Send first nick query
 	RS_PlayerUserinfoChanged( player, NULL );
-	player->loginTime = 0;
 }
 
 
@@ -190,7 +175,6 @@ void RS_PlayerReset( rs_authplayer_t *player )
 	player->playTime = 0;
 	player->races = 0;
 	player->nick[0] = '\0';
-	player->loginTime = 0;
 }
 
 /**
@@ -201,11 +185,23 @@ void RS_PlayerReset( rs_authplayer_t *player )
  */
 void RS_PlayerUserinfoChanged( rs_authplayer_t *player, char *oldname )
 {
-	static char simpOld[MAX_NAME_CHARS], simpNew[MAX_NAME_CHARS];
-	static int num;
+	char simpOld[MAX_NAME_CHARS], simpNew[MAX_NAME_CHARS];
+	int num;
+	char *login;
 
 	if( !player->client )
 		return;
+
+	// Player mm login came back, time to send rs queries?
+	if( player->client->mm_session > 0 && player->status == QSTATUS_NONE )
+	{
+		login = Info_ValueForKey( player->client->userinfo, "cl_mm_login" );
+		if( login && strlen( login ) )
+		{
+			Q_strncpyz( player->login, login, strlen( login ) + 1 );
+			RS_QueryPlayer( player );
+		}
+	}
 
 	Q_strncpyz( simpNew, COM_RemoveColorTokens( player->client->netname ), sizeof( simpNew ) );
 	Q_strlwr( simpNew );

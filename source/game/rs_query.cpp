@@ -72,6 +72,7 @@ static void RS_SignQuery( stat_query_t *query )
 	// Make the auth token
 	sha256( (const unsigned char*)message, strlen( message ), digest );
 	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, &outlen );
+	G_Printf( "Sign %s %s\n", message, digest64 );
 
 	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
 	rs_sqapi->SetField( query, "sToken", digest64 );

@@ -292,7 +292,10 @@ static void sv_mm_clientconnect_done( stat_query_t *query, qboolean success, voi
 		Com_Printf("SV_MM_ClientConnect: Forcing local_session %d on client %s\n", isession_id, cl->name );
 		cl->mm_session = isession_id;
 		// TODO: reflect this to the userinfo
-		Info_SetValueForKey( cl->userinfo, "cl_mm_session", va("%d", isession_id ) );
+		// racesow - Let UserinfoChanged update it
+		// Info_SetValueForKey( cl->userinfo, "cl_mm_session", va("%d", isession_id ) );
+		SV_UserinfoChanged( cl );
+		// !racesow
 
 		// We should also notify MM about the new local session id?
 		// Or another option would be that MM doesnt track local sessions at all,

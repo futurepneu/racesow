@@ -28,7 +28,6 @@ typedef struct rs_authplayer_s
 	bool admin;					/**< has admin privleges */
 	int id;						/**< database id for player, 0 for unauthenticated */
 	int races;					/**< number of races finished */
-	unsigned int loginTime;		/**< realtime to send the login queries, 0 for already sent */
 	unsigned int failTime;		/**< realtime to rename the player */
 	unsigned int thinkTime;		/**< realtime for next protectednick think */
 	unsigned int playTime;		/**< time spent playing the map in milliseconds */
