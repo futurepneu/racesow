@@ -69,13 +69,21 @@ void RS_ThinkAuth( void )
 			{
 				// Send a warning and set next think time
 				if( player->status != QSTATUS_PENDING )
+				{
 					G_PrintMsg( &game.edicts[playerNum + 1], "%sWarning: %s%s%s is protected, please change your name within %d seconds\n",
 						S_COLOR_ORANGE, S_COLOR_WHITE, player->client->netname, S_COLOR_WHITE, remaining );
 
-				if( remaining > 5 )
-					player->thinkTime = game.realtime + 5000;
+					if( remaining > 5 )
+						player->thinkTime = game.realtime + 5000;
+					else
+						player->thinkTime = game.realtime + 1000;
+				}
 				else
+				{
+					// Waiting on auth query, delay think 1 second
+					player->failTime += 1000;
 					player->thinkTime = game.realtime + 1000;
+				}
 			}
 		}
 	}
