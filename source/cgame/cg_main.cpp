@@ -1033,6 +1033,11 @@ void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int 
 	// get configstrings
 	CG_RegisterConfigStrings();
 
+	// racesow load defaults
+	if( rs_runOnce->integer )
+		trap_Cmd_ExecuteText( EXEC_NOW, "exec rs_defaults.cfg silent" );
+	// !racesow
+
 	// register fonts here so loading screen works
 	CG_RegisterFonts();
 	cgs.shaderWhite = trap_R_RegisterPic( "$whiteimage" );
