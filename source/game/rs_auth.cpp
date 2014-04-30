@@ -43,6 +43,10 @@ void RS_ThinkAuth( void )
 			}
 		}
 
+		// auth hud stat
+		player->client->ps.stats[STAT_AUTH_STATE] = player->id == 0 ? STAT_NOTSEST :
+		                                            player->admin ? 2 : 1;
+
 		// Protected nick status
 		if( player->thinkTime && player->thinkTime < game.realtime )
 		{

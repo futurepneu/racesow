@@ -595,6 +595,7 @@ static const reference_numeric_t cg_numeric_references[] =
 	{ "IMAGE_BETA", CG_GetStatValue, (void *)STAT_IMAGE_BETA },
 
 	// racesow - Make these long ints
+	{ "AUTH_STATE", CG_GetStatValue, (void *)STAT_AUTH_STATE },
 	{ "TIME_SELF", CG_GetLongStatValue, (void *)STAT_TIME_SELF },
 	{ "TIME_BEST", CG_GetLongStatValue, (void *)STAT_TIME_BEST },
 	{ "TIME_RECORD", CG_GetLongStatValue, (void *)STAT_TIME_RECORD },
