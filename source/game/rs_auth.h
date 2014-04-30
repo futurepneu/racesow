@@ -1,5 +1,5 @@
 #define MAX_AUTH_CHARS 64		/**< Maximum length of auth name */
-#define RS_NICK_TIMEOUT 10		/**< Proctected nick timer length */
+#define RS_NICK_TIMEOUT 20		/**< Proctected nick timer length */
 
 typedef enum
 {
