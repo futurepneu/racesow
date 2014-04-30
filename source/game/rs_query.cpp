@@ -476,7 +476,7 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 	int count, playerNum, i;
 	rs_racetime_t top, racetime, timediff;
 	cJSON *data, *node, *player;
-	char *mapname;
+	char *mapname, *oneliner;
 
 	gclient_t *client = (gclient_t *)customp;
 	playerNum = (int)( client - game.clients );
@@ -495,6 +495,7 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 	data = (cJSON*)rs_sqapi->GetRoot( query );
 	count = cJSON_GetObjectItem( data, "count" )->valueint;
 	mapname = cJSON_GetObjectItem( data, "map" )->valuestring;
+	oneliner = va( "\"%s\"", cJSON_GetObjectItem( data, "oneliner" )->valuestring );
 
 	G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sTop %d times on map %s\n",
 	 			S_COLOR_ORANGE, count, mapname );
@@ -511,14 +512,14 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 		player = cJSON_GetObjectItem( node, "player" );
 
 		// Print the row
-		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%d. %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s%s %s%s \"%s\"%s\n",
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%d. %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s%s %s%s %s%s\n",
 			S_COLOR_WHITE, i + 1,
 			S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
 			( top.timedelta == racetime.timedelta ? S_COLOR_YELLOW : S_COLOR_RED ), 
 			( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli / 10,
 			S_COLOR_WHITE, cJSON_GetObjectItem( node, "created" )->valuestring,
 			S_COLOR_WHITE, cJSON_GetObjectItem( player, "name" )->valuestring,
-			( i == 0 ? cJSON_GetObjectItem( data, "oneliner" )->valuestring : "" ),
+			( i == 0 ? oneliner : "" ),
 			S_COLOR_GREEN );
 	}
 }
