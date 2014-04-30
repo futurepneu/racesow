@@ -44,7 +44,7 @@ void RS_ThinkAuth( void )
 		}
 
 		// auth hud stat
-		player->client->ps.stats[STAT_AUTH_STATE] = player->id == 0 ? STAT_NOTSEST :
+		player->client->ps.stats[STAT_AUTH_STATE] = player->id == 0 ? STAT_NOTSET :
 		                                            player->admin ? 2 : 1;
 
 		// Protected nick status
