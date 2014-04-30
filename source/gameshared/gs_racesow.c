@@ -6,9 +6,9 @@
 #include "gs_public.h"
 
 // Prejump validation
-int pj_jumps[MAX_CLIENTS] = {0};
-int pj_dashes[MAX_CLIENTS] = {0};
-int pj_walljumps[MAX_CLIENTS] = {0};
+static int pj_jumps[MAX_CLIENTS] = {0};
+static int pj_dashes[MAX_CLIENTS] = {0};
+static int pj_walljumps[MAX_CLIENTS] = {0};
 
 /**
  * RS_ResetPjState
@@ -60,9 +60,12 @@ void RS_IncrementWallJumps(int playerNum)
  */
 qboolean RS_QueryPjState(int playerNum)
 {
-	return ( pj_jumps[playerNum] > 1 ||
+	if ( pj_jumps[playerNum] > 1 ||
 		pj_dashes[playerNum] > 1 ||
-		pj_walljumps[playerNum] > 1 );
+		pj_walljumps[playerNum] > 1 )
+		return qtrue;
+	else
+		return qfalse;
 }
 
 /**

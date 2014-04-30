@@ -22,6 +22,12 @@
     <Filter Include="Source Files\gameshared">
       <UniqueIdentifier>{f7334d36-1380-49c9-9f57-ee97ffb5b24a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\qcommon">
+      <UniqueIdentifier>{758adf84-1f89-47a3-a88c-4bcbcb496b67}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\qalgo">
+      <UniqueIdentifier>{c4b7f8e9-df15-47ef-88df-cca955ae3b39}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\gameshared\gs_gameteams.c">
@@ -186,6 +192,21 @@
     <ClCompile Include="g_web.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="g_racesow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\qcommon\cjson.c">
+      <Filter>Source Files\qcommon</Filter>
+    </ClCompile>
+    <ClCompile Include="..\qalgo\sha2.c">
+      <Filter>Source Files\qalgo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\gameshared\gs_racesow.c">
+      <Filter>Source Files\gameshared</Filter>
+    </ClCompile>
+    <ClCompile Include="..\qalgo\base64.c">
+      <Filter>Source Files\qalgo</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\gameshared\anorms.h">
@@ -254,5 +275,24 @@
     <ClInclude Include="ai\AStar.h">
       <Filter>Header Files\ai</Filter>
     </ClInclude>
+    <ClInclude Include="..\gameshared\gs_racesow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="g_racesow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\qcommon\cjson.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\qalgo\base64.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\qalgo\sha2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="game.rc" />
   </ItemGroup>
 </Project>
