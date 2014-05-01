@@ -2598,7 +2598,7 @@ static void objectRSPlayer_reportRace( int rtime, CScriptArrayInterface &checkpo
 {
 	int i;
 	int cpNum = checkpoints.GetSize();
-	int cp[cpNum];
+	int *cp = (int*)G_Malloc( sizeof(int) * cpNum );
 
 	for( i = 0; i < cpNum; i++ )
 		cp[i] = *((int*)checkpoints.At( i ));
