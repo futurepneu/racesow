@@ -259,9 +259,10 @@ void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum )
 
 /**
  * Report Map data
- * @param tags Space separated list of tags to add to the map
+ * @param tags     Space separated list of tags to add to the map
+ * @param oneliner Oneliner message to leave for the map
  */
-void RS_ReportMap( const char *tags )
+void RS_ReportMap( char *tags, char *oneliner )
 {
 	char tagset[1024], *token, *b64tags;
 	stat_query_t *query;
@@ -281,11 +282,16 @@ void RS_ReportMap( const char *tags )
 	token = cJSON_Print( arr );
 	b64tags = (char*)base64_encode( (unsigned char *)token, strlen( token ), NULL );
 
+	// Allow null oneliner
+	if( !oneliner )
+		oneliner = "";
+
 	// Form the query
 	query = rs_sqapi->CreateRootQuery( va( "%s/api/map/%s", rs_statsUrl->string, authmap.b64name ), qfalse );
 	rs_sqapi->SetField( query, "playTime", va( "%d", authmap.playTime ) );
 	rs_sqapi->SetField( query, "races", va( "%d", authmap.races ) );
 	rs_sqapi->SetField( query, "tags", b64tags );
+	rs_sqapi->SetField( query, "oneliner", oneliner );
 
 	// Reset the fields
 	authmap.playTime = 0;

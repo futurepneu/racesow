@@ -2982,9 +2982,9 @@ static void asFunc_RS_QueryMaps( gclient_t *client, asstring_t *pattern, asstrin
 	RS_QueryMaps( client, pattern->buffer, tags->buffer, page );
 }
 
-static void asFunc_RS_ReportMap( asstring_t *tags )
+static void asFunc_RS_ReportMap( asstring_t *tags, asstring_t *oneliner )
 {
-	RS_ReportMap( tags->buffer );
+	RS_ReportMap( tags->buffer, oneliner->buffer );
 }
 
 static void asFunc_RS_UpdateMaplist( void )
@@ -3359,7 +3359,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "void RS_Cancelvote( Entity @ent, bool admin )", asFUNCTION(asFunc_RS_Cancelvote), NULL },
 	{ "void RS_QueryTop( Client @client, String @mapname, int limit, bool old )", asFUNCTION(asFunc_RS_QueryTop), NULL },
 	{ "void RS_QueryMaps( Client @client, const String &pattern, const String &tags, int page )", asFUNCTION(asFunc_RS_QueryMaps), NULL },
-	{ "void RS_ReportMap( const String &tags )", asFUNCTION(asFunc_RS_ReportMap), NULL },
+	{ "void RS_ReportMap( const String &tags, const String &oneliner )", asFUNCTION(asFunc_RS_ReportMap), NULL },
 	{ "void RS_UpdateMaplist()", asFUNCTION(asFunc_RS_UpdateMaplist), NULL },
 	// !racesow
 

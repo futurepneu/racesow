@@ -15,7 +15,7 @@ void RS_InitAuth( void )
 
 void RS_ShutdownAuth( void )
 {
-	RS_ReportMap( NULL );
+	RS_ReportMap( NULL, NULL );
 	G_Free( authplayers );
 	free( authmap.b64name );
 }
