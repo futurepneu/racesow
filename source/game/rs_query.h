@@ -9,7 +9,7 @@ void RS_AuthNick( rs_authplayer_t *player, char *nick );
 void RS_AuthMap( void );
 
 void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum );
-void RS_ReportMap( char *tags, char *oneliner );
+void RS_ReportMap( const char *tags, const char *oneliner );
 void RS_ReportPlayer( rs_authplayer_t *player );
 void RS_ReportNick( rs_authplayer_t *player, const char* nick );
 
