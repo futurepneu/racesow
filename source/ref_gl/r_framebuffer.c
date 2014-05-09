@@ -126,7 +126,7 @@ found:
 
 	// setup 24bit depth buffer for render-to-texture
 	qglBindRenderbufferEXT( GL_RENDERBUFFER_EXT, fbo->renderBufferAttachment );
-	qglRenderbufferStorageEXT( GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, width, height );
+	qglRenderbufferStorageEXT( GL_RENDERBUFFER_EXT, glConfig.ext.depth24 ? GL_DEPTH_COMPONENT24 : GL_DEPTH_COMPONENT16, width, height );
 	qglBindRenderbufferEXT( GL_RENDERBUFFER_EXT, 0 );
 
 	// attach depth renderbuffer
@@ -293,11 +293,13 @@ image_t	*RFB_GetObjectTextureAttachment( int object, qboolean depth )
 */
 void RFB_DisableObjectDrawBuffer( void )
 {
+#ifndef GL_ES_VERSION_2_0
 	if( !r_bound_framebuffer_object )
 		return;
 
 	qglDrawBuffer( GL_NONE );
 	qglReadBuffer( GL_NONE );
+#endif
 }
 
 /*
@@ -308,6 +310,7 @@ void RFB_DisableObjectDrawBuffer( void )
 */
 void RFB_BlitObject( int dest, int bitMask, int mode )
 {
+#ifndef GL_ES_VERSION_2_0
 	int bits;
 	int dx, dy, dw, dh;
 	r_fbo_t *fbo = r_bound_framebuffer_object, 
@@ -360,6 +363,7 @@ void RFB_BlitObject( int dest, int bitMask, int mode )
 	qglBindFramebufferEXT( GL_FRAMEBUFFER_EXT, fbo->objectID );
 
 	assert( qglGetError() == GL_NO_ERROR );
+#endif
 }
 
 /*

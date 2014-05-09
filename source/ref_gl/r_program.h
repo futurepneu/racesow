@@ -17,8 +17,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-#ifndef __R_PROGRAM_H__
-#define __R_PROGRAM_H__
+#ifndef R_PROGRAM_H
+#define R_PROGRAM_H
 
 typedef quint64 r_glslfeat_t;
 
@@ -92,10 +92,14 @@ enum
 #define GLSL_SHADER_COMMON_AUTOSPRITE2			GLSL_BIT(19)
 #define GLSL_SHADER_COMMON_AUTOPARTICLE			GLSL_BIT(20)
 
-#define GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS	GLSL_BIT(21)
-#define GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS	GLSL_BIT(22)
+#define GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS	GLSL_BIT(21)
+#define GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS	GLSL_BIT(22)
 
 #define GLSL_SHADER_COMMON_SOFT_PARTICLE		GLSL_BIT(23)
+
+#define GLSL_SHADER_COMMON_AFUNC_GT0			GLSL_BIT(24)
+#define GLSL_SHADER_COMMON_AFUNC_LT128			GLSL_BIT(25)
+#define GLSL_SHADER_COMMON_AFUNC_GE128			(GLSL_SHADER_COMMON_AFUNC_GT0 | GLSL_SHADER_COMMON_AFUNC_LT128)
 
 // material prgoram type features
 #define GLSL_SHADER_MATERIAL_LIGHTSTYLE0		GLSL_BIT(32)
@@ -218,4 +222,4 @@ void RP_UpdateShadowsUniforms( int elem, int numShadows, const shadowGroup_t **g
 
 void RP_UpdateInstancesUniforms( int elem, unsigned int numInstances, instancePoint_t *instances );
 
-#endif // __R_PROGRAM_H__
+#endif // R_PROGRAM_H

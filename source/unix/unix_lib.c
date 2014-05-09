@@ -24,12 +24,35 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <dlfcn.h>
 
+#ifdef __linux__
+#include <linux/limits.h>
+#endif
+
 /*
 * Sys_Library_Close
 */
 qboolean Sys_Library_Close( void *lib )
 {
 	return !dlclose( lib );
+}
+
+/*
+* Sys_Library_GetFullName
+*/
+const char *Sys_Library_GetFullName( const char *name )
+{
+	return FS_AbsoluteNameForBaseFile( name );
+}
+
+/*
+* Sys_Library_GetGameLibPath
+*/
+const char *Sys_Library_GetGameLibPath( const char *name, qint64 time, int randomizer )
+{
+	static char tempname[PATH_MAX];
+	Q_snprintfz( tempname, sizeof(tempname), "%s/%s/tempmodules_%lld_%d/%s", FS_WriteDirectory(), FS_GameDirectory(),
+		time, randomizer, name );
+	return tempname;
 }
 
 /*
@@ -51,7 +74,7 @@ void *Sys_Library_ProcAddress( void *lib, const char *apifuncname )
 /*
 * Sys_Library_ErrorString
 */
-char *Sys_Library_ErrorString( void )
+const char *Sys_Library_ErrorString( void )
 {
 	return dlerror();
 }

@@ -1145,10 +1145,11 @@ static void R_Clear( int bitMask )
 	int bits;
 	qbyte *envColor = rsh.worldModel && !( rn.refdef.rdflags & RDF_NOWORLDMODEL ) && rsh.worldBrushModel->globalfog ?
 		rsh.worldBrushModel->globalfog->shader->fog_color : mapConfig.environmentColor;
+	qboolean rgbShadow = ( rn.renderFlags & RF_SHADOWMAPVIEW ) && rn.fbColorAttachment != NULL ? qtrue : qfalse;
 
 	bits = GL_DEPTH_BUFFER_BIT;
 
-	if( !( rn.refdef.rdflags & RDF_NOWORLDMODEL ) && R_FASTSKY() )
+	if( ( !( rn.refdef.rdflags & RDF_NOWORLDMODEL ) && R_FASTSKY() ) || rgbShadow )
 		bits |= GL_COLOR_BUFFER_BIT;
 	if( glConfig.stencilEnabled )
 		bits |= GL_STENCIL_BUFFER_BIT;
@@ -1491,7 +1492,17 @@ static void R_SwapInterval( qboolean swapInterval )
 	if( !glConfig.stereoEnabled )
 	{
 		if( qglSwapInterval )
+		{
 			qglSwapInterval( swapInterval );
+		}
+#ifdef EGL_VERSION_1_0
+		else if( qeglSwapInterval )
+		{
+			EGLDisplay dpy = qeglGetCurrentDisplay();
+			if( dpy != EGL_NO_DISPLAY )
+				qeglSwapInterval( dpy, swapInterval );
+		}
+#endif
 	}
 }
 
@@ -1540,18 +1551,24 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 
 	RB_BeginFrame();
 
-	rf.cameraSeparation = cameraSeparation;
-	if( cameraSeparation < 0 && glConfig.stereoEnabled )
+	if( rf.cameraSeparation != cameraSeparation )
 	{
-		qglDrawBuffer( GL_BACK_LEFT );
-	}
-	else if( cameraSeparation > 0 && glConfig.stereoEnabled )
-	{
-		qglDrawBuffer( GL_BACK_RIGHT );
-	}
-	else
-	{
-		qglDrawBuffer( GL_BACK );
+		rf.cameraSeparation = cameraSeparation;
+#ifdef GL_ES_VERSION_2_0
+		if( glConfig.ext.multiview_draw_buffers )
+		{
+			int location = GL_MULTIVIEW_EXT;
+			int index = ( cameraSeparation > 0 && glConfig.stereoEnabled ) ? 1 : 0;
+			qglDrawBuffersIndexedEXT( 1, &location, &index );
+		}
+#else
+		if( cameraSeparation < 0 && glConfig.stereoEnabled )
+			qglDrawBuffer( GL_BACK_LEFT );
+		else if( cameraSeparation > 0 && glConfig.stereoEnabled )
+			qglDrawBuffer( GL_BACK_RIGHT );
+		else
+			qglDrawBuffer( GL_BACK );
+#endif
 	}
 
 	if( mapConfig.forceClear )
@@ -1595,6 +1612,7 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 	{
 		gl_drawbuffer->modified = qfalse;
 
+#ifndef GL_ES_VERSION_2_0
 		if( cameraSeparation == 0 || !glConfig.stereoEnabled )
 		{
 			if( Q_stricmp( gl_drawbuffer->string, "GL_FRONT" ) == 0 )
@@ -1602,6 +1620,7 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 			else
 				qglDrawBuffer( GL_BACK );
 		}
+#endif
 	}
 
 	// texturemode stuff
@@ -1909,6 +1928,18 @@ struct cinematics_s *R_GetShaderCinematic( shader_t *shader )
 //===================================================================
 
 /*
+* R_NormToLatLong
+*/
+void R_NormToLatLong( const vec_t *normal, qbyte latlong[2] )
+{
+	float flatlong[2];
+
+	NormToLatLong( normal, flatlong );
+	latlong[0] = (int)( flatlong[0] * 255.0 / M_TWOPI ) & 255;
+	latlong[1] = (int)( flatlong[1] * 255.0 / M_TWOPI ) & 255;
+}
+
+/*
 * R_LatLongToNorm4
 */
 void R_LatLongToNorm4( const qbyte latlong[2], vec4_t out )
@@ -1923,6 +1954,7 @@ void R_LatLongToNorm4( const qbyte latlong[2], vec4_t out )
 
 	Vector4Set( out, cos_b * sin_a, sin_b * sin_a, cos_a, 0 );
 }
+
 /*
 * R_LatLongToNorm
 */

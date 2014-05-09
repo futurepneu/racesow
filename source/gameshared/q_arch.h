@@ -93,12 +93,12 @@ extern "C" {
 #define HAVE_WSIPX
 #endif
 
+#define MUMBLE_SUPPORT
+
 #define LIB_DIRECTORY "libs"
 #define LIB_SUFFIX ".dll"
 
 #define VID_INITFIRST
-
-#define GL_DRIVERNAME "opengl32.dll"
 
 #define VORBISFILE_LIBNAME "libvorbisfile.dll"
 
@@ -174,21 +174,29 @@ typedef UINT_PTR socket_handle_t;
 #define LIB_DIRECTORY "libs"
 #define LIB_SUFFIX ".so"
 
-#define GL_DRIVERNAME  "libGL.so.1"
+#ifndef __ANDROID__
+#define MUMBLE_SUPPORT
+#endif
 
 #define VORBISFILE_LIBNAME "libvorbisfile.so"
 
-#ifdef __FreeBSD__
+#if defined ( __FreeBSD__ )
 #define BUILDSTRING "FreeBSD"
 #define OSNAME "FreeBSD"
+#elif defined ( __ANDROID__ )
+#define BUILDSTRING "Android"
+#define OSNAME "Android"
 #else
 #define BUILDSTRING "Linux"
 #define OSNAME "Linux"
 #endif
 
 #ifdef __i386__
-#if defined __FreeBSD__
+#if defined ( __FreeBSD__ )
 #define ARCH "freebsd_i386"
+#define CPUSTRING "i386"
+#elif defined ( __ANDROID__ )
+#define ARCH "android_x86"
 #define CPUSTRING "i386"
 #else
 #define ARCH "i386"
@@ -203,11 +211,27 @@ typedef UINT_PTR socket_handle_t;
 #define CPUSTRING "x86_64"
 #endif
 #elif defined ( __powerpc__ )
-#define CPUSTRING "ppc"
 #define ARCH "ppc"
+#define CPUSTRING "ppc"
 #elif defined ( __alpha__ )
-#define CPUSTRING "axp"
 #define ARCH "axp"
+#define CPUSTRING "axp"
+#elif defined ( __arm__ )
+#if defined ( __ANDROID__ )
+#define ARCH "android_armeabi-v7a"
+#define CPUSTRING "arm"
+#else
+#define ARCH "arm"
+#define CPUSTRING "arm"
+#endif
+#elif defined ( _MIPS_ARCH )
+#if defined ( __ANDROID__ )
+#define ARCH "android_mips"
+#define CPUSTRING "mips"
+#else
+#define ARCH "mips"
+#define CPUSTRING "mips"
+#endif
 #else
 #define CPUSTRING "Unknown"
 #define ARCH "Unknown"
@@ -245,10 +269,10 @@ typedef int socket_handle_t;
 #define HAVE_STRCASECMP
 #endif
 
+#define MUMBLE_SUPPORT
+
 #define LIB_DIRECTORY "libs"
 #define LIB_SUFFIX ".dylib"
-
-#define GL_DRIVERNAME  "/System/Library/Frameworks/OpenGL.framework/Libraries/libGL.dylib"
 
 #define VORBISFILE_LIBNAME "libvorbisfile.dylib"
 

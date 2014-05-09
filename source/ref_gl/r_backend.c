@@ -159,16 +159,14 @@ static void RB_SetGLDefaults( void )
 	qglDisable( GL_CULL_FACE );
 	qglFrontFace( GL_CCW );
 	qglDisable( GL_BLEND );
-	qglDisable( GL_ALPHA_TEST );
 	qglDepthFunc( GL_LEQUAL );
 	qglDepthMask( GL_FALSE );
 	qglDisable( GL_POLYGON_OFFSET_FILL );
 	qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
 	qglEnable( GL_DEPTH_TEST );
-	qglShadeModel( GL_SMOOTH );
-	if( qglPolygonMode ) {
-		qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-	}
+#ifndef GL_ES_VERSION_2_0
+	qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+#endif
 	qglFrontFace( GL_CCW );
 
 	rb.gl.state = 0;
@@ -190,7 +188,9 @@ void RB_SelectTextureUnit( int tmu )
 	rb.gl.currentTMU = tmu;
 
 	qglActiveTextureARB( tmu + GL_TEXTURE0_ARB );
+#ifndef GL_ES_VERSION_2_0
 	qglClientActiveTextureARB( tmu + GL_TEXTURE0_ARB );
+#endif
 }
 
 /*
@@ -405,38 +405,12 @@ void RB_SetState( int state )
 		}
 	}
 
-	if( diff & GLSTATE_ALPHAFUNC )
-	{
-		int alphafunc = state & GLSTATE_ALPHAFUNC;
-
-		if( alphafunc )
-		{
-			qglEnable( GL_ALPHA_TEST );
-			if( alphafunc == GLSTATE_AFUNC_GT0 )
-				qglAlphaFunc( GL_GREATER, 0 );
-			else if( alphafunc == GLSTATE_AFUNC_LT128 )
-				qglAlphaFunc( GL_LESS, 0.5f );
-			else
-				qglAlphaFunc( GL_GEQUAL, 0.5f );
-		}
-		else
-		{
-			qglDisable( GL_ALPHA_TEST );
-		}
-	}
-
 	if( diff & GLSTATE_NO_COLORWRITE )
 	{
 		if( state & GLSTATE_NO_COLORWRITE )
-		{
-			qglShadeModel( GL_FLAT );
 			qglColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
-		}
 		else
-		{
-			qglShadeModel( GL_SMOOTH );
 			qglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
-		}
 	}
 
 	if( diff & GLSTATE_DEPTHFUNC_EQ )
@@ -960,7 +934,7 @@ void RB_BatchMesh( const mesh_t *mesh )
 		if( mesh->normalsArray && (vattribs & VATTRIB_NORMAL_BIT) ) {
 			memcpy( rb.batchMesh.normalsArray + batch->numVerts, mesh->normalsArray, numVerts * sizeof( vec4_t ) );
 		}
-		if( mesh->sVectorsArray && (vattribs & VATTRIB_SVECTOR_BIT) ) {
+		if( mesh->sVectorsArray && ( ( vattribs & (VATTRIB_SVECTOR_BIT|VATTRIB_AUTOSPRITE2_BIT) ) == VATTRIB_SVECTOR_BIT ) ) {
 			memcpy( rb.batchMesh.sVectorsArray + batch->numVerts, mesh->sVectorsArray, numVerts * sizeof( vec4_t ) );
 		}
 		if( mesh->stArray && (vattribs & VATTRIB_TEXCOORDS_BIT) ) {
@@ -980,13 +954,6 @@ void RB_BatchMesh( const mesh_t *mesh )
 
 		if( mesh->colorsArray[0] && (vattribs & VATTRIB_COLOR0_BIT) ) {
 			memcpy( rb.batchMesh.colorsArray[0] + batch->numVerts, mesh->colorsArray[0], numVerts * sizeof( byte_vec4_t ) );
-
-			for( i = 1; i < MAX_LIGHTMAPS; i++ ) {
-				if( !mesh->colorsArray[i] || !(vattribs & (VATTRIB_COLOR1_BIT<<(i-1))) ) {
-					break;
-				}
-				memcpy( rb.batchMesh.colorsArray[i] + batch->numVerts, mesh->colorsArray[i], numVerts * sizeof( byte_vec4_t ) );
-			}
 		}
 
 		batch->numVerts += numVerts;
@@ -1031,7 +998,6 @@ void RB_EndBatch( void )
 */
 static void RB_EnableVertexAttribs( void )
 {
-	int i;
 	vattribmask_t vattribs = rb.currentVAttribs;
 	mesh_vbo_t *vbo = rb.currentVBO;
 	vattribmask_t hfa = vbo->halfFloatAttribs;
@@ -1040,14 +1006,14 @@ static void RB_EnableVertexAttribs( void )
 
 	// xyz position
 	GL_EnableVertexAttrib( VATTRIB_POSITION, qtrue );
-	qglVertexAttribPointerARB( VATTRIB_POSITION, 4, FLOAT_VATTRIB_TYPE( VATTRIB_POSITION_BIT, hfa ), GL_FALSE, 0, 
-		( const GLvoid * )0 );
+	qglVertexAttribPointerARB( VATTRIB_POSITION, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_POSITION_BIT, hfa ), 
+		GL_FALSE, vbo->vertexSize, ( const GLvoid * )0 );
 
 	// normal
 	if( vattribs & VATTRIB_NORMAL_BIT ) {
 		GL_EnableVertexAttrib( VATTRIB_NORMAL, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_NORMAL, 4, FLOAT_VATTRIB_TYPE( VATTRIB_NORMAL_BIT, hfa ), GL_FALSE, 0,
-			( const GLvoid * )vbo->normalsOffset );
+		qglVertexAttribPointerARB( VATTRIB_NORMAL, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_NORMAL_BIT, hfa ), 
+			GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->normalsOffset );
 	}
 	else {
 		GL_EnableVertexAttrib( VATTRIB_NORMAL, qfalse );
@@ -1056,8 +1022,8 @@ static void RB_EnableVertexAttribs( void )
 	// s-vector
 	if( vattribs & VATTRIB_SVECTOR_BIT ) {
 		GL_EnableVertexAttrib( VATTRIB_SVECTOR, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_SVECTOR, 4, FLOAT_VATTRIB_TYPE( VATTRIB_SVECTOR_BIT, hfa ), GL_FALSE, 0, 
-			( const GLvoid * )vbo->sVectorsOffset );
+		qglVertexAttribPointerARB( VATTRIB_SVECTOR, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_SVECTOR_BIT, hfa ), 
+			GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->sVectorsOffset );
 	}
 	else {
 		GL_EnableVertexAttrib( VATTRIB_SVECTOR, qfalse );
@@ -1066,8 +1032,8 @@ static void RB_EnableVertexAttribs( void )
 	// color
 	if( vattribs & VATTRIB_COLOR0_BIT ) {
 		GL_EnableVertexAttrib( VATTRIB_COLOR0, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_COLOR0, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (
-			const GLvoid * )vbo->colorsOffset[0] );
+		qglVertexAttribPointerARB( VATTRIB_COLOR0, 4, GL_UNSIGNED_BYTE, 
+			GL_TRUE, vbo->vertexSize, (const GLvoid * )vbo->colorsOffset[0] );
 	}
 	else {
 		GL_EnableVertexAttrib( VATTRIB_COLOR0, qfalse );
@@ -1076,78 +1042,60 @@ static void RB_EnableVertexAttribs( void )
 	// texture coordinates
 	if( vattribs & VATTRIB_TEXCOORDS_BIT ) {
 		GL_EnableVertexAttrib( VATTRIB_TEXCOORDS, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_TEXCOORDS, 2, FLOAT_VATTRIB_TYPE( VATTRIB_TEXCOORDS_BIT, hfa ), GL_FALSE, 0, 
-			( const GLvoid * )vbo->stOffset );
+		qglVertexAttribPointerARB( VATTRIB_TEXCOORDS, 2, FLOAT_VATTRIB_GL_TYPE( VATTRIB_TEXCOORDS_BIT, hfa ), 
+			GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->stOffset );
 	}
 	else {
 		GL_EnableVertexAttrib( VATTRIB_TEXCOORDS, qfalse );
 	}
 
-	if( (vattribs & VATTRIB_AUTOSPRITE2_BIT) == VATTRIB_AUTOSPRITE2_BIT ) {
-		// submit sprite centre and the longest edge
-		GL_EnableVertexAttrib( VATTRIB_SPRITEPOINT, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_SPRITEPOINT, 4, FLOAT_VATTRIB_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ), GL_FALSE, 0, 
-			( const GLvoid * )vbo->spritePointsOffset );
-
-		GL_EnableVertexAttrib( VATTRIB_SPRITERAXIS, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_SPRITERAXIS, 3, FLOAT_VATTRIB_TYPE( VATTRIB_AUTOSPRITE2_BIT, hfa ), GL_FALSE, 0, 
-			( const GLvoid * )vbo->spriteRightAxesOffset );
-
-		GL_EnableVertexAttrib( VATTRIB_SPRITEUAXIS, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_SPRITEUAXIS, 3, FLOAT_VATTRIB_TYPE( VATTRIB_AUTOSPRITE2_BIT, hfa ), GL_FALSE, 0, 
-			( const GLvoid * )vbo->spriteUpAxesOffset );
-	}
-	else if( (vattribs & VATTRIB_AUTOSPRITE_BIT) == VATTRIB_AUTOSPRITE_BIT ) {
+	if( (vattribs & VATTRIB_AUTOSPRITE_BIT) == VATTRIB_AUTOSPRITE_BIT ) {
 		// submit sprite point
-		GL_EnableVertexAttrib( VATTRIB_SPRITERAXIS, qfalse );
-		GL_EnableVertexAttrib( VATTRIB_SPRITEUAXIS, qfalse );
 		GL_EnableVertexAttrib( VATTRIB_SPRITEPOINT, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_SPRITEPOINT, 4, FLOAT_VATTRIB_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ), GL_FALSE, 0, 
-			( const GLvoid * )vbo->spritePointsOffset );
+		qglVertexAttribPointerARB( VATTRIB_SPRITEPOINT, 4, FLOAT_VATTRIB_GL_TYPE( VATTRIB_AUTOSPRITE_BIT, hfa ), 
+			GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->spritePointsOffset );
 	}
 	else {
 		GL_EnableVertexAttrib( VATTRIB_SPRITEPOINT, qfalse );
-		GL_EnableVertexAttrib( VATTRIB_SPRITERAXIS, qfalse );
-		GL_EnableVertexAttrib( VATTRIB_SPRITEUAXIS, qfalse );
 	}
 
 	// bones (skeletal models)
 	if( (vattribs & VATTRIB_BONES_BITS) == VATTRIB_BONES_BITS ) {
 		// submit indices
 		GL_EnableVertexAttrib( VATTRIB_BONESINDICES, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_BONESINDICES, 4, GL_UNSIGNED_BYTE, GL_FALSE, SKM_MAX_WEIGHTS, 
-			( const GLvoid * )vbo->bonesIndicesOffset );
+		qglVertexAttribPointerARB( VATTRIB_BONESINDICES, 4, GL_UNSIGNED_BYTE, 
+			GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->bonesIndicesOffset );
 
 		// submit weights
 		GL_EnableVertexAttrib( VATTRIB_BONESWEIGHTS, qtrue );
-		qglVertexAttribPointerARB( VATTRIB_BONESWEIGHTS, 4, GL_UNSIGNED_BYTE, GL_TRUE, SKM_MAX_WEIGHTS, 
-			( const GLvoid * )vbo->bonesWeightsOffset );
+		qglVertexAttribPointerARB( VATTRIB_BONESWEIGHTS, 4, GL_UNSIGNED_BYTE, 
+			GL_TRUE, vbo->vertexSize, ( const GLvoid * )vbo->bonesWeightsOffset );
 	}
 	else {
+		int i;
+		vattrib_t lmattr;
+		vattribbit_t lmattrbit;
+
 		GL_EnableVertexAttrib( VATTRIB_BONESINDICES, qfalse );
 		GL_EnableVertexAttrib( VATTRIB_BONESWEIGHTS, qfalse );
 
 		// lightmap texture coordinates
-		if( vattribs & VATTRIB_LMCOORDS0_BIT ) {
-			GL_EnableVertexAttrib( VATTRIB_LMCOORDS0, qtrue );
-			qglVertexAttribPointerARB( VATTRIB_LMCOORDS0, 2, FLOAT_VATTRIB_TYPE( VATTRIB_LMCOORDS0_BIT, hfa ), GL_FALSE, 0, 
-				( const GLvoid * )vbo->lmstOffset[0] );
-		}
-		else {
-			GL_EnableVertexAttrib( VATTRIB_LMCOORDS0, qfalse );
-		}
+		lmattr = VATTRIB_LMCOORDS01;
+		lmattrbit = VATTRIB_LMCOORDS0_BIT;
 
-		for( i = 0; i < MAX_LIGHTMAPS-1; i++ ) {
-			vattribbit_t lmvattrib = ( vattribbit_t ) (VATTRIB_LMCOORDS1_BIT<<i);
-
-			if( vattribs & lmvattrib ) {
-				GL_EnableVertexAttrib( VATTRIB_LMCOORDS1+i, qtrue );
-				qglVertexAttribPointerARB( VATTRIB_LMCOORDS1+i, 2, FLOAT_VATTRIB_TYPE( lmvattrib, hfa ), GL_FALSE, 0, 
-					( const GLvoid * )vbo->lmstOffset[i+1] );
+		for( i = 0; i < MAX_LIGHTMAPS/2; i++ ) {
+			if( vattribs & lmattrbit ) {
+				GL_EnableVertexAttrib( lmattr, qtrue );
+				qglVertexAttribPointerARB( lmattr, vbo->lmstSize[i], 
+					FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa ), 
+					GL_FALSE, vbo->vertexSize, ( const GLvoid * )vbo->lmstOffset[i] );
 			}
 			else {
-				GL_EnableVertexAttrib( VATTRIB_LMCOORDS1+i, qfalse );
+				GL_EnableVertexAttrib( lmattr, qfalse );
 			}
+
+			lmattr++;
+			lmattrbit <<= 2;
 		}
 	}
 
@@ -1187,8 +1135,8 @@ void RB_DrawElementsReal( void )
 	if( numInstances ) {
 		if( glConfig.ext.instanced_arrays ) {
 			// the instance data is contained in vertex attributes
-			qglDrawElementsInstancedARB( rb.primitive, numElems, GL_UNSIGNED_INT, 
-				(GLvoid *)(firstElem * sizeof( int )), numInstances );
+			qglDrawElementsInstancedARB( rb.primitive, numElems, GL_UNSIGNED_SHORT, 
+				(GLvoid *)(firstElem * sizeof( elem_t )), numInstances );
 
 			rb.stats.c_totalDraws++;
 		} else if( glConfig.ext.draw_instanced ) {
@@ -1201,8 +1149,8 @@ void RB_DrawElementsReal( void )
 
 				RB_SetInstanceData( numUInstances, rb.drawInstances + i );
 
-				qglDrawElementsInstancedARB( rb.primitive, numElems, GL_UNSIGNED_INT, 
-					(GLvoid *)(firstElem * sizeof( int )), numUInstances );
+				qglDrawElementsInstancedARB( rb.primitive, numElems, GL_UNSIGNED_SHORT, 
+					(GLvoid *)(firstElem * sizeof( elem_t )), numUInstances );
 
 				rb.stats.c_totalDraws++;
 			}
@@ -1214,9 +1162,19 @@ void RB_DrawElementsReal( void )
 			for( i = 0; i < numInstances; i++ ) {
 				RB_SetInstanceData( 1, rb.drawInstances + i );
 
-				qglDrawRangeElementsEXT( rb.primitive, 
-					firstVert, firstVert + numVerts - 1, numElems, 
-					GL_UNSIGNED_INT, (GLvoid *)(firstElem * sizeof( int )) );
+#ifndef GL_ES_VERSION_2_0
+				if( glConfig.ext.draw_range_elements )
+				{
+					qglDrawRangeElementsEXT( rb.primitive, 
+						firstVert, firstVert + numVerts - 1, numElems, 
+						GL_UNSIGNED_SHORT, (GLvoid *)(firstElem * sizeof( elem_t )) );
+				}
+				else
+#endif
+				{
+					qglDrawElements( rb.primitive, numElems, GL_UNSIGNED_SHORT,
+						(GLvoid *)(firstElem * sizeof( elem_t )) );
+				}
 
 				rb.stats.c_totalDraws++;
 			}
@@ -1225,9 +1183,19 @@ void RB_DrawElementsReal( void )
 	else {
 		numInstances = 1;
 
-		qglDrawRangeElementsEXT( rb.primitive, 
-			firstVert, firstVert + numVerts - 1, numElems, 
-			GL_UNSIGNED_INT, (GLvoid *)(firstElem * sizeof( int )) );
+#ifndef GL_ES_VERSION_2_0
+		if( glConfig.ext.draw_range_elements )
+		{
+			qglDrawRangeElementsEXT( rb.primitive, 
+				firstVert, firstVert + numVerts - 1, numElems, 
+				GL_UNSIGNED_SHORT, (GLvoid *)(firstElem * sizeof( elem_t )) );
+		}
+		else
+#endif
+		{
+			qglDrawElements( rb.primitive, numElems, GL_UNSIGNED_SHORT,
+				(GLvoid *)(firstElem * sizeof( elem_t )) );
+		}
 
 		rb.stats.c_totalDraws++;
 	}
@@ -1265,10 +1233,6 @@ static void RB_DrawElements_( int firstVert, int numVerts, int firstElem, int nu
 	RB_EnableVertexAttribs();
 
 	if( rb.triangleOutlines ) {
-		if( !qglPolygonMode ) {
-			// OpenGL ES systems don't support glPolygonMode
-			return;
-		}
 		RB_DrawOutlinedElements();
 	} else {
 		RB_DrawShadedElements();
@@ -1372,17 +1336,16 @@ qboolean RB_EnableTriangleOutlines( qboolean enable )
 		rb.triangleOutlines = enable;
 
 		// OpenGL ES systems don't support glPolygonMode
-		// so check whether the function is actually present
-		if( qglPolygonMode ) {
-			if( enable ) {
-				RB_SetShaderStateMask( 0, GLSTATE_NO_DEPTH_TEST );
-				qglPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-			}
-			else {
-				RB_SetShaderStateMask( ~0, 0 );
-				qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-			}
+#ifndef GL_ES_VERSION_2_0
+		if( enable ) {
+			RB_SetShaderStateMask( 0, GLSTATE_NO_DEPTH_TEST );
+			qglPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 		}
+		else {
+			RB_SetShaderStateMask( ~0, 0 );
+			qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+		}
+#endif
 	}
 
 	return oldVal;

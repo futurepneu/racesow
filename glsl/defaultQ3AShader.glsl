@@ -34,7 +34,10 @@ qf_varying vec2 v_TexCoord;
 #endif
 
 #ifdef NUM_LIGHTMAPS
-qf_varying vec2 v_LightmapTexCoord[NUM_LIGHTMAPS];
+qf_varying qf_lmvec01 v_LightmapTexCoord01;
+#if NUM_LIGHTMAPS > 2 
+qf_varying qf_lmvec23 v_LightmapTexCoord23;
+#endif
 #endif
 
 #if defined(APPLY_FOG) && !defined(APPLY_FOG_COLOR)
@@ -53,7 +56,7 @@ qf_varying float v_Depth;
 #include "include/rgbgen.glsl"
 
 #if defined(APPLY_TC_GEN_REFLECTION)
-uniform mat4 u_ReflectionTexMatrix;
+uniform mat3 u_ReflectionTexMatrix;
 #elif defined(APPLY_TC_GEN_VECTOR)
 uniform mat4 u_VectorTexMatrix;
 #endif
@@ -90,7 +93,7 @@ void main(void)
 #elif defined(APPLY_TC_GEN_VECTOR)
 	v_TexCoord = vec2(u_VectorTexMatrix * Position);
 #elif defined(APPLY_TC_GEN_REFLECTION)
-	v_TexCoord = vec3(u_ReflectionTexMatrix * vec4(reflect(normalize(Position.xyz - u_EntityDist), Normal.xyz), 0.0));
+	v_TexCoord = u_ReflectionTexMatrix * reflect(normalize(Position.xyz - u_EntityDist), Normal.xyz);
 #elif defined(APPLY_TC_GEN_PROJECTION)
 	v_TexCoord = vec2(normalize(u_ModelViewProjectionMatrix * Position) * 0.5 + vec4(0.5));
 #else
@@ -104,16 +107,10 @@ void main(void)
 #endif
 
 #ifdef NUM_LIGHTMAPS
-	v_LightmapTexCoord[0] = a_LightmapCoord0;
-#if NUM_LIGHTMAPS >= 2
-	v_LightmapTexCoord[1] = a_LightmapCoord1;
-#if NUM_LIGHTMAPS >= 3
-	v_LightmapTexCoord[2] = a_LightmapCoord2;
-#if NUM_LIGHTMAPS >= 4
-	v_LightmapTexCoord[3] = a_LightmapCoord3;
-#endif // NUM_LIGHTMAPS >= 4
-#endif // NUM_LIGHTMAPS >= 3
-#endif // NUM_LIGHTMAPS >= 2
+	v_LightmapTexCoord01 = a_LightmapCoord01;
+#if NUM_LIGHTMAPS > 2
+	v_LightmapTexCoord23 = a_LightmapCoord23;
+#endif // NUM_LIGHTMAPS > 2
 #endif // NUM_LIGHTMAPS
 
 	gl_Position = u_ModelViewProjectionMatrix * Position;
@@ -157,13 +154,13 @@ void main(void)
 
 #ifdef NUM_LIGHTMAPS
 	color = myhalf4(0.0, 0.0, 0.0, qf_FrontColor.a);
-	color.rgb += myhalf3(qf_texture(u_LightmapTexture[0], v_LightmapTexCoord[0])) * u_LightstyleColor[0];
+	color.rgb += myhalf3(qf_texture(u_LightmapTexture[0], v_LightmapTexCoord01.st)) * u_LightstyleColor[0];
 #if NUM_LIGHTMAPS >= 2
-	color.rgb += myhalf3(qf_texture(u_LightmapTexture[1], v_LightmapTexCoord[1])) * u_LightstyleColor[1];
+	color.rgb += myhalf3(qf_texture(u_LightmapTexture[1], v_LightmapTexCoord01.pq)) * u_LightstyleColor[1];
 #if NUM_LIGHTMAPS >= 3
-	color.rgb += myhalf3(qf_texture(u_LightmapTexture[2], v_LightmapTexCoord[2])) * u_LightstyleColor[2];
+	color.rgb += myhalf3(qf_texture(u_LightmapTexture[2], v_LightmapTexCoord23.st)) * u_LightstyleColor[2];
 #if NUM_LIGHTMAPS >= 4
-	color.rgb += myhalf3(qf_texture(u_LightmapTexture[3], v_LightmapTexCoord[3])) * u_LightstyleColor[3];
+	color.rgb += myhalf3(qf_texture(u_LightmapTexture[3], v_LightmapTexCoord23.pq)) * u_LightstyleColor[3];
 #endif // NUM_LIGHTMAPS >= 4
 #endif // NUM_LIGHTMAPS >= 3
 #endif // NUM_LIGHTMAPS >= 2
@@ -194,6 +191,11 @@ void main(void)
 
 	color *= diffuse;
 
+#ifdef NUM_LIGHTMAPS
+	// so that team-colored shaders work
+	color *= myhalf4(qf_FrontColor);
+#endif
+
 #ifdef APPLY_GREYSCALE
 	color.rgb = Greyscale(color.rgb);
 #endif
@@ -203,8 +205,12 @@ void main(void)
 #endif
 
 #if defined(APPLY_SOFT_PARTICLE)
-	myhalf softness = FragmentSoftness(v_Depth, u_DepthTexture, gl_FragCoord.xy, u_Viewport, u_ZNear, u_ZFar, u_SoftParticlesScale);
+	myhalf softness = FragmentSoftness(v_Depth, u_DepthTexture, gl_FragCoord.xy, u_ZRange);
 	color *= mix(myhalf4(1.0), myhalf4(softness), u_BlendMix.xxxy);
+#endif
+
+#ifdef QF_ALPHATEST
+	QF_ALPHATEST(color.a);
 #endif
 
 	qf_FragColor = vec4(color);

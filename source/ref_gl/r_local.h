@@ -18,8 +18,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-#ifndef __R_LOCAL_H__
-#define __R_LOCAL_H__
+#ifndef R_LOCAL_H
+#define R_LOCAL_H
 
 #include "../gameshared/q_arch.h"
 #include "../gameshared/q_math.h"
@@ -32,7 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 typedef struct mempool_s mempool_t;
 typedef struct cinematics_s cinematics_t;
 
-typedef unsigned int elem_t;
+typedef unsigned short elem_t;
 
 typedef vec_t instancePoint_t[8]; // quaternion for rotation + xyz pos + uniform scale
 
@@ -391,6 +391,7 @@ extern cvar_t *vid_multiscreen_head;
 
 //====================================================================
 
+void R_NormToLatLong( const vec_t *normal, qbyte latlong[2] );
 void R_LatLongToNorm( const qbyte latlong[2], vec3_t out );
 void R_LatLongToNorm4( const qbyte latlong[2], vec4_t out );
 
@@ -722,6 +723,7 @@ typedef struct mesh_vbo_s
 	unsigned int 		numVerts;
 	unsigned int 		numElems;
 
+	size_t				vertexSize;
 	size_t				arrayBufferSize;
 	size_t				elemBufferSize;
 
@@ -730,13 +732,12 @@ typedef struct mesh_vbo_s
 	size_t 				normalsOffset;
 	size_t 				sVectorsOffset;
 	size_t 				stOffset;
-	size_t 				lmstOffset[MAX_LIGHTMAPS];
+	size_t 				lmstOffset[MAX_LIGHTMAPS/2];
+	size_t 				lmstSize[MAX_LIGHTMAPS/2];
 	size_t 				colorsOffset[MAX_LIGHTMAPS];
 	size_t				bonesIndicesOffset;
 	size_t				bonesWeightsOffset;
 	size_t				spritePointsOffset; // autosprite or autosprite2 centre + radius
-	size_t				spriteRightAxesOffset;
-	size_t				spriteUpAxesOffset;
 	size_t				instancesOffset;
 } mesh_vbo_t;
 
@@ -753,8 +754,6 @@ vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset, vattribma
 	const mesh_t *mesh, vbo_hint_t hint );
 void 		R_UploadVBOElemData( mesh_vbo_t *vbo, int vertsOffset, int elemsOffset, 
 	const mesh_t *mesh, vbo_hint_t hint );
-vattribmask_t R_UploadVBOBonesData( mesh_vbo_t *vbo, int vertsOffset, int numVerts, 
-	qbyte *bonesIndices, qbyte *bonesWeights );
 vattribmask_t R_UploadVBOInstancesData( mesh_vbo_t *vbo, int instOffset,
 	int numInstances, instancePoint_t *instances );
 void		R_FreeVBOsByTag( vbo_tag_t tag );
@@ -808,4 +807,4 @@ typedef struct
 extern mapconfig_t	mapConfig;
 extern refinst_t	rn;
 
-#endif /*__R_LOCAL_H__*/
+#endif // R_LOCAL_H

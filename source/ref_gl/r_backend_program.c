@@ -294,7 +294,7 @@ void RB_VertexTCCelshadeMatrix( mat4_t matrix )
 */
 void RB_ApplyTCMods( const shaderpass_t *pass, mat4_t result )
 {
-	int i;
+	unsigned i;
 	const float *table;
 	double t1, t2, sint, cost;
 	mat4_t m1, m2;
@@ -366,8 +366,8 @@ void RB_GetShaderpassColor( const shaderpass_t *pass, byte_vec4_t rgba_ )
 	double temp;
 	float *table, a;
 	vec3_t v;
-	const shaderfunc_t *rgbgenfunc = pass->rgbgen.func;
-	const shaderfunc_t *alphagenfunc = pass->alphagen.func;
+	const shaderfunc_t *rgbgenfunc = &pass->rgbgen.func;
+	const shaderfunc_t *alphagenfunc = &pass->alphagen.func;
 
 	Vector4Set( rgba, 255, 255, 255, 255 );
 
@@ -555,7 +555,7 @@ static int RB_RGBAlphaGenToProgramFeatures( const colorgen_t *rgbgen, const colo
 		case RGB_GEN_WAVE:
 		case RGB_GEN_CUSTOMWAVE:
 			programFeatures |= GLSL_SHADER_COMMON_RGB_GEN_CONST;
-			if( rgbgen->func && rgbgen->func->type == SHADER_FUNC_RAMP ) {
+			if( rgbgen->func.type == SHADER_FUNC_RAMP ) {
 				programFeatures |= GLSL_SHADER_COMMON_RGB_DISTANCERAMP;
 			}
 			break;
@@ -574,7 +574,7 @@ static int RB_RGBAlphaGenToProgramFeatures( const colorgen_t *rgbgen, const colo
 			break;
 		case ALPHA_GEN_WAVE:
 			programFeatures |= GLSL_SHADER_COMMON_ALPHA_GEN_CONST;
-			if( alphagen->func && alphagen->func->type == SHADER_FUNC_RAMP ) {
+			if( alphagen->func.type == SHADER_FUNC_RAMP ) {
 				programFeatures |= GLSL_SHADER_COMMON_ALPHA_DISTANCERAMP;
 			}
 			break;
@@ -652,9 +652,9 @@ static r_glslfeat_t RB_InstancedArraysProgramFeatures( void )
 {
 	r_glslfeat_t programFeatures = 0;
 	if( ( rb.currentVAttribs & VATTRIB_INSTANCES_BITS ) == VATTRIB_INSTANCES_BITS ) {
-		programFeatures |= GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS;
+		programFeatures |= GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS;
 	} else if( rb.drawElements.numInstances ) {
-		programFeatures |= GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS;
+		programFeatures |= GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS;
 	}
 	return programFeatures;
 }
@@ -673,6 +673,22 @@ static r_glslfeat_t RB_FogProgramFeatures( const shaderpass_t *pass, const mfog_
 		}
 	}
 	return programFeatures;
+}
+
+/*
+* RB_AlphatestProgramFeatures
+*/
+static r_glslfeat_t RB_AlphatestProgramFeatures( const shaderpass_t *pass )
+{
+	switch( pass->flags & SHADERPASS_ALPHAFUNC ) {
+	case SHADERPASS_AFUNC_GT0:
+		return GLSL_SHADER_COMMON_AFUNC_GT0;
+	case SHADERPASS_AFUNC_LT128:
+		return GLSL_SHADER_COMMON_AFUNC_LT128;
+	case SHADERPASS_AFUNC_GE128:
+		return GLSL_SHADER_COMMON_AFUNC_GE128;
+	}
+	return 0;
 }
 
 /*
@@ -723,8 +739,8 @@ static void RB_UpdateCommonUniforms( int program, const shaderpass_t *pass, mat4
 		rb.currentShaderTime, 
 		entOrigin, entDist, rb.entityColor,
 		constColor, 
-		pass->rgbgen.func ? pass->rgbgen.func->args : pass->rgbgen.args, 
-		pass->alphagen.func ? pass->alphagen.func->args : pass->alphagen.args,
+		pass->rgbgen.func.type != SHADER_FUNC_NONE ? pass->rgbgen.func.args : pass->rgbgen.args, 
+		pass->alphagen.func.type != SHADER_FUNC_NONE ? pass->alphagen.func.args : pass->alphagen.args,
 		texMatrix );
 
 	RP_UpdateBlendMixUniform( program, blendMix );
@@ -1355,6 +1371,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 {
 	int state;
 	int program;
+	int rgbgen = pass->rgbgen.type;
 	const image_t *image;
 	const mfog_t *fog = rb.fog;
 	qboolean isWorldSurface = rb.currentModelType == mod_brush ? qtrue : qfalse;
@@ -1369,7 +1386,10 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 	if( isWorldSurface && 
 		rb.superLightStyle && 
 		rb.superLightStyle->lightmapNum[0] >= 0	&& 
-		pass->rgbgen.type == RGB_GEN_IDENTITY && 
+		(rgbgen == RGB_GEN_IDENTITY 
+			|| rgbgen == RGB_GEN_CONST 
+			|| rgbgen == RGB_GEN_WAVE 
+			|| rgbgen == RGB_GEN_CUSTOMWAVE) && 
 		(rb.currentShader->flags & SHADER_LIGHTMAP) && 
 		(pass->flags & GLSTATE_BLEND_ADD) != GLSTATE_BLEND_ADD ) {
 		lightStyle = rb.superLightStyle;
@@ -1378,7 +1398,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 
 	// vertex-lit world surface
 	if( isWorldSurface
-		&& ( pass->rgbgen.type == RGB_GEN_VERTEX || pass->rgbgen.type == RGB_GEN_EXACT_VERTEX )
+		&& ( rgbgen == RGB_GEN_VERTEX || rgbgen == RGB_GEN_EXACT_VERTEX )
 		&& ( rb.superLightStyle != NULL ) ) {
 		isWorldVertexLight = qtrue;
 	}
@@ -1401,7 +1421,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 	programFeatures |= RB_FogProgramFeatures( pass, fog );
 
 	// diffuse lighting for entities
-	if( !isWorldSurface && pass->rgbgen.type == RGB_GEN_LIGHTING_DIFFUSE && !(e->flags & RF_FULLBRIGHT) ) {
+	if( !isWorldSurface && rgbgen == RGB_GEN_LIGHTING_DIFFUSE && !(e->flags & RF_FULLBRIGHT) ) {
 		vec3_t temp = { 0.1f, 0.2f, 0.7f };
 		float radius = 1;
 
@@ -1456,7 +1476,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 		!rb.doneDepthPass &&
 		!(state & GLSTATE_DEPTHWRITE) &&
 		(rb.currentShader->flags & SHADER_DEPTHWRITE) ) {
-		if( !(pass->flags & GLSTATE_ALPHAFUNC) ) {
+		if( !(pass->flags & SHADERPASS_ALPHAFUNC) ) {
 			state &= ~( GLSTATE_SRCBLEND_MASK|GLSTATE_DSTBLEND_MASK );
 		}
 		state |= GLSTATE_DEPTHWRITE;
@@ -1701,6 +1721,7 @@ void RB_RenderMeshGLSLProgrammed( const shaderpass_t *pass, int programType )
 	features |= RB_BonesTransformsToProgramFeatures();
 	features |= RB_AutospriteProgramFeatures();
 	features |= RB_InstancedArraysProgramFeatures();
+	features |= RB_AlphatestProgramFeatures( pass );
 	
 	if( ( rb.currentShader->flags & SHADER_SOFT_PARTICLE ) 
 		&& rsh.screenDepthTextureCopy
@@ -2103,6 +2124,7 @@ static inline const vec_t *RB_TriangleLinesColor( void )
 */
 void RB_DrawOutlinedElements( void )
 {
+#ifndef GL_ES_VERSION_2_0
 	static shaderpass_t r_triLinesPass;
 	static vec4_t r_triLinesColor;
 	shaderpass_t *pass;
@@ -2125,6 +2147,7 @@ void RB_DrawOutlinedElements( void )
 	rb.currentShadowBits = 0;
 	rb.currentDlightBits = 0;
 	rb.colorFog = rb.texFog = NULL;
+	rb.superLightStyle = NULL;
 
 	// copy and override
 	r_triLinesPass = *pass;
@@ -2141,6 +2164,7 @@ void RB_DrawOutlinedElements( void )
 	RB_SetShaderState();
 
 	RB_RenderPass( &r_triLinesPass );
+#endif
 }
 
 /*
@@ -2148,7 +2172,7 @@ void RB_DrawOutlinedElements( void )
 */
 void RB_DrawShadedElements( void )
 {
-	int i;
+	unsigned i;
 	qboolean addGLSLOutline = qfalse;
 	shaderpass_t *pass;
 
