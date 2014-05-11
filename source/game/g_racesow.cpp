@@ -8,22 +8,25 @@ cvar_t *rs_grenade_timeout;
 cvar_t *rs_grenade_gravity;
 cvar_t *rs_grenade_friction;
 cvar_t *rs_grenade_prestep;
+cvar_t *rs_grenade_splashfrac;
 cvar_t *rs_rocket_minKnockback;
 cvar_t *rs_rocket_maxKnockback;
 cvar_t *rs_rocket_splash;
 cvar_t *rs_rocket_speed;
 cvar_t *rs_rocket_prestep;
 cvar_t *rs_rocket_antilag;
+cvar_t *rs_rocket_splashfrac;
 cvar_t *rs_plasma_minKnockback;
 cvar_t *rs_plasma_maxKnockback;
 cvar_t *rs_plasma_splash;
 cvar_t *rs_plasma_speed;
 cvar_t *rs_plasma_prestep;
 cvar_t *rs_plasma_hack;
+cvar_t *rs_plasma_splashfrac;
 cvar_t *rs_gunblade_minKnockback;
 cvar_t *rs_gunblade_maxKnockback;
 cvar_t *rs_gunblade_splash;
-cvar_t *rs_splashfrac;
+cvar_t *rs_gunblade_splashfrac;
 
 /**
  * RS_Init
@@ -39,22 +42,25 @@ void RS_Init( void )
 	rs_grenade_gravity = trap_Cvar_Get( "rs_grenade_gravity", "1.22", CVAR_ARCHIVE );
 	rs_grenade_friction = trap_Cvar_Get( "rs_grenade_friction", "1.0", CVAR_ARCHIVE );
 	rs_grenade_prestep = trap_Cvar_Get( "rs_grenade_prestep", "24", CVAR_ARCHIVE );
+	rs_grenade_splashfrac = trap_Cvar_Get( "rs_grenade_splashfrac", "2.5", CVAR_ARCHIVE );
 	rs_rocket_minKnockback = trap_Cvar_Get( "rs_rocket_minKnockback", "1", CVAR_ARCHIVE );
 	rs_rocket_maxKnockback = trap_Cvar_Get( "rs_rocket_maxKnockback", "90", CVAR_ARCHIVE );
 	rs_rocket_splash = trap_Cvar_Get( "rs_rocket_splash", "180", CVAR_ARCHIVE );
 	rs_rocket_speed = trap_Cvar_Get( "rs_rocket_speed", "950", CVAR_ARCHIVE );
 	rs_rocket_prestep = trap_Cvar_Get( "rs_rocket_prestep", "10", CVAR_ARCHIVE );
 	rs_rocket_antilag = trap_Cvar_Get( "rs_rocket_antilag", "0", CVAR_ARCHIVE );
+	rs_rocket_splashfrac = trap_Cvar_Get( "rs_rocket_splashfrac", "1.3", CVAR_ARCHIVE );
 	rs_plasma_minKnockback = trap_Cvar_Get( "rs_plasma_minKnockback", "1", CVAR_ARCHIVE );
 	rs_plasma_maxKnockback = trap_Cvar_Get( "rs_plasma_maxKnockback", "23", CVAR_ARCHIVE );
 	rs_plasma_splash = trap_Cvar_Get( "rs_plasma_splash", "45", CVAR_ARCHIVE );
 	rs_plasma_speed = trap_Cvar_Get( "rs_plasma_speed", "1700", CVAR_ARCHIVE );
 	rs_plasma_prestep = trap_Cvar_Get( "rs_plasma_prestep", "16", CVAR_ARCHIVE );
 	rs_plasma_hack = trap_Cvar_Get( "rs_plasma_hack", "1", CVAR_ARCHIVE );
+	rs_plasma_splashfrac = trap_Cvar_Get( "rs_plasma_splashfrac", "1.15", CVAR_ARCHIVE );
 	rs_gunblade_minKnockback = trap_Cvar_Get( "rs_gunblade_minKnockback", "10", CVAR_ARCHIVE ); // TODO: decide gunblade values
 	rs_gunblade_maxKnockback = trap_Cvar_Get( "rs_gunblade_maxKnockback", "60", CVAR_ARCHIVE );
 	rs_gunblade_splash = trap_Cvar_Get( "rs_gunblade_splash", "80", CVAR_ARCHIVE );
-	rs_splashfrac = trap_Cvar_Get( "rs_splashfrac", "1.3", CVAR_ARCHIVE );
+	rs_gunblade_splashfrac = trap_Cvar_Get( "rs_gunblade_splashfrac", "1.3", CVAR_ARCHIVE );
 
 	RS_InitQuery();
 	RS_InitAuth();
@@ -119,7 +125,7 @@ void RS_clearHUDStats( gclient_t *client )
  * RS_SplashFrac
  * Racesow version of G_SplashFrac by Weqo
  */
-void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, const vec3_t point, float maxradius, vec3_t pushdir, float *kickFrac, float *dmgFrac )
+void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, const vec3_t point, float maxradius, vec3_t pushdir, float *kickFrac, float *dmgFrac, float splashFrac )
 {
 	vec3_t boxcenter = { 0, 0, 0 };
 	float distance = 0;
@@ -172,7 +178,7 @@ void RS_SplashFrac( const vec3_t origin, const vec3_t mins, const vec3_t maxs, c
 	{
 		distance = fabs( distance / maxradius );
 		clamp( distance, 0.0f, 1.0f );
-		*kickFrac = 1.0 - pow( distance, rs_splashfrac->value );
+		*kickFrac = 1.0 - pow( distance, splashFrac );
 	}
 
 	VectorSubtract( boxcenter, point, pushdir );

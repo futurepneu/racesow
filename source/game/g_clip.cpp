@@ -1228,17 +1228,23 @@ void G_SplashFrac4D( int entNum, vec3_t hitpoint, float maxradius, vec3_t pushdi
 	c4clipedict_t *clipEnt;
 
 	clipEnt = GClip_GetClipEdictForDeltaTime( entNum, timeDelta );
-	// racesow
-	if( rs_splashfrac->integer )
-		RS_SplashFrac( clipEnt->s.origin, clipEnt->r.mins,
-			clipEnt->r.maxs, hitpoint, maxradius, pushdir,
-			kickFrac, dmgFrac );
-	else
-		G_SplashFrac( clipEnt->s.origin, clipEnt->r.mins,
-			clipEnt->r.maxs, hitpoint, maxradius, pushdir,
-			kickFrac, dmgFrac );
-	// !racesow
+	G_SplashFrac( clipEnt->s.origin, clipEnt->r.mins,
+		clipEnt->r.maxs, hitpoint, maxradius, pushdir,
+		kickFrac, dmgFrac );
 }
+
+// racesow
+void RS_SplashFrac4D( int entNum, vec3_t hitpoint, float maxradius, vec3_t pushdir, 
+	float *kickFrac, float *dmgFrac, int timeDelta, float splashFrac )
+{
+	c4clipedict_t *clipEnt;
+
+	clipEnt = GClip_GetClipEdictForDeltaTime( entNum, timeDelta );
+	RS_SplashFrac( clipEnt->s.origin, clipEnt->r.mins,
+		clipEnt->r.maxs, hitpoint, maxradius, pushdir,
+		kickFrac, dmgFrac, splashFrac );
+}
+// !racesow
 
 entity_state_t *G_GetEntityStateForDeltaTime( int entNum, int deltaTime )
 {
