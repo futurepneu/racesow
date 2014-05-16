@@ -2954,8 +2954,9 @@ static void asFunc_RS_removeProjectiles( edict_t *owner )
 
 static bool asFunc_RS_QueryPjState( int playerNum )
 {
-	// FIXME: There's an implicit qboolean->bool conversion here
-	return RS_QueryPjState( playerNum );
+	if( RS_QueryPjState( playerNum ) )
+		return true;
+	return false;
 }
 
 static bool asFunc_RS_ResetPjState( int playerNum )
