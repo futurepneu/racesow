@@ -132,9 +132,6 @@
     <ClCompile Include="..\gameshared\gs_racesow.c">
       <Filter>Source Files\gameshared</Filter>
     </ClCompile>
-    <ClCompile Include="cg_racesow.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\qalgo\sha2.c">
       <Filter>Source Files\qalgo</Filter>
     </ClCompile>

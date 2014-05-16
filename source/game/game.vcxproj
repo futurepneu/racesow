@@ -597,12 +597,8 @@
     <ClInclude Include="ai\ai.h" />
     <ClInclude Include="ai\ai_local.h" />
     <ClInclude Include="ai\AStar.h" />
-    <ClInclude Include="resource.h" />
     <ClInclude Include="rs_auth.h" />
     <ClInclude Include="rs_query.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="game.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

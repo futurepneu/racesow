@@ -205,7 +205,6 @@
     <ClCompile Include="cg_pmodels.cpp" />
     <ClCompile Include="cg_polys.cpp" />
     <ClCompile Include="cg_predict.cpp" />
-    <ClCompile Include="cg_racesow.cpp" />
     <ClCompile Include="cg_scoreboard.cpp" />
     <ClCompile Include="cg_screen.cpp" />
     <ClCompile Include="cg_syscalls.cpp" />

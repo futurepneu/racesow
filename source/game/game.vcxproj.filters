@@ -296,15 +296,11 @@
     <ClInclude Include="..\qalgo\sha2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h" />
     <ClInclude Include="rs_query.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rs_auth.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="game.rc" />
   </ItemGroup>
 </Project>
