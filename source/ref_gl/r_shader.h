@@ -17,8 +17,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-#ifndef __R_SHADER_H__
-#define __R_SHADER_H__
+#ifndef R_SHADER_H
+#define R_SHADER_H
 
 #define MAX_SHADERS					2048
 #define MAX_SHADER_PASSES			8
@@ -78,15 +78,21 @@ enum
 };
 
 // shaderpass flags
-#define SHADERPASS_MARK_BEGIN		0x10000 // same as GLSTATE_MARK_END
+#define SHADERPASS_MARK_BEGIN		0x4000 // same as GLSTATE_MARK_END
 enum
 {
 	SHADERPASS_LIGHTMAP				= SHADERPASS_MARK_BEGIN,
 	SHADERPASS_DETAIL				= SHADERPASS_MARK_BEGIN << 1,
 	SHADERPASS_PORTALMAP			= SHADERPASS_MARK_BEGIN << 2,
 	SHADERPASS_GREYSCALE			= SHADERPASS_MARK_BEGIN << 3,
-	SHADERPASS_SKYBOXSIDE			= SHADERPASS_MARK_BEGIN << 4
+	SHADERPASS_SKYBOXSIDE			= SHADERPASS_MARK_BEGIN << 4,
+
+	SHADERPASS_AFUNC_GT0			= SHADERPASS_MARK_BEGIN << 5,
+	SHADERPASS_AFUNC_LT128			= SHADERPASS_MARK_BEGIN << 6,
+	SHADERPASS_AFUNC_GE128			= SHADERPASS_AFUNC_GT0|SHADERPASS_AFUNC_LT128
 };
+
+#define SHADERPASS_ALPHAFUNC ( SHADERPASS_AFUNC_GT0|SHADERPASS_AFUNC_LT128|SHADERPASS_AFUNC_GE128 )
 
 // transform functions
 enum
@@ -178,26 +184,26 @@ enum
 
 typedef struct
 {
-	unsigned short		type;			// SHADER_FUNC enum
+	unsigned int		type;			// SHADER_FUNC enum
 	float				args[4];		// offset, amplitude, phase_offset, rate
 } shaderfunc_t;
 
 typedef struct
 {
-	unsigned short		type;
+	unsigned int		type;
 	float				args[6];
 } tcmod_t;
 
 typedef struct
 {
-	unsigned short		type;
+	unsigned int		type;
 	float				*args;
-	shaderfunc_t		*func;
+	shaderfunc_t		func;
 } colorgen_t;
 
 typedef struct
 {
-	unsigned short		type;
+	unsigned int		type;
 	float				args[4];
 	shaderfunc_t		func;
 } deformv_t;
@@ -210,20 +216,20 @@ typedef struct
 	colorgen_t			rgbgen;
 	colorgen_t			alphagen;
 
-	unsigned short		tcgen;
+	unsigned int		tcgen;
 	vec_t				*tcgenVec;
 
-	unsigned short		numtcmods;
+	unsigned int		numtcmods;
 	tcmod_t				*tcmods;
 
 	unsigned int		cin;
 
-	unsigned short		program_type;
+	unsigned int		program_type;
 
 	image_t				*images[MAX_SHADER_images]; // texture refs
 
 	float				anim_fps;					// animation frames per sec
-	unsigned short		anim_numframes;
+	unsigned int		anim_numframes;
 } shaderpass_t;
 
 // Shader information
@@ -239,10 +245,10 @@ typedef struct shader_s
 	unsigned int		sort;
 	unsigned int		sortkey;
 
-	unsigned short		numpasses;
+	unsigned int		numpasses;
 	shaderpass_t		*passes;
 
-	unsigned short		numdeforms;
+	unsigned int		numdeforms;
 	deformv_t			*deforms;
 	char				*deformsKey;
 
@@ -294,4 +300,4 @@ void		R_RemapShader( const char *from, const char *to, int timeOffset );
 
 void		R_GetShaderDimensions( const shader_t *shader, int *width, int *height );
 
-#endif /*__R_SHADER_H__*/
+#endif // R_SHADER_H

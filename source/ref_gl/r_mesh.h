@@ -17,8 +17,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-#ifndef __R_MESH_H__
-#define __R_MESH_H__
+#ifndef R_MESH_H
+#define R_MESH_H
 
 struct shader_s;
 struct mfog_s;
@@ -34,6 +34,9 @@ typedef struct mesh_s
 	vec2_t				*stArray;
 	vec2_t				*lmstArray[MAX_LIGHTMAPS];
 	byte_vec4_t			*colorsArray[MAX_LIGHTMAPS];
+
+	qbyte				*blendIndices;
+	qbyte				*blendWeights;
 
 	unsigned short		numElems;
 	elem_t				*elems;
@@ -64,4 +67,4 @@ typedef struct
 typedef qboolean (*beginDrawSurf_cb)( const entity_t *, const struct shader_s *, const struct mfog_s *, void * );
 typedef void (*batchDrawSurf_cb)( const entity_t *, const struct shader_s *, const struct mfog_s *, void * );
 
-#endif /*__R_MESH_H__*/
+#endif // R_MESH_H

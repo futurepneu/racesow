@@ -848,7 +848,8 @@ int FS_FOpenAbsoluteFile( const char *filename, int *filenum, int mode )
 		return -1;
 	}
 
-	end = (mode == FS_WRITE ? 0 : FS_FileLength( f, qfalse ));
+	end = (mode == FS_WRITE || gz ? 0 : FS_FileLength( f, qfalse ));
+
 	*filenum = FS_OpenFileHandle();
 	file = &fs_filehandles[*filenum - 1];
 	file->fstream = f;
@@ -858,6 +859,12 @@ int FS_FOpenAbsoluteFile( const char *filename, int *filenum, int mode )
 	file->offset = 0;
 	file->gzstream = gzf;
 	file->gzlevel = Z_DEFAULT_COMPRESSION;
+
+#if ZLIB_VER_MAJOR >= 1 && ZLIB_VER_MINOR >= 2 && ZLIB_VER_REVISION >= 4
+	if( gzf ) {
+		gzbuffer( gzf, FZ_GZ_BUFSIZE );
+	}
+#endif
 
 	return end;
 }
@@ -1901,18 +1908,24 @@ qboolean FS_RemoveFile( const char *filename )
 /*
 * _FS_CopyFile
 */
-qboolean _FS_CopyFile( const char *src, const char *dst, qboolean base )
+qboolean _FS_CopyFile( const char *src, const char *dst, qboolean base, qboolean absolute )
 {
-	int srcnum, dstnum, length, l;
+	int srcnum, dstnum, length, result, l;
 	qbyte buffer[FS_MAX_BLOCK_SIZE];
-
-	if( _FS_FOpenFile( dst, &dstnum, FS_WRITE, base ) == -1 )
-		return qfalse;
 
 	length = _FS_FOpenFile( src, &srcnum, FS_READ, base );
 	if( length == -1 )
 	{
-		FS_FCloseFile( dstnum );
+		return qfalse;
+	}
+
+	if( absolute )
+		result = FS_FOpenAbsoluteFile( dst, &dstnum, FS_WRITE ) == -1;
+	else
+		result = _FS_FOpenFile( dst, &dstnum, FS_WRITE, base ) == -1;
+	if( result == -1 )
+	{
+		FS_FCloseFile( srcnum );
 		return qfalse;
 	}
 
@@ -1942,7 +1955,7 @@ qboolean _FS_CopyFile( const char *src, const char *dst, qboolean base )
 */
 qboolean FS_CopyFile( const char *src, const char *dst )
 {
-	return _FS_CopyFile( src, dst, qfalse );
+	return _FS_CopyFile( src, dst, qfalse, qfalse );
 }
 
 /*
@@ -1950,7 +1963,15 @@ qboolean FS_CopyFile( const char *src, const char *dst )
 */
 qboolean FS_CopyBaseFile( const char *src, const char *dst )
 {
-	return _FS_CopyFile( src, dst, qtrue );
+	return _FS_CopyFile( src, dst, qtrue, qfalse );
+}
+
+/*
+* FS_ExtractFile
+*/
+qboolean FS_ExtractFile( const char *src, const char *dst )
+{
+	return _FS_CopyFile( src, dst, qfalse, qtrue );
 }
 
 /*
@@ -3664,6 +3685,7 @@ static void Cmd_FileMTime_f( void )
 void FS_Init( void )
 {
 	int i;
+	const char *homedir;
 
 	assert( !fs_initialized );
 
@@ -3695,7 +3717,8 @@ void FS_Init( void )
 	//
 	fs_cdpath = Cvar_Get( "fs_cdpath", "", CVAR_NOSET );
 	fs_basepath = Cvar_Get( "fs_basepath", ".", CVAR_NOSET );
-	if( Sys_FS_GetHomeDirectory() != NULL )
+	homedir = Sys_FS_GetHomeDirectory();
+	if( homedir != NULL )
 #ifdef PUBLIC_BUILD
 		fs_usehomedir = Cvar_Get( "fs_usehomedir", "1", CVAR_NOSET );
 #else
@@ -3705,15 +3728,8 @@ void FS_Init( void )
 	if( fs_cdpath->string[0] )
 		FS_AddBasePath( fs_cdpath->string );
 	FS_AddBasePath( fs_basepath->string );
-	if( Sys_FS_GetHomeDirectory() != NULL && fs_usehomedir->integer )
-#ifdef __MACOSX__
-		FS_AddBasePath( va( "%s/Library/Application Support/%s-%d.%d", Sys_FS_GetHomeDirectory(), APPLICATION, APP_VERSION_MAJOR, APP_VERSION_MINOR ) );
-#elif defined(_WIN32)
-		FS_AddBasePath( va( "%s/%s %d.%d", Sys_FS_GetHomeDirectory(), APPLICATION, APP_VERSION_MAJOR, APP_VERSION_MINOR ) );
-#else	// Unix
-		FS_AddBasePath( va( "%s/.%c%s-%d.%d", Sys_FS_GetHomeDirectory(), tolower( *( (const char *)APPLICATION ) ),
-			( (const char *)APPLICATION ) + 1, APP_VERSION_MAJOR, APP_VERSION_MINOR ) );
-#endif
+	if( homedir != NULL && fs_usehomedir->integer )
+		FS_AddBasePath( homedir );
 
 	//
 	// set game directories

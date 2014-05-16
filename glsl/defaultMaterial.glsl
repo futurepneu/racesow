@@ -18,7 +18,10 @@
 
 qf_varying vec2 v_TexCoord;
 #ifdef NUM_LIGHTMAPS
-qf_varying vec2 v_LightmapTexCoord[NUM_LIGHTMAPS];
+qf_varying qf_lmvec01 v_LightmapTexCoord01;
+#if NUM_LIGHTMAPS > 2 
+qf_varying qf_lmvec23 v_LightmapTexCoord23;
+#endif
 #endif
 
 qf_varying vec3 v_Position;
@@ -66,16 +69,10 @@ void main()
 	v_TexCoord = TextureMatrix2x3Mul(u_TextureMatrix, TexCoord);
 
 #ifdef NUM_LIGHTMAPS
-	v_LightmapTexCoord[0] = a_LightmapCoord0;
-#if NUM_LIGHTMAPS >= 2
-	v_LightmapTexCoord[1] = a_LightmapCoord1;
-#if NUM_LIGHTMAPS >= 3
-	v_LightmapTexCoord[2] = a_LightmapCoord2;
-#if NUM_LIGHTMAPS >= 4
-	v_LightmapTexCoord[3] = a_LightmapCoord3;
-#endif // NUM_LIGHTMAPS >= 4
-#endif // NUM_LIGHTMAPS >= 3
-#endif // NUM_LIGHTMAPS >= 2
+	v_LightmapTexCoord01 = a_LightmapCoord01;
+#if NUM_LIGHTMAPS > 2
+	v_LightmapTexCoord23 = a_LightmapCoord23;
+#endif // NUM_LIGHTMAPS > 2
 #endif // NUM_LIGHTMAPS
 
 	v_StrMatrix[0] = Tangent;
@@ -97,7 +94,7 @@ void main()
 // Fragment shader
 
 #ifdef NUM_LIGHTMAPS
-uniform float u_DeluxemapOffset[NUM_LIGHTMAPS]; // s-offset for v_LightmapTexCoord
+uniform vec4 u_DeluxemapOffset[(NUM_LIGHTMAPS + 3) / 4]; // s-offset for v_LightmapTexCoord
 uniform sampler2D u_LightmapTexture[NUM_LIGHTMAPS];
 #endif
 
@@ -121,8 +118,7 @@ uniform myhalf3 u_WallColor;
 uniform myhalf3 u_FloorColor;
 #endif
 
-uniform myhalf u_GlossIntensity; // gloss scaling factor
-uniform myhalf u_GlossExponent; // gloss exponent factor
+uniform myhalf2 u_GlossFactors; // gloss scaling and exponent factors
 
 #if defined(APPLY_OFFSETMAPPING) || defined(APPLY_RELIEFMAPPING)
 // The following reliefmapping and offsetmapping routine was taken from DarkPlaces
@@ -268,19 +264,19 @@ void main()
 
 #ifdef NUM_LIGHTMAPS
 	// get light normal
-	diffuseNormalModelspace = normalize(myhalf3 (qf_texture(u_LightmapTexture[0], vec2(v_LightmapTexCoord[0].s+u_DeluxemapOffset[0],v_LightmapTexCoord[0].t))) - myhalf3 (0.5));
+	diffuseNormalModelspace = normalize(myhalf3 (qf_texture(u_LightmapTexture[0], v_LightmapTexCoord01.st+vec2(u_DeluxemapOffset[0].x, 0.0))) - myhalf3 (0.5));
 	// calculate directional shading
 	diffuseProduct = float (dot (surfaceNormalModelspace, diffuseNormalModelspace));
 
 #ifdef APPLY_FBLIGHTMAP
 	weightedDiffuseNormalModelspace = diffuseNormalModelspace;
 	// apply lightmap color
-	color.rgb += myhalf3 (max (diffuseProduct, 0.0) * myhalf3 (qf_texture (u_LightmapTexture[0], v_LightmapTexCoord[0])));
+	color.rgb += myhalf3 (max (diffuseProduct, 0.0) * myhalf3 (qf_texture (u_LightmapTexture[0], v_LightmapTexCoord01.st)));
 #else
 #define NORMALIZE_DIFFUSE_NORMAL
 	weightedDiffuseNormalModelspace = u_LightstyleColor[0] * diffuseNormalModelspace;
 	// apply lightmap color
-	color.rgb += u_LightstyleColor[0] * myhalf(max (diffuseProduct, 0.0)) * myhalf3 (qf_texture(u_LightmapTexture[0], v_LightmapTexCoord[0]));
+	color.rgb += u_LightstyleColor[0] * myhalf(max (diffuseProduct, 0.0)) * myhalf3 (qf_texture(u_LightmapTexture[0], v_LightmapTexCoord01.st));
 #endif // APPLY_FBLIGHTMAP
 
 #ifdef APPLY_AMBIENT_COMPENSATION
@@ -289,20 +285,20 @@ void main()
 #endif
 
 #if NUM_LIGHTMAPS >= 2
-	diffuseNormalModelspace = normalize(myhalf3 (qf_texture (u_LightmapTexture[1], vec2(v_LightmapTexCoord[1].s+u_DeluxemapOffset[1],v_LightmapTexCoord[1].t))) - myhalf3 (0.5));
+	diffuseNormalModelspace = normalize(myhalf3 (qf_texture (u_LightmapTexture[1], v_LightmapTexCoord01.pq+vec2(u_DeluxemapOffset[0].y,0.0))) - myhalf3 (0.5));
 	diffuseProduct = float (dot (surfaceNormalModelspace, diffuseNormalModelspace));
 	weightedDiffuseNormalModelspace += u_LightstyleColor[1] * diffuseNormalModelspace;
-	color.rgb += u_LightstyleColor[1] * myhalf(max (diffuseProduct, 0.0)) * myhalf3 (qf_texture(u_LightmapTexture[1], v_LightmapTexCoord[1]));
+	color.rgb += u_LightstyleColor[1] * myhalf(max (diffuseProduct, 0.0)) * myhalf3 (qf_texture(u_LightmapTexture[1], v_LightmapTexCoord01.pq));
 #if NUM_LIGHTMAPS >= 3
-	diffuseNormalModelspace = normalize(myhalf3 (qf_texture (u_LightmapTexture[2], vec2(v_LightmapTexCoord[2].s+u_DeluxemapOffset[2],v_LightmapTexCoord[2].t))) - myhalf3 (0.5));
+	diffuseNormalModelspace = normalize(myhalf3 (qf_texture (u_LightmapTexture[2], v_LightmapTexCoord23.st+vec2(u_DeluxemapOffset[0].z,0.0))) - myhalf3 (0.5));
 	diffuseProduct = float (dot (surfaceNormalModelspace, diffuseNormalModelspace));
 	weightedDiffuseNormalModelspace += u_LightstyleColor[2] * diffuseNormalModelspace;
-	color.rgb += u_LightstyleColor[2] * myhalf(max (diffuseProduct, 0.0)) * myhalf3 (qf_texture(u_LightmapTexture[2], v_LightmapTexCoord[2]));
+	color.rgb += u_LightstyleColor[2] * myhalf(max (diffuseProduct, 0.0)) * myhalf3 (qf_texture(u_LightmapTexture[2], v_LightmapTexCoord23.st));
 #if NUM_LIGHTMAPS >= 4
-	diffuseNormalModelspace = normalize(myhalf3 (qf_texture (u_LightmapTexture[3], vec2(v_LightmapTexCoord[3].s+u_DeluxemapOffset[3],v_LightmapTexCoord[3].t))) - myhalf3 (0.5));
+	diffuseNormalModelspace = normalize(myhalf3 (qf_texture (u_LightmapTexture[3], v_LightmapTexCoord23.pq+vec2(u_DeluxemapOffset[0].w,0.0))) - myhalf3 (0.5));
 	diffuseProduct = float (dot (surfaceNormalModelspace, diffuseNormalModelspace));
 	weightedDiffuseNormalModelspace += u_LightstyleColor[3] * diffuseNormalModelspace;
-	color.rgb += u_LightstyleColor[3] * myhalf(max (diffuseProduct, 0.0)) * myhalf3 (qf_texture(u_LightmapTexture[3], v_LightmapTexCoord[3]));
+	color.rgb += u_LightstyleColor[3] * myhalf(max (diffuseProduct, 0.0)) * myhalf3 (qf_texture(u_LightmapTexture[3], v_LightmapTexCoord23.pq));
 #endif // NUM_LIGHTMAPS >= 4
 #endif // NUM_LIGHTMAPS >= 3
 #endif // NUM_LIGHTMAPS >= 2
@@ -321,7 +317,7 @@ void main()
 #endif
 
 	myhalf specularProduct = myhalf(dot (surfaceNormalModelspace, specularNormal));
-	color.rgb += (myhalf3(qf_texture(u_GlossTexture, v_TexCoord)) * u_GlossIntensity) * pow(myhalf(max(specularProduct, 0.0)), u_GlossExponent);
+	color.rgb += (myhalf3(qf_texture(u_GlossTexture, v_TexCoord)) * u_GlossFactors.x) * pow(myhalf(max(specularProduct, 0.0)), u_GlossFactors.y);
 #endif // APPLY_SPECULAR
 
 #if defined(APPLY_BASETEX_ALPHA_ONLY) && !defined(APPLY_DRAWFLAT)
@@ -371,6 +367,10 @@ color = color * diffuse;
 #endif
 
 #endif // APPLY_DECAL
+
+#ifdef QF_ALPHATEST
+	QF_ALPHATEST(color.a);
+#endif
 
 #ifdef APPLY_GREYSCALE
 	color.rgb = Greyscale(color.rgb);

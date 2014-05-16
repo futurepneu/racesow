@@ -1423,7 +1423,8 @@ void CScriptArray::Precache()
 					continue;
 
 				// The parameter must either be a reference to the subtype or a handle to the subtype
-				int paramTypeId = func->GetParamTypeId(0, &flags);
+				int paramTypeId;
+				func->GetParam(0, &paramTypeId, &flags);
 
 				if( (paramTypeId & ~(asTYPEID_OBJHANDLE|asTYPEID_HANDLETOCONST)) != (subTypeId &  ~(asTYPEID_OBJHANDLE|asTYPEID_HANDLETOCONST)) )
 					continue;
@@ -1812,7 +1813,9 @@ void RegisterScriptArray(asIScriptEngine *engine, bool defaultArray)
 
 	if( defaultArray )
 	{
-		int r = engine->RegisterDefaultArrayType("array<T>"); assert( r >= 0 );
+		int r;
+		r = engine->RegisterDefaultArrayType("array<T>");
+		assert( r >= 0 );
 	}
 }
 

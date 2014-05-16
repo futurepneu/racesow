@@ -52,7 +52,7 @@ typedef struct glsl_program_s
 		int			ModelViewMatrix,
 					ModelViewProjectionMatrix,
 
-					ZNear, ZFar,
+					ZRange,
 
 					ViewOrigin,
 					ViewAxis,
@@ -67,8 +67,7 @@ typedef struct glsl_program_s
 
 					TextureMatrix,
 
-					GlossIntensity,
-					GlossExponent,
+					GlossFactors,
 
 					OffsetMappingScale,
 					OutlineHeight,
@@ -87,9 +86,8 @@ typedef struct glsl_program_s
 					struct {
 						int Plane,
 							Color,
-							Scale,
-							EyePlane,
-							EyeDist;
+							ScaleAndEyeDist,
+							EyePlane;
 					} Fog;
 
 		int			ShaderTime,
@@ -98,20 +96,22 @@ typedef struct glsl_program_s
 					VectorTexMatrix,
 
 					DeluxemapOffset,
-					LightstyleColor,
+					LightstyleColor[MAX_LIGHTMAPS],
 
-					DynamicLightsRadius[MAX_DLIGHTS],
 					DynamicLightsPosition[MAX_DLIGHTS],
-					DynamicLightsDiffuse[MAX_DLIGHTS],
+					DynamicLightsDiffuseAndRadius[MAX_DLIGHTS],
 					NumDynamicLights,
 
 					AttrBonesIndices,
 					AttrBonesWeights,
+					DualQuats,
+
+					InstancePoints,
 
 					WallColor,
 					FloorColor,
 
-					ShadowProjDistance[GLSL_SHADOWMAP_LIMIT],
+					ShadowProjDistance,
 					ShadowmapTextureParams[GLSL_SHADOWMAP_LIMIT],
 					ShadowmapMatrix[GLSL_SHADOWMAP_LIMIT],
 					ShadowAlpha,
@@ -126,9 +126,7 @@ typedef struct glsl_program_s
 					ViewOrigin,
 					ViewAxis,
 					MirrorSide,
-					EntityOrigin,
-					DualQuats,
-					InstancePoints;
+					EntityOrigin;
 		} builtin;
 	} loc;
 } glsl_program_t;
@@ -323,19 +321,19 @@ static void RF_DeleteProgram( glsl_program_t *program )
 	if( program->vertexShader )
 	{
 		qglDetachObjectARB( program->object, program->vertexShader );
-		qglDeleteObjectARB( program->vertexShader );
+		qglDeleteShader( program->vertexShader );
 		program->vertexShader = 0;
 	}
 
 	if( program->fragmentShader )
 	{
 		qglDetachObjectARB( program->object, program->fragmentShader );
-		qglDeleteObjectARB( program->fragmentShader );
+		qglDeleteShader( program->fragmentShader );
 		program->fragmentShader = 0;
 	}
 
 	if( program->object )
-		qglDeleteObjectARB( program->object );
+		qglDeleteProgram( program->object );
 
 	if( program->name )
 		R_Free( program->name );
@@ -363,13 +361,13 @@ static int RF_CompileShader( int program, const char *programName, const char *s
 	// if lengths is NULL, then each string is assumed to be null-terminated
 	qglShaderSourceARB( shader, numStrings, strings, NULL );
 	qglCompileShaderARB( shader );
-	qglGetObjectParameterivARB( shader, GL_OBJECT_COMPILE_STATUS_ARB, &compiled );
+	qglGetShaderiv( shader, GL_OBJECT_COMPILE_STATUS_ARB, &compiled );
 
 	if( !compiled )
 	{
 		char log[4096];
 
-		qglGetInfoLogARB( shader, sizeof( log ) - 1, NULL, log );
+		qglGetShaderInfoLog( shader, sizeof( log ) - 1, NULL, log );
 		log[sizeof( log ) - 1] = 0;
 
 		if( log[0] ) {
@@ -386,7 +384,7 @@ static int RF_CompileShader( int program, const char *programName, const char *s
 			Com_Printf( "\n" );
 		}
 
-		qglDeleteObjectARB( shader );
+		qglDeleteShader( shader );
 		return 0;
 	}
 
@@ -444,14 +442,18 @@ static const glsl_feature_t glsl_features_material[] =
 	{ GLSL_SHADER_COMMON_AUTOSPRITE2, "#define APPLY_AUTOSPRITE2\n", "" },
 	{ GLSL_SHADER_COMMON_AUTOPARTICLE, "#define APPLY_AUTOSPRITE\n#define APPLY_AUTOPARTICLE\n", "" },
 
-	{ GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
-	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n"
-		"#define APPLY_INSTANCED_ATTRIB_TRASNFORMS\n", "_instanced_va" },
+	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
+	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n"
+		"#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
+	
+	{ GLSL_SHADER_COMMON_AFUNC_GE128, "#define QF_ALPHATEST(a) { if ((a) < 0.5) discard; }\n", "_afunc_ge128" },
+	{ GLSL_SHADER_COMMON_AFUNC_LT128, "#define QF_ALPHATEST(a) { if ((a) >= 0.5) discard; }\n", "_afunc_lt128" },
+	{ GLSL_SHADER_COMMON_AFUNC_GT0, "#define QF_ALPHATEST(a) { if ((a) <= 0.0) discard; }\n", "_afunc_gt0" },
 
-	{ GLSL_SHADER_MATERIAL_LIGHTSTYLE3, "#define NUM_LIGHTMAPS 4\n", "_ls3" },
-	{ GLSL_SHADER_MATERIAL_LIGHTSTYLE2, "#define NUM_LIGHTMAPS 3\n", "_ls2" },
-	{ GLSL_SHADER_MATERIAL_LIGHTSTYLE1, "#define NUM_LIGHTMAPS 2\n", "_ls1" },
-	{ GLSL_SHADER_MATERIAL_LIGHTSTYLE0, "#define NUM_LIGHTMAPS 1\n", "_ls0" },
+	{ GLSL_SHADER_MATERIAL_LIGHTSTYLE3, "#define NUM_LIGHTMAPS 4\n#define qf_lmvec23 vec4\n", "_ls3" },
+	{ GLSL_SHADER_MATERIAL_LIGHTSTYLE2, "#define NUM_LIGHTMAPS 3\n#define qf_lmvec23 vec2\n", "_ls2" },
+	{ GLSL_SHADER_MATERIAL_LIGHTSTYLE1, "#define NUM_LIGHTMAPS 2\n#define qf_lmvec01 vec4\n", "_ls1" },
+	{ GLSL_SHADER_MATERIAL_LIGHTSTYLE0, "#define NUM_LIGHTMAPS 1\n#define qf_lmvec01 vec2\n", "_ls0" },
 	{ GLSL_SHADER_MATERIAL_FB_LIGHTMAP, "#define APPLY_FBLIGHTMAP\n", "_fb" },
 	{ GLSL_SHADER_MATERIAL_DIRECTIONAL_LIGHT, "#define APPLY_DIRECTIONAL_LIGHT\n", "_dirlight" },
 
@@ -493,9 +495,9 @@ static const glsl_feature_t glsl_features_distortion[] =
 	{ GLSL_SHADER_COMMON_AUTOSPRITE2, "#define APPLY_AUTOSPRITE2\n", "" },
 	{ GLSL_SHADER_COMMON_AUTOPARTICLE, "#define APPLY_AUTOSPRITE\n#define APPLY_AUTOPARTICLE\n", "" },
 
-	{ GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
-	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n"
-			"#define APPLY_INSTANCED_ATTRIB_TRASNFORMS\n", "_instanced_va" },
+	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
+	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n"
+			"#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
 
 	{ GLSL_SHADER_COMMON_FOG, "#define APPLY_FOG\n#define APPLY_FOG_IN 1\n", "_fog" },
 	{ GLSL_SHADER_COMMON_FOG_RGB, "#define APPLY_FOG_COLOR\n", "_rgb" },
@@ -516,8 +518,8 @@ static const glsl_feature_t glsl_features_rgbshadow[] =
 	{ GLSL_SHADER_COMMON_BONE_TRANSFORMS2, "#define NUM_BONE_INFLUENCES 2\n", "_bones2" },
 	{ GLSL_SHADER_COMMON_BONE_TRANSFORMS1, "#define NUM_BONE_INFLUENCES 1\n", "_bones1" },
 
-	{ GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
-	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRASNFORMS\n", "_instanced_va" },
+	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
+	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
 
 	{ 0, NULL, NULL }
 };
@@ -529,8 +531,8 @@ static const glsl_feature_t glsl_features_shadowmap[] =
 	{ GLSL_SHADER_COMMON_BONE_TRANSFORMS2, "#define NUM_BONE_INFLUENCES 2\n", "_bones2" },
 	{ GLSL_SHADER_COMMON_BONE_TRANSFORMS1, "#define NUM_BONE_INFLUENCES 1\n", "_bones1" },
 
-	{ GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
-	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRASNFORMS\n", "_instanced_va" },
+	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
+	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
 
 	{ GLSL_SHADER_SHADOWMAP_DITHER, "#define APPLY_DITHER\n", "_dither" },
 	{ GLSL_SHADER_SHADOWMAP_PCF, "#define APPLY_PCF\n", "_pcf" },
@@ -554,8 +556,8 @@ static const glsl_feature_t glsl_features_outline[] =
 
 	{ GLSL_SHADER_COMMON_FOG, "#define APPLY_FOG\n#define APPLY_FOG_IN 1\n", "_fog" },
 
-	{ GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
-	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRASNFORMS\n", "_instanced_va" },
+	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
+	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
 
 	{ GLSL_SHADER_OUTLINE_OUTLINES_CUTOFF, "#define APPLY_OUTLINES_CUTOFF\n", "_outcut" },
 
@@ -605,20 +607,24 @@ static const glsl_feature_t glsl_features_q3a[] =
 	{ GLSL_SHADER_COMMON_AUTOSPRITE2, "#define APPLY_AUTOSPRITE2\n", "" },
 	{ GLSL_SHADER_COMMON_AUTOPARTICLE, "#define APPLY_AUTOSPRITE\n#define APPLY_AUTOPARTICLE\n", "" },
 
-	{ GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
-	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRASNFORMS\n", "_instanced_va" },
+	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
+	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
 
 	{ GLSL_SHADER_COMMON_SOFT_PARTICLE, "#define APPLY_SOFT_PARTICLE\n", "_sp" },
+	
+	{ GLSL_SHADER_COMMON_AFUNC_GE128, "#define QF_ALPHATEST(a) { if ((a) < 0.5) discard; }\n", "_afunc_ge128" },
+	{ GLSL_SHADER_COMMON_AFUNC_LT128, "#define QF_ALPHATEST(a) { if ((a) >= 0.5) discard; }\n", "_afunc_lt128" },
+	{ GLSL_SHADER_COMMON_AFUNC_GT0, "#define QF_ALPHATEST(a) { if ((a) <= 0.0) discard; }\n", "_afunc_gt0" },
 
 	{ GLSL_SHADER_Q3_TC_GEN_REFLECTION, "#define APPLY_TC_GEN_REFLECTION\n", "_tc_refl" },
 	{ GLSL_SHADER_Q3_TC_GEN_PROJECTION, "#define APPLY_TC_GEN_PROJECTION\n", "_tc_proj" },
 	{ GLSL_SHADER_Q3_TC_GEN_ENV, "#define APPLY_TC_GEN_ENV\n", "_tc_env" },
 	{ GLSL_SHADER_Q3_TC_GEN_VECTOR, "#define APPLY_TC_GEN_VECTOR\n", "_tc_vec" },
 
-	{ GLSL_SHADER_Q3_LIGHTSTYLE3, "#define NUM_LIGHTMAPS 4\n", "_ls3" },
-	{ GLSL_SHADER_Q3_LIGHTSTYLE2, "#define NUM_LIGHTMAPS 3\n", "_ls2" },
-	{ GLSL_SHADER_Q3_LIGHTSTYLE1, "#define NUM_LIGHTMAPS 2\n", "_ls1" },
-	{ GLSL_SHADER_Q3_LIGHTSTYLE0, "#define NUM_LIGHTMAPS 1\n", "_ls0" },
+	{ GLSL_SHADER_Q3_LIGHTSTYLE3, "#define NUM_LIGHTMAPS 4\n#define qf_lmvec23 vec4\n", "_ls3" },
+	{ GLSL_SHADER_Q3_LIGHTSTYLE2, "#define NUM_LIGHTMAPS 3\n#define qf_lmvec23 vec2\n", "_ls2" },
+	{ GLSL_SHADER_Q3_LIGHTSTYLE1, "#define NUM_LIGHTMAPS 2\n#define qf_lmvec01 vec4\n", "_ls1" },
+	{ GLSL_SHADER_Q3_LIGHTSTYLE0, "#define NUM_LIGHTMAPS 1\n#define qf_lmvec01 vec2\n", "_ls0" },
 
 	{ 0, NULL, NULL }
 };
@@ -648,8 +654,12 @@ static const glsl_feature_t glsl_features_celshade[] =
 	{ GLSL_SHADER_COMMON_FOG, "#define APPLY_FOG\n#define APPLY_FOG_IN 1\n", "_fog" },
 	{ GLSL_SHADER_COMMON_FOG_RGB, "#define APPLY_FOG_COLOR\n", "_rgb" },
 
-	{ GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
-	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRASNFORMS\n", "_instanced_va" },
+	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
+	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
+	
+	{ GLSL_SHADER_COMMON_AFUNC_GE128, "#define QF_ALPHATEST(a) { if ((a) < 0.5) discard; }\n", "_afunc_ge128" },
+	{ GLSL_SHADER_COMMON_AFUNC_LT128, "#define QF_ALPHATEST(a) { if ((a) >= 0.5) discard; }\n", "_afunc_lt128" },
+	{ GLSL_SHADER_COMMON_AFUNC_GT0, "#define QF_ALPHATEST(a) { if ((a) <= 0.0) discard; }\n", "_afunc_gt0" },
 
 	{ GLSL_SHADER_CELSHADE_DIFFUSE, "#define APPLY_DIFFUSE\n", "_diff" },
 	{ GLSL_SHADER_CELSHADE_DECAL, "#define APPLY_DECAL\n", "_decal" },
@@ -678,8 +688,8 @@ static const glsl_feature_t glsl_features_fog[] =
 	{ GLSL_SHADER_COMMON_AUTOSPRITE2, "#define APPLY_AUTOSPRITE2\n", "" },
 	{ GLSL_SHADER_COMMON_AUTOPARTICLE, "#define APPLY_AUTOSPRITE\n#define APPLY_AUTOPARTICLE\n", "" },
 
-	{ GLSL_SHADER_COMMON_INSTANCED_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
-	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRASNFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRASNFORMS\n", "_instanced_va" },
+	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
+	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
 
 	{ 0, NULL, NULL }
 };
@@ -728,8 +738,14 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 #define QF_GLSL_VERSION140 "" \
 "#version 140\n"
 
-#define QF_GLSL_ENABLE_ARB_DRAW_INSTACED "" \
+#define QF_GLSL_VERSION300ES "" \
+"#version 300 es\n"
+
+#define QF_GLSL_ENABLE_ARB_DRAW_INSTANCED "" \
 "#extension GL_ARB_draw_instanced : enable\n"
+
+#define QF_GLSL_ENABLE_EXT_SHADOW_SAMPLERS "" \
+"#extension GL_EXT_shadow_samplers : enable\n"
 
 #define QF_BUILTIN_GLSL_MACROS "" \
 "#if !defined(myhalf)\n" \
@@ -745,46 +761,75 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 "//#define myhalf4 half4\n" \
 "//#endif\n" \
 "#endif\n" \
-"\n" \
-"#if QF_GLSL_VERSION >= 130\n" \
-"  precision highp float;\n" \
-"\n" \
-"# ifdef VERTEX_SHADER\n" \
-"   out myhalf4 qf_FrontColor;\n" \
-"#  define qf_varying out\n" \
-"#  define qf_attribute in\n" \
-"# endif\n" \
-"# ifdef FRAGMENT_SHADER\n" \
-"   in myhalf4 qf_FrontColor;\n" \
-"   out myhalf4	qf_FragColor;\n" \
-"#  define qf_varying in\n" \
-"#  define qf_attribute in\n" \
-"# endif\n" \
-"\n" \
-"# define qf_texture texture\n" \
-"# define qf_textureCube texture\n" \
-"# define qf_textureLod textureLod\n" \
-"# define qf_textureOffset(a,b,c,d) textureOffset(a,b,ivec2(c,d))\n" \
-"# define qf_shadow texture\n" \
-"#else\n" \
-"# ifdef VERTEX_SHADER\n" \
-"#  define qf_FrontColor gl_FrontColor\n" \
-"#  define qf_varying varying\n" \
-"#  define qf_attribute attribute\n" \
-"# endif\n" \
-"\n" \
-"# ifdef FRAGMENT_SHADER\n" \
-"#  define qf_FrontColor gl_Color\n" \
-"#  define qf_FragColor gl_FragColor\n" \
-"#  define qf_varying varying\n" \
-"#  define qf_attribute attribute\n" \
-"# endif\n" \
-"# define qf_texture texture2D\n" \
-"# define qf_textureLod texture2DLod\n" \
-"# define qf_textureCube textureCube\n" \
-"# define qf_textureOffset(a,b,c,d) texture2DOffset(a,b,ivec2(c,d))\n" \
-"# define qf_shadow shadow2D\n" \
+
+#define QF_BUILTIN_GLSL_MACROS_GLSL120 "" \
+"#ifdef VERTEX_SHADER\n" \
+"# define qf_FrontColor gl_FrontColor\n" \
+"# define qf_varying varying\n" \
+"# define qf_attribute attribute\n" \
 "#endif\n" \
+"#ifdef FRAGMENT_SHADER\n" \
+"# define qf_FrontColor gl_Color\n" \
+"# define qf_FragColor gl_FragColor\n" \
+"# define qf_varying varying\n" \
+"#endif\n" \
+"#define qf_texture texture2D\n" \
+"#define qf_textureLod texture2DLod\n" \
+"#define qf_textureCube textureCube\n" \
+"#define qf_textureOffset(a,b,c,d) texture2DOffset(a,b,ivec2(c,d))\n" \
+"#define qf_shadow shadow2D\n" \
+"\n"
+
+#define QF_BUILTIN_GLSL_MACROS_GLSL130 "" \
+"precision highp float;\n" \
+"#ifdef VERTEX_SHADER\n" \
+"  out myhalf4 qf_FrontColor;\n" \
+"# define qf_varying out\n" \
+"# define qf_attribute in\n" \
+"#endif\n" \
+"#ifdef FRAGMENT_SHADER\n" \
+"  in myhalf4 qf_FrontColor;\n" \
+"  out myhalf4 qf_FragColor;\n" \
+"# define qf_varying in\n" \
+"#endif\n" \
+"#define qf_texture texture\n" \
+"#define qf_textureCube texture\n" \
+"#define qf_textureLod textureLod\n" \
+"#define qf_textureOffset(a,b,c,d) textureOffset(a,b,ivec2(c,d))\n" \
+"#define qf_shadow texture\n" \
+"\n"
+
+#define QF_BUILTIN_GLSL_MACROS_GLSL100ES "" \
+"#define qf_varying varying\n" \
+"#ifdef VERTEX_SHADER\n" \
+"# define qf_attribute attribute\n" \
+"#endif\n" \
+"#ifdef FRAGMENT_SHADER\n" \
+"  precision mediump float;\n" \
+"# define qf_FragColor gl_FragColor\n" \
+"#endif\n" \
+" qf_varying myhalf4 qf_FrontColor;\n" \
+"#define qf_texture texture2D\n" \
+"#define qf_textureLod texture2DLod\n" \
+"#define qf_textureCube textureCube\n" \
+"#define qf_shadow shadow2DEXT\n" \
+"\n"
+
+#define QF_BUILTIN_GLSL_MACROS_GLSL300ES "" \
+"#ifdef VERTEX_SHADER\n" \
+"# define qf_varying out\n" \
+"# define qf_attribute in\n" \
+"#endif\n" \
+"#ifdef FRAGMENT_SHADER\n" \
+"  precision highp float;\n" \
+"  layout(location = 0) out lowp vec4 qf_FragColor;\n" \
+"# define qf_varying in\n" \
+"#endif\n" \
+" qf_varying myhalf4 qf_FrontColor;\n" \
+"#define qf_texture texture\n" \
+"#define qf_textureLod textureLod\n" \
+"#define qf_textureCube texture\n" \
+"#define qf_shadow texture\n" \
 "\n"
 
 #define QF_GLSL_PI "" \
@@ -820,160 +865,37 @@ QF_GLSL_PI \
 "#ifndef WAVE_SIN\n" \
 "float QF_WaveFunc_Sin(float x)\n" \
 "{\n" \
-"x -= floor(x);\n" \
-"return sin(x * M_TWOPI);\n" \
+"return sin(fract(x) * M_TWOPI);\n" \
 "}\n" \
 "float QF_WaveFunc_Triangle(float x)\n" \
 "{\n" \
-"x -= floor(x);\n" \
+"x = fract(x);\n" \
 "return step(x, 0.25) * x * 4.0 + (2.0 - 4.0 * step(0.25, x) * step(x, 0.75) * x) + ((step(0.75, x) * x - 0.75) * 4.0 - 1.0);\n" \
 "}\n" \
 "float QF_WaveFunc_Square(float x)\n" \
 "{\n" \
-"x -= floor(x);\n" \
-"return step(x, 0.5) * 2.0 - 1.0;\n" \
+"return step(fract(x), 0.5) * 2.0 - 1.0;\n" \
 "}\n" \
 "float QF_WaveFunc_Sawtooth(float x)\n" \
 "{\n" \
-"x -= floor(x);\n" \
-"return x;\n" \
+"return fract(x);\n" \
 "}\n" \
-"float QF_QF_WaveFunc_InverseSawtooth(float x)\n" \
+"float QF_WaveFunc_InverseSawtooth(float x)\n" \
 "{\n" \
-"x -= floor(x);\n" \
-"return 1.0 - x;\n" \
+"return 1.0 - fract(x);\n" \
 "}\n" \
 "\n" \
 "#define WAVE_SIN(time,base,amplitude,phase,freq) (((base)+(amplitude)*QF_WaveFunc_Sin((phase)+(time)*(freq))))\n" \
 "#define WAVE_TRIANGLE(time,base,amplitude,phase,freq) (((base)+(amplitude)*QF_WaveFunc_Triangle((phase)+(time)*(freq))))\n" \
 "#define WAVE_SQUARE(time,base,amplitude,phase,freq) (((base)+(amplitude)*QF_WaveFunc_Square((phase)+(time)*(freq))))\n" \
 "#define WAVE_SAWTOOTH(time,base,amplitude,phase,freq) (((base)+(amplitude)*QF_WaveFunc_Sawtooth((phase)+(time)*(freq))))\n" \
-"#define WAVE_INVERSESAWTOOTH(time,base,amplitude,phase,freq) (((base)+(amplitude)*QF_QF_WaveFunc_InverseSawtooth((phase)+(time)*(freq))))\n" \
+"#define WAVE_INVERSESAWTOOTH(time,base,amplitude,phase,freq) (((base)+(amplitude)*QF_WaveFunc_InverseSawtooth((phase)+(time)*(freq))))\n" \
 "#endif\n" \
 "\n"
 
-#define QF_DUAL_QUAT_TRANSFORM_OVERLOAD "" \
-"#if defined(DUAL_QUAT_TRANSFORM_NORMALS)\n" \
-"#if defined(DUAL_QUAT_TRANSFORM_TANGENT)\n" \
-"void QF_VertexDualQuatsTransform(const int numWeights, inout vec4 Position, inout vec3 Normal, inout vec3 Tangent)\n" \
-"#else\n" \
-"void QF_VertexDualQuatsTransform(const int numWeights, inout vec4 Position, inout vec3 Normal)\n" \
-"#endif\n" \
-"#else\n" \
-"void QF_VertexDualQuatsTransform(const int numWeights, inout vec4 Position)\n" \
-"#endif\n" \
-"{\n" \
-"int index;\n" \
-"vec4 Indices = a_BonesIndices;\n" \
-"vec4 Weights = a_BonesWeights;\n" \
-"vec4 Indices_2 = Indices * 2.0;\n" \
-"vec4 DQReal, DQDual;\n" \
-"\n" \
-"index = int(Indices_2.x);\n" \
-"DQReal = u_QF_DualQuats[index+0];\n" \
-"DQDual = u_QF_DualQuats[index+1];\n" \
-"\n" \
-"if (numWeights > 1)\n" \
-"{\n" \
-"DQReal *= Weights.x;\n" \
-"DQDual *= Weights.x;\n" \
-"\n" \
-"vec4 DQReal1, DQDual1;\n" \
-"float scale;\n" \
-"\n" \
-"index = int(Indices_2.y);\n" \
-"DQReal1 = u_QF_DualQuats[index+0];\n" \
-"DQDual1 = u_QF_DualQuats[index+1];\n" \
-"// antipodality handling\n" \
-"scale = (dot(DQReal1, DQReal) < 0.0 ? -1.0 : 1.0) * Weights.y;\n" \
-"DQReal += DQReal1 * scale;\n" \
-"DQDual += DQDual1 * scale;\n" \
-"\n" \
-"if (numWeights > 2)\n" \
-"{\n" \
-"index = int(Indices_2.z);\n" \
-"DQReal1 = u_QF_DualQuats[index+0];\n" \
-"DQDual1 = u_QF_DualQuats[index+1];\n" \
-"// antipodality handling\n" \
-"scale = (dot(DQReal1, DQReal) < 0.0 ? -1.0 : 1.0) * Weights.z;\n" \
-"DQReal += DQReal1 * scale;\n" \
-"DQDual += DQDual1 * scale;\n" \
-"\n" \
-"if (numWeights > 3)\n" \
-"{\n" \
-"index = int(Indices_2.w);\n" \
-"DQReal1 = u_QF_DualQuats[index+0];\n" \
-"DQDual1 = u_QF_DualQuats[index+1];\n" \
-"// antipodality handling\n" \
-"scale = (dot(DQReal1, DQReal) < 0.0 ? -1.0 : 1.0) * Weights.w;\n" \
-"DQReal += DQReal1 * scale;\n" \
-"DQDual += DQDual1 * scale;\n" \
-"}\n" \
-"}\n" \
-"}\n" \
-"\n" \
-"float len = length(DQReal);\n" \
-"DQReal /= len;\n" \
-"DQDual /= len;\n" \
-"\n" \
-"Position.xyz = (cross(DQReal.xyz, cross(DQReal.xyz, Position.xyz) + Position.xyz*DQReal.w + DQDual.xyz) + " \
-	"DQDual.xyz*DQReal.w - DQReal.xyz*DQDual.w)*2.0 + Position.xyz;\n" \
-"\n" \
-"#ifdef DUAL_QUAT_TRANSFORM_NORMALS\n" \
-"Normal = cross(DQReal.xyz, cross(DQReal.xyz, Normal) + Normal*DQReal.w)*2.0 + Normal;\n" \
-"#endif\n" \
-"\n" \
-"#ifdef DUAL_QUAT_TRANSFORM_TANGENT\n" \
-"Tangent = cross(DQReal.xyz, cross(DQReal.xyz, Tangent) + Tangent*DQReal.w)*2.0 + Tangent;\n" \
-"#endif\n" \
-"}\n"
-
-// #version 130+
-#define QF_GLSL_DUAL_QUAT_TRANSFORMS \
-"#ifdef VERTEX_SHADER\n" \
-"attribute vec4 a_BonesIndices;\n" \
-"attribute vec4 a_BonesWeights;\n" \
-"\n" \
-"uniform vec4 u_QF_DualQuats[MAX_UNIFORM_BONES*2];\n" \
-"\n" \
-QF_DUAL_QUAT_TRANSFORM_OVERLOAD \
-"\n" \
-"// use defines to overload the transform function\n" \
-"\n" \
-"#define DUAL_QUAT_TRANSFORM_NORMALS\n" \
-QF_DUAL_QUAT_TRANSFORM_OVERLOAD \
-"\n" \
-"#define DUAL_QUAT_TRANSFORM_TANGENT\n" \
-QF_DUAL_QUAT_TRANSFORM_OVERLOAD \
-"\n" \
-"#endif\n"
-
-#define QF_GLSL_INSTANCED_TRASFORMS \
-"#ifdef VERTEX_SHADER\n" \
-"#ifdef APPLY_INSTANCED_ATTRIB_TRASNFORMS\n" \
-"attribute vec4 a_InstanceQuat;\n" \
-"attribute vec4 a_InstancePosAndScale;\n" \
-"#elif defined(GL_ARB_draw_instanced)\n" \
-"\n" \
-"uniform vec4 u_QF_InstancePoints[MAX_UNIFORM_INSTANCES*2];\n" \
-"\n" \
-"#define a_InstanceQuat u_QF_InstancePoints[gl_InstanceID*2]\n" \
-"#define a_InstancePosAndScale u_QF_InstancePoints[gl_InstanceID*2+1]\n" \
-"#else\n" \
-"uniform vec4 u_QF_InstancePoints[2];\n" \
-"#define a_InstanceQuat u_QF_InstancePoints[0]\n" \
-"#define a_InstancePosAndScale u_QF_InstancePoints[1]\n" \
-"#endif\n" \
-"\n" \
-"void QF_InstancedTransform(inout vec4 Position, inout vec3 Normal)\n" \
-"{\n" \
-"Position.xyz = (cross(a_InstanceQuat.xyz, cross(a_InstanceQuat.xyz, Position.xyz) + " \
-	"Position.xyz*a_InstanceQuat.w)*2.0 + Position.xyz) *\n" \
-" a_InstancePosAndScale.w + a_InstancePosAndScale.xyz;\n" \
-"Normal = cross(a_InstanceQuat.xyz, cross(a_InstanceQuat.xyz, Normal) + Normal*a_InstanceQuat.w)*2.0 + Normal;\n" \
-"}\n" \
-"\n" \
-"#endif\n"
+#define QF_GLSL_MATH \
+"#define QF_LatLong2Norm(ll) vec3(cos((ll).y) * sin((ll).x), sin((ll).y) * sin((ll).x), cos((ll).x))\n" \
+"\n"
 
 /*
 * R_GLSLBuildDeformv
@@ -1002,17 +924,15 @@ static const char *R_GLSLBuildDeformv( const deformv_t *deformv, int numDeforms 
 		"#define APPLY_DEFORMVERTS\n"
 		"\n"
 		"#if defined(APPLY_AUTOSPRITE) || defined(APPLY_AUTOSPRITE2)\n"
-		"attribute vec4 a_SpritePoint;\n"
+		"qf_attribute vec4 a_SpritePoint;\n"
 		"#else\n"
 		"#define a_SpritePoint vec4(0.0)\n"
 		"#endif\n"
 		"\n"
 		"#if defined(APPLY_AUTOSPRITE2)\n"
-		"attribute vec3 a_SpriteRightAxis;\n"
-		"attribute vec3 a_SpriteUpAxis;\n"
+		"qf_attribute vec4 a_SpriteRightUpAxis;\n"
 		"#else\n"
-		"#define a_SpriteRightAxis vec3(0.0)\n"
-		"#define a_SpriteUpAxis vec3(0.0)\n"
+		"#define a_SpriteRightUpAxis vec4(0.0)\n"
 		"#endif\n"
 		"\n"
 		"void QF_DeformVerts(inout vec4 Position, inout vec3 Normal, inout vec2 TexCoord)\n"
@@ -1056,9 +976,9 @@ static const char *R_GLSLBuildDeformv( const deformv_t *deformv, int numDeforms 
 				break;
 			case DEFORMV_AUTOSPRITE:
 				Q_strncatz( program,
-						"right = (1.0 - step(0.5, TexCoord.s) * 2.0) * u_QF_ViewAxis[1] * u_QF_MirrorSide;\n;"
-						"up = (1.0 - step(0.5, TexCoord.t) * 2.0) * u_QF_ViewAxis[2];\n"
-						"forward = -1 * u_QF_ViewAxis[0];\n"
+						"right = (1.0 + step(0.5, TexCoord.s) * -2.0) * u_QF_ViewAxis[1] * u_QF_MirrorSide;\n;"
+						"up = (1.0 + step(0.5, TexCoord.t) * -2.0) * u_QF_ViewAxis[2];\n"
+						"forward = -1.0 * u_QF_ViewAxis[0];\n"
 						"Position.xyz = a_SpritePoint.xyz + (right + up) * a_SpritePoint.w;\n"
 						"Normal.xyz = forward;\n"
 						"TexCoord.st = vec2(step(0.5, TexCoord.s),step(0.5, TexCoord.t));\n",
@@ -1066,9 +986,9 @@ static const char *R_GLSLBuildDeformv( const deformv_t *deformv, int numDeforms 
 				break;
 			case DEFORMV_AUTOPARTICLE:
 				Q_strncatz( program,
-						"right = (1.0 - TexCoord.s * 2.0) * u_QF_ViewAxis[1] * u_QF_MirrorSide;\n;"
-						"up = (1.0 - TexCoord.t * 2.0) * u_QF_ViewAxis[2];\n"
-						"forward = -1 * u_QF_ViewAxis[0];\n"
+						"right = (1.0 + TexCoord.s * -2.0) * u_QF_ViewAxis[1] * u_QF_MirrorSide;\n;"
+						"up = (1.0 + TexCoord.t * -2.0) * u_QF_ViewAxis[2];\n"
+						"forward = -1.0 * u_QF_ViewAxis[0];\n"
 						"// prevent the particle from disappearing at large distances\n"
 						"t = dot(a_SpritePoint.xyz + u_QF_EntityOrigin - u_QF_ViewOrigin, u_QF_ViewAxis[0]);\n"
 						"t = 1.5 + step(20.0, t) * t * 0.006;\n"
@@ -1079,8 +999,8 @@ static const char *R_GLSLBuildDeformv( const deformv_t *deformv, int numDeforms 
 			case DEFORMV_AUTOSPRITE2:
 				Q_strncatz( program,
 					"// local sprite axes\n"
-					"right = a_SpriteRightAxis * u_QF_MirrorSide;\n"
-					"up = a_SpriteUpAxis;\n"
+					"right = QF_LatLong2Norm(a_SpriteRightUpAxis.xy) * u_QF_MirrorSide;\n"
+					"up = QF_LatLong2Norm(a_SpriteRightUpAxis.zw);\n"
 					"\n"
 					"// mid of quad to camera vector\n"
 					"dist = u_QF_ViewOrigin - u_QF_EntityOrigin - a_SpritePoint.xyz;\n"
@@ -1323,7 +1243,7 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 	unsigned int i;
 	int hash;
 	int linked, error = 0;
-	int shaderTypeIdx, deformvIdx, instancedIdx;
+	int shaderTypeIdx, deformvIdx, instancedIdx, shadowIdx;
 	int body_start, num_init_strings, num_shader_strings;
 	glsl_program_t *program;
 	char fullName[1024];
@@ -1407,6 +1327,11 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 	ri.Com_DPrintf( "Registering GLSL program %s\n", fullName );
 
 	i = 0;
+#ifdef GL_ES_VERSION_2_0
+	if( glConfig.shadingLanguageVersion >= 300 ) {
+		shaderStrings[i++] = QF_GLSL_VERSION300ES;
+	}
+#else
 	if( glConfig.shadingLanguageVersion >= 140 ) {
 		shaderStrings[i++] = QF_GLSL_VERSION140;
 	}
@@ -1416,24 +1341,41 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 	else {
 		shaderStrings[i++] = QF_GLSL_VERSION120;
 	}
+#endif
 
 	instancedIdx = i;
-	if( glConfig.shadingLanguageVersion < 400 && glConfig.ext.draw_instanced ) {
-		shaderStrings[i++] = QF_GLSL_ENABLE_ARB_DRAW_INSTACED;
-	}
-	else {
+#ifndef GL_ES_VERSION_2_0
+	if( glConfig.shadingLanguageVersion < 400 && glConfig.ext.draw_instanced )
+		shaderStrings[i++] = QF_GLSL_ENABLE_ARB_DRAW_INSTANCED;
+	else
+#endif
 		shaderStrings[i++] = "\n";
-	}
 
+	shadowIdx = i;
+	shaderStrings[i++] = "\n";
 	shaderStrings[i++] = shaderVersion;
 	shaderTypeIdx = i;
 	shaderStrings[i++] = "\n";
 	shaderStrings[i++] = QF_BUILTIN_GLSL_MACROS;
+#ifdef GL_ES_VERSION_2_0
+	if( glConfig.shadingLanguageVersion >= 300 ) {
+		shaderStrings[i++] = QF_BUILTIN_GLSL_MACROS_GLSL300ES;
+	}
+	else {
+		shaderStrings[i++] = QF_BUILTIN_GLSL_MACROS_GLSL100ES;
+	}
+#else
+	if( glConfig.shadingLanguageVersion >= 130 ) {
+		shaderStrings[i++] = QF_BUILTIN_GLSL_MACROS_GLSL130;
+	}
+	else {
+		shaderStrings[i++] = QF_BUILTIN_GLSL_MACROS_GLSL120;
+	}
+#endif
 	shaderStrings[i++] = QF_BUILTIN_GLSL_CONSTANTS;
-	shaderStrings[i++] = QF_BUILTIN_GLSL_UNIFORMS;	
+	shaderStrings[i++] = QF_BUILTIN_GLSL_UNIFORMS;
 	shaderStrings[i++] = QF_GLSL_WAVEFUNCS;
-	shaderStrings[i++] = QF_GLSL_DUAL_QUAT_TRANSFORMS;
-	shaderStrings[i++] = QF_GLSL_INSTANCED_TRASFORMS;
+	shaderStrings[i++] = QF_GLSL_MATH;
 
 	if( header ) {
 		body_start = i;
@@ -1483,6 +1425,10 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 
 	// fragment shader
 	shaderStrings[instancedIdx] = "\n"; // GL_ARB_draw_instanced is unsupported in fragment shader
+#ifdef GL_ES_VERSION_2_0
+	if( glConfig.shadingLanguageVersion < 300 && glConfig.ext.shadow )
+		shaderStrings[shadowIdx] = QF_GLSL_ENABLE_EXT_SHADOW_SAMPLERS;
+#endif
 	shaderStrings[shaderTypeIdx] = "#define FRAGMENT_SHADER\n";
 	shaderStrings[deformvIdx] = "\n";
 	program->fragmentShader = RF_CompileShader( program->object, fullName, "fragment", GL_FRAGMENT_SHADER_ARB, 
@@ -1495,12 +1441,12 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 
 	// link
 	qglLinkProgramARB( program->object );
-	qglGetObjectParameterivARB( program->object, GL_OBJECT_LINK_STATUS_ARB, &linked );
+	qglGetProgramiv( program->object, GL_OBJECT_LINK_STATUS_ARB, &linked );
 	if( !linked )
 	{
 		char log[8192];
 
-		qglGetInfoLogARB( program->object, sizeof( log ), NULL, log );
+		qglGetProgramInfoLog( program->object, sizeof( log ), NULL, log );
 		log[sizeof( log ) - 1] = 0;
 
 		if( log[0] ) {
@@ -1618,7 +1564,7 @@ void RP_UpdateShaderUniforms( int elem,
 		m[2] = texMatrix[1], m[3] = texMatrix[5];
 		m[4] = texMatrix[12], m[5] = texMatrix[13];
 
-		qglUniform2fvARB( program->loc.TextureMatrix, 3, m );
+		qglUniform4fvARB( program->loc.TextureMatrix, 2, m );
 	}
 }
 
@@ -1641,11 +1587,8 @@ void RP_UpdateViewUniforms( int elem,
 		qglUniformMatrix4fvARB( program->loc.ModelViewProjectionMatrix, 1, GL_FALSE, modelviewProjectionMatrix );
 	}
 
-	if( program->loc.ZNear >= 0 ) {
-		qglUniform1fARB( program->loc.ZNear, zNear );
-	}
-	if( program->loc.ZFar >= 0 ) {
-		qglUniform1fARB( program->loc.ZFar, zFar );
+	if( program->loc.ZRange >= 0 ) {
+		qglUniform2fARB( program->loc.ZRange, zNear, zFar );
 	}
 
 	if( viewOrigin ) {
@@ -1725,10 +1668,8 @@ void RP_UpdateMaterialUniforms( int elem,
 {
 	glsl_program_t *program = r_glslprograms + elem - 1;
 
-	if( program->loc.GlossIntensity >= 0 )
-		qglUniform1fARB( program->loc.GlossIntensity, glossIntensity );
-	if( program->loc.GlossExponent >= 0 )
-		qglUniform1fARB( program->loc.GlossExponent, glossExponent );
+	if( program->loc.GlossFactors >= 0 )
+		qglUniform2fARB( program->loc.GlossFactors, glossIntensity, glossExponent );
 	if( program->loc.OffsetMappingScale >= 0 )
 		qglUniform1fARB( program->loc.OffsetMappingScale, offsetmappingScale );
 }
@@ -1781,14 +1722,12 @@ void RP_UpdateFogUniforms( int elem, byte_vec4_t color, float clearDist, float o
 
 	if( program->loc.Fog.Color >= 0 )
 		qglUniform3fvARB( program->loc.Fog.Color, 1, fog_color ); 
-	if( program->loc.Fog.Scale >= 0 )
-		qglUniform1fARB( program->loc.Fog.Scale, 1.0 / (opaqueDist - clearDist) );
+	if( program->loc.Fog.ScaleAndEyeDist >= 0 )
+		qglUniform2fARB( program->loc.Fog.ScaleAndEyeDist, 1.0 / (opaqueDist - clearDist), eyeDist );
 	if( program->loc.Fog.Plane >= 0 )
 		qglUniform4fARB( program->loc.Fog.Plane, fogPlane->normal[0], fogPlane->normal[1], fogPlane->normal[2], fogPlane->dist );
 	if( program->loc.Fog.EyePlane >= 0 )
 		qglUniform4fARB( program->loc.Fog.EyePlane, eyePlane->normal[0], eyePlane->normal[1], eyePlane->normal[2], eyePlane->dist );
-	if( program->loc.Fog.EyeDist >= 0 )
-		qglUniform1fARB( program->loc.Fog.EyeDist, eyeDist );
 }
 
 /*
@@ -1807,17 +1746,21 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 	if( superLightStyle ) {
 		int i;
 		GLfloat rgb[3];
+		static float deluxemapOffset[(MAX_LIGHTMAPS + 3) & (~3)];
 
 		for( i = 0; i < MAX_LIGHTMAPS && superLightStyle->lightmapStyles[i] != 255; i++ ) {
 			VectorCopy( rsc.lightStyles[superLightStyle->lightmapStyles[i]].rgb, rgb );
 			if( mapConfig.lightingIntensity )
 				VectorScale( rgb, mapConfig.lightingIntensity, rgb );
 
-			if( program->loc.LightstyleColor >= 0 )	
-				qglUniform3fvARB( program->loc.LightstyleColor+i, 1, rgb );
-			if( program->loc.DeluxemapOffset >= 0 )	
-				qglUniform1fARB( program->loc.DeluxemapOffset+i, superLightStyle->stOffset[i][0] );
+			if( program->loc.LightstyleColor[i] >= 0 )	
+				qglUniform3fvARB( program->loc.LightstyleColor[i], 1, rgb );
+			if( program->loc.DeluxemapOffset >= 0 )
+				deluxemapOffset[i] = superLightStyle->stOffset[i][0];
 		}
+
+		if( i && ( program->loc.DeluxemapOffset >= 0 ) )
+			qglUniform4fvARB( program->loc.DeluxemapOffset, (i + 3) / 4, deluxemapOffset );
 	}
 
 	if( dlightbits ) {
@@ -1827,7 +1770,7 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 			if( !dl->intensity ) {
 				continue;
 			}
-			if( program->loc.DynamicLightsRadius[n] < 0 ) {
+			if( program->loc.DynamicLightsPosition[n] < 0 ) {
 				break;
 			}
 
@@ -1838,9 +1781,8 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 			}
 			VectorScale( dl->color, colorScale, dlcolor );
 
-			qglUniform1fARB( program->loc.DynamicLightsRadius[n], dl->intensity );
 			qglUniform3fvARB( program->loc.DynamicLightsPosition[n], 1, dlorigin );
-			qglUniform3fvARB( program->loc.DynamicLightsDiffuse[n], 1, dlcolor );
+			qglUniform4fARB( program->loc.DynamicLightsDiffuseAndRadius[n], dlcolor[0], dlcolor[1], dlcolor[2], dl->intensity );
 
 			n++;
 			dlightbits &= ~(1<<i);
@@ -1854,11 +1796,10 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 		}
 
 		for( ; n < MAX_DLIGHTS; n++ ) {
-			if( program->loc.DynamicLightsRadius[n] < 0 ) {
+			if( program->loc.DynamicLightsPosition[n] < 0 ) {
 				break;
 			}
-			qglUniform1fARB( program->loc.DynamicLightsRadius[n], 1 );
-			qglUniform3fARB( program->loc.DynamicLightsDiffuse[n], 0, 0, 0 );
+			qglUniform4fARB( program->loc.DynamicLightsDiffuseAndRadius[n], 0.0f, 0.0f, 0.0f, 1.0f );
 		}
 	}
 	
@@ -1873,7 +1814,13 @@ void RP_UpdateTexGenUniforms( int elem, const mat4_t reflectionMatrix, const mat
 	glsl_program_t *program = r_glslprograms + elem - 1;
 
 	if( program->loc.ReflectionTexMatrix >= 0 )
-		qglUniformMatrix4fvARB( program->loc.ReflectionTexMatrix, 1, GL_FALSE, reflectionMatrix );
+	{
+		mat3_t m;
+		memcpy( &m[0], &reflectionMatrix[0], 3 * sizeof( vec_t ) );
+		memcpy( &m[3], &reflectionMatrix[4], 3 * sizeof( vec_t ) );
+		memcpy( &m[6], &reflectionMatrix[8], 3 * sizeof( vec_t ) );
+		qglUniformMatrix3fvARB( program->loc.ReflectionTexMatrix, 1, GL_FALSE, m );
+	}
 	if( program->loc.VectorTexMatrix >= 0 )
 		qglUniformMatrix4fvARB( program->loc.VectorTexMatrix, 1, GL_FALSE, vectorMatrix );
 }
@@ -1897,10 +1844,6 @@ void RP_UpdateShadowsUniforms( int elem, int numShadows, const shadowGroup_t **g
 
 	for( i = 0; i < numShadows; i++ ) {
 		group = groups[i];
-
-		if( program->loc.ShadowProjDistance[i] >= 0 ) {
-			qglUniform1fARB( program->loc.ShadowProjDistance[i], group->projDist );
-		}
 
 		if( program->loc.ShadowmapTextureParams[i] >= 0 ) {
 			qglUniform4fARB( program->loc.ShadowmapTextureParams[i], 
@@ -1931,10 +1874,10 @@ void RP_UpdateBonesUniforms( int elem, unsigned int numBones, dualquat_t *animDu
 	if( numBones > glConfig.maxGLSLBones ) {
 		return;
 	}
-	if( program->loc.builtin.DualQuats < 0 ) {
+	if( program->loc.DualQuats < 0 ) {
 		return;
 	}
-	qglUniform4fvARB( program->loc.builtin.DualQuats, numBones * 2, &animDualQuat[0][0] );
+	qglUniform4fvARB( program->loc.DualQuats, numBones * 2, &animDualQuat[0][0] );
 }
 
 /*
@@ -1949,10 +1892,10 @@ void RP_UpdateInstancesUniforms( int elem, unsigned int numInstances, instancePo
 	if( numInstances > MAX_GLSL_UNIFORM_INSTANCES ) {
 		numInstances = MAX_GLSL_UNIFORM_INSTANCES;
 	}
-	if( program->loc.builtin.InstancePoints < 0 ) {
+	if( program->loc.InstancePoints < 0 ) {
 		return;
 	}
-	qglUniform4fvARB( program->loc.builtin.InstancePoints, numInstances * 2, &instances[0][0] );
+	qglUniform4fvARB( program->loc.InstancePoints, numInstances * 2, &instances[0][0] );
 }
 
 
@@ -2000,8 +1943,7 @@ static void RF_GetUniformLocations( glsl_program_t *program )
 	program->loc.ModelViewMatrix = qglGetUniformLocationARB( program->object, "u_ModelViewMatrix" );
 	program->loc.ModelViewProjectionMatrix = qglGetUniformLocationARB( program->object, "u_ModelViewProjectionMatrix" );
 
-	program->loc.ZNear = qglGetUniformLocationARB( program->object, "u_ZNear" );
-	program->loc.ZFar = qglGetUniformLocationARB( program->object, "u_ZFar" );
+	program->loc.ZRange = qglGetUniformLocationARB( program->object, "u_ZRange" );
 
 	program->loc.ViewOrigin = qglGetUniformLocationARB( program->object, "u_ViewOrigin" );
 	program->loc.ViewAxis = qglGetUniformLocationARB( program->object, "u_ViewAxis" );
@@ -2043,17 +1985,16 @@ static void RF_GetUniformLocations( glsl_program_t *program )
 	locYUVTextureU = qglGetUniformLocationARB( program->object, "u_YUVTextureU" );
 	locYUVTextureV = qglGetUniformLocationARB( program->object, "u_YUVTextureV" );
 
-	program->loc.LightstyleColor = qglGetUniformLocationARB( program->object, "u_LightstyleColor" );
 	program->loc.DeluxemapOffset = qglGetUniformLocationARB( program->object, "u_DeluxemapOffset" );
 
 	for( i = 0; i < MAX_LIGHTMAPS; i++ ) {
 		locLightmapTexture[i] = qglGetUniformLocationARB( program->object, va( "u_LightmapTexture[%i]", i ) );
 		if( locLightmapTexture[i] < 0 )
 			break;
+		program->loc.LightstyleColor[i] = qglGetUniformLocationARB( program->object, va( "u_LightstyleColor[%i]", i ) );
 	}
 
-	program->loc.GlossIntensity = qglGetUniformLocationARB( program->object, "u_GlossIntensity" );
-	program->loc.GlossExponent = qglGetUniformLocationARB( program->object, "u_GlossExponent" );
+	program->loc.GlossFactors = qglGetUniformLocationARB( program->object, "u_GlossFactors" );
 
 	program->loc.OffsetMappingScale = qglGetUniformLocationARB( program->object, "u_OffsetMappingScale" );
 
@@ -2073,9 +2014,8 @@ static void RF_GetUniformLocations( glsl_program_t *program )
 
 	program->loc.Fog.Plane = qglGetUniformLocationARB( program->object, "u_Fog.Plane" );
 	program->loc.Fog.Color = qglGetUniformLocationARB( program->object, "u_Fog.Color" );
-	program->loc.Fog.Scale = qglGetUniformLocationARB( program->object, "u_Fog.Scale" );
+	program->loc.Fog.ScaleAndEyeDist = qglGetUniformLocationARB( program->object, "u_Fog.ScaleAndEyeDist" );
 	program->loc.Fog.EyePlane = qglGetUniformLocationARB( program->object, "u_Fog.EyePlane" );
-	program->loc.Fog.EyeDist = qglGetUniformLocationARB( program->object, "u_Fog.EyeDist" );
 
 	program->loc.ShaderTime = qglGetUniformLocationARB( program->object, "u_ShaderTime" );
 
@@ -2087,26 +2027,21 @@ static void RF_GetUniformLocations( glsl_program_t *program )
 	program->loc.builtin.MirrorSide = qglGetUniformLocationARB( program->object, "u_QF_MirrorSide" );
 	program->loc.builtin.EntityOrigin = qglGetUniformLocationARB( program->object, "u_QF_EntityOrigin" );
 	program->loc.builtin.ShaderTime = qglGetUniformLocationARB( program->object, "u_QF_ShaderTime" );
-	program->loc.builtin.DualQuats = qglGetUniformLocationARB( program->object, "u_QF_DualQuats" );
-	program->loc.builtin.InstancePoints = qglGetUniformLocationARB( program->object, "u_QF_InstancePoints" );
 
 	// dynamic lights
 	for( i = 0; i < MAX_DLIGHTS; i++ ) {
-		int locR, locP, locD;
+		int locP, locD;
 
-		locR = qglGetUniformLocationARB( program->object, va( "u_DynamicLights[%i].Radius", i ) );
 		locP = qglGetUniformLocationARB( program->object, va( "u_DynamicLights[%i].Position", i ) );
-		locD = qglGetUniformLocationARB( program->object, va( "u_DynamicLights[%i].Diffuse", i ) );
+		locD = qglGetUniformLocationARB( program->object, va( "u_DynamicLights[%i].DiffuseAndRadius", i ) );
 
-		if( locR < 0 || locP < 0 || locD < 0 ) {
-			program->loc.DynamicLightsRadius[i] = program->loc.DynamicLightsPosition[i] = 
-				program->loc.DynamicLightsDiffuse[i] = -1;
+		if( locP < 0 || locD < 0 ) {
+			program->loc.DynamicLightsPosition[i] = program->loc.DynamicLightsDiffuseAndRadius[i] = -1;
 			break;
 		}
 
-		program->loc.DynamicLightsRadius[i] = locR;
 		program->loc.DynamicLightsPosition[i] = locP;
-		program->loc.DynamicLightsDiffuse[i] = locD;
+		program->loc.DynamicLightsDiffuseAndRadius[i] = locD;
 	}
 	program->loc.NumDynamicLights = qglGetUniformLocationARB( program->object, "u_NumDynamicLights" );
 
@@ -2119,8 +2054,6 @@ static void RF_GetUniformLocations( glsl_program_t *program )
 
 		program->loc.ShadowmapMatrix[i] = 
 			qglGetUniformLocationARB( program->object, va( "u_ShadowmapMatrix[%i]", i ) );
-		program->loc.ShadowProjDistance[i] = 
-			qglGetUniformLocationARB( program->object, va( "u_ShadowProjDistance[%i]", i ) );
 	}
 
 	program->loc.ShadowAlpha = qglGetUniformLocationARB( program->object, "u_ShadowAlpha" );
@@ -2128,6 +2061,10 @@ static void RF_GetUniformLocations( glsl_program_t *program )
 	program->loc.BlendMix = qglGetUniformLocationARB( program->object, "u_BlendMix" );
 
 	program->loc.SoftParticlesScale = qglGetUniformLocationARB( program->object, "u_SoftParticlesScale" );
+
+	program->loc.DualQuats = qglGetUniformLocationARB( program->object, "u_DualQuats" );
+
+	program->loc.InstancePoints = qglGetUniformLocationARB( program->object, "u_InstancePoints" );
 	
 	program->loc.WallColor = qglGetUniformLocationARB( program->object, "u_WallColor" );
 	program->loc.FloorColor = qglGetUniformLocationARB( program->object, "u_FloorColor" );
@@ -2195,27 +2132,24 @@ static void RF_BindAttrbibutesLocations( glsl_program_t *program )
 	qglBindAttribLocationARB( program->object, VATTRIB_TEXCOORDS, "a_TexCoord" );
 
 	qglBindAttribLocationARB( program->object, VATTRIB_SPRITEPOINT, "a_SpritePoint" );
-	qglBindAttribLocationARB( program->object, VATTRIB_SPRITERAXIS, "a_SpriteRightAxis" );
-	qglBindAttribLocationARB( program->object, VATTRIB_SPRITEUAXIS, "a_SpriteUpAxis" );
+	qglBindAttribLocationARB( program->object, VATTRIB_SVECTOR, "a_SpriteRightUpAxis" );
 
 	qglBindAttribLocationARB( program->object, VATTRIB_BONESINDICES, "a_BonesIndices" );
 	qglBindAttribLocationARB( program->object, VATTRIB_BONESWEIGHTS, "a_BonesWeights" );
 
-	qglBindAttribLocationARB( program->object, VATTRIB_LMCOORDS0, "a_LightmapCoord0" );
-	qglBindAttribLocationARB( program->object, VATTRIB_LMCOORDS1, "a_LightmapCoord1" );
-	qglBindAttribLocationARB( program->object, VATTRIB_LMCOORDS2, "a_LightmapCoord2" );
-	qglBindAttribLocationARB( program->object, VATTRIB_LMCOORDS3, "a_LightmapCoord3" );
+	qglBindAttribLocationARB( program->object, VATTRIB_LMCOORDS01, "a_LightmapCoord01" );
+	qglBindAttribLocationARB( program->object, VATTRIB_LMCOORDS23, "a_LightmapCoord23" );
 
-	qglBindAttribLocationARB( program->object, VATTRIB_COLOR1, "a_Color1" );
-	qglBindAttribLocationARB( program->object, VATTRIB_COLOR2, "a_Color2" );
-	qglBindAttribLocationARB( program->object, VATTRIB_COLOR3, "a_Color3" );
+	if( glConfig.ext.instanced_arrays ) {
+		qglBindAttribLocationARB( program->object, VATTRIB_INSTANCE_QUAT, "a_InstanceQuat" );
+		qglBindAttribLocationARB( program->object, VATTRIB_INSTANCE_XYZS, "a_InstancePosAndScale" );
+	}
 
-	qglBindAttribLocationARB( program->object, VATTRIB_INSTANCE_QUAT, "a_InstanceQuat" );
-	qglBindAttribLocationARB( program->object, VATTRIB_INSTANCE_XYZS, "a_InstancePosAndScale" );
-
+#ifndef GL_ES_VERSION_2_0
 	if( glConfig.shadingLanguageVersion >= 130 ) {
 		qglBindFragDataLocation( program->object, 0, "qf_FragColor" );
 	}
+#endif
 }
 
 /*
