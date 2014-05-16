@@ -154,8 +154,7 @@
       <AdditionalIncludeDirectories>..\win32\include\msvc;..\win32\include;..\..\libsrcs\angelscript\sdk\angelscript\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_DEPRECATE;GAME_MODULE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <StringPooling>true</StringPooling>
-      <ExceptionHandling>
-      </ExceptionHandling>
+      <ExceptionHandling>Sync</ExceptionHandling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>false</FunctionLevelLinking>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
@@ -567,6 +566,8 @@
     <ClCompile Include="ai\ai_tools.cpp" />
     <ClCompile Include="ai\AStar.cpp" />
     <ClCompile Include="ai\bot_spawn.cpp" />
+    <ClCompile Include="rs_auth.cpp" />
+    <ClCompile Include="rs_query.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\gameshared\anorms.h" />
@@ -597,6 +598,8 @@
     <ClInclude Include="ai\ai_local.h" />
     <ClInclude Include="ai\AStar.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="rs_auth.h" />
+    <ClInclude Include="rs_query.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="game.rc" />
