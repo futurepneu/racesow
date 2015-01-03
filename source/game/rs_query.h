@@ -14,6 +14,6 @@ void RS_ReportPlayer( rs_authplayer_t *player );
 void RS_ReportNick( rs_authplayer_t *player, const char* nick );
 
 void RS_QueryPlayer( rs_authplayer_t *player );
-void RS_QueryTop( gclient_t *client, const char* mapname, int limit, bool old );
+void RS_QueryTop( gclient_t *client, const char* mapname, int limit, int cmd );
 void RS_QueryMaps( gclient_t *client, const char* pattern, const char* tags, int page );
 void RS_QueryRandmap( char* tags[], void *data );

@@ -478,10 +478,11 @@ void RS_QueryPlayer( rs_authplayer_t *player )
  */
 void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	int count, playerNum, i;
-	rs_racetime_t top, racetime, timediff;
-	cJSON *data, *node, *player;
-	char *mapname, *oneliner;
+	int count, playerNum, i, status, indent;
+	rs_racetime_t top, racetime, timediff, oldtop, besttop;
+	cJSON *data, *node, *player, *tmp, *oldnode, *curnode;
+	char *mapname, *oneliner, *error_message, *name, *simplified, *oldoneliner;
+	bool firstoldtime = true, firstnewtime = true, oldtime = false; // topall
 
 	gclient_t *client = (gclient_t *)customp;
 	playerNum = (int)( client - game.clients );
@@ -489,10 +490,19 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 	if( playerNum < 0 || playerNum >= gs.maxclients )
 		return;
 
-	if( rs_sqapi->GetStatus( query ) != 200 )
+	status = rs_sqapi->GetStatus( query );
+	if( status != 200 )
 	{
-		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sError:%s Top query failed\n", 
-					S_COLOR_RED, S_COLOR_WHITE );
+		if( status == 400 )
+		{
+			// We assume the response is properly formed
+			data = (cJSON*)rs_sqapi->GetRoot( query );
+			error_message = cJSON_GetObjectItem( data, "error" )->valuestring;
+		} else {
+			error_message = "Failed to query database";
+		}
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sError:%s %s\n",
+					S_COLOR_RED, S_COLOR_WHITE, error_message );
 		return;
 	}
 
@@ -502,34 +512,135 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 	mapname = cJSON_GetObjectItem( data, "map" )->valuestring;
 	oneliner = va( "\"%s\"", cJSON_GetObjectItem( data, "oneliner" )->valuestring );
 
-	G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sTop %d times on map %s\n",
-	 			S_COLOR_ORANGE, count, mapname );
+	if( strlen(oneliner) == 2 )  // don't print empty oneliner
+		oneliner = "";
 
-	node = cJSON_GetObjectItem( data, "races" )->child;
-	if( node )
-		RS_Racetime( cJSON_GetObjectItem( node, "time" )->valueint, &top );
-
-	for( i = 0; node != NULL; i++, node=node->next )
+	// Check whether we received the result from topall command
+	tmp = cJSON_GetObjectItem( data, "oldoneliner" );
+	if( tmp )
 	{
-		// Calculate the racetime and difftime from top for each record
-		RS_Racetime( cJSON_GetObjectItem( node, "time" )->valueint, &racetime );
-		RS_Racetime( racetime.timedelta - top.timedelta, &timediff );
-		player = cJSON_GetObjectItem( node, "player" );
+		// Print results for topall
+		oldoneliner = va( "\"%s\"", tmp->valuestring );
+		if( strlen(oldoneliner) == 2 )  // don't print empty oneliner
+			oldoneliner = "";
 
-		// Print the row
-		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%d. %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s%s %s%s %s%s\n",
-			S_COLOR_WHITE, i + 1,
-			S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
-			( top.timedelta == racetime.timedelta ? S_COLOR_YELLOW : S_COLOR_RED ), 
-			( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli / 10,
-			S_COLOR_WHITE, cJSON_GetObjectItem( node, "created" )->valuestring,
-			S_COLOR_WHITE, cJSON_GetObjectItem( player, "name" )->valuestring,
-			( i == 0 ? oneliner : "" ),
-			S_COLOR_GREEN );
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sAll-time top %s%d%s times on map %s%s%s\n",
+					S_COLOR_ORANGE, S_COLOR_YELLOW, count, S_COLOR_ORANGE, S_COLOR_YELLOW, mapname, S_COLOR_GREEN );
+
+		// read both new and old top times (if any)
+		node = cJSON_GetObjectItem( data, "races" )->child;
+		if( node )
+			RS_Racetime( cJSON_GetObjectItem( node, "time" )->valueint, &top );
+
+		oldnode = cJSON_GetObjectItem( data, "oldraces" )->child;
+		if( oldnode )
+			RS_Racetime( cJSON_GetObjectItem( oldnode, "time" )->valueint, &oldtop );
+
+		// select current top time to refer from
+		if( node && oldnode )
+		{
+			if( top.timedelta <= oldtop.timedelta )
+				besttop = top;
+			else
+				besttop = oldtop;
+		}
+		else
+			besttop = oldnode != NULL ? oldtop : top; // assign top by default; we wont enter loop if node is null
+
+		i = 0;
+		while( node || oldnode )
+		{
+			if( node && oldnode )
+			{
+				// there is both a new and an old time remaining, compare them
+				if( cJSON_GetObjectItem( node, "time" )->valueint <=
+						cJSON_GetObjectItem( oldnode, "time" )->valueint )
+					oldtime = false;  // the new time is faster or equally fast
+				else
+					oldtime = true;  // the old time is faster
+			}
+			else if( node )
+				oldtime = false;  // only new time(s) remaining
+			else
+				oldtime = true;  // only old time(s) remaining
+
+			// point curnode to the appropriate node
+			curnode = oldtime ? oldnode : node;
+
+			// Calculate the racetime and difftime from top for each record
+			RS_Racetime( cJSON_GetObjectItem( curnode, "time" )->valueint, &racetime );
+			RS_Racetime( racetime.timedelta - besttop.timedelta, &timediff );
+			player = cJSON_GetObjectItem( curnode, "player" );
+			name = cJSON_GetObjectItem( player, "name" )->valuestring;
+			simplified = cJSON_GetObjectItem( player, "simplified" )->valuestring;
+
+			// add spaces for colorcodes to the indentation level
+			indent = 16 + (strlen(name) - strlen(simplified));
+
+			// Print the row; oldtime is printed with grey rank and date
+			G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%2d. %s%-*s %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s(%s) %s%s%s\n",
+				( oldtime ? S_COLOR_GREY : S_COLOR_WHITE ), i + 1, S_COLOR_WHITE,
+				indent, name,
+				S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
+				S_COLOR_YELLOW,
+				( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli / 10,
+				( oldtime ? S_COLOR_GREY : S_COLOR_WHITE ), cJSON_GetObjectItem( curnode, "created" )->valuestring,
+				S_COLOR_YELLOW, ( oldtime && firstoldtime ? oldoneliner : !oldtime && firstnewtime ? oneliner : "" ), S_COLOR_GREEN );
+
+			// increment rank number
+			i++;
+			if( i == count )
+				return;
+
+			// set 'first' boolean to false and traverse linked list for next node
+			if( oldtime )
+			{
+				firstoldtime = false;
+				oldnode = oldnode->next;
+			}
+			else
+			{
+				firstnewtime = false;
+				node = node->next;
+			}
+		}
+	}
+	else
+	{
+		// Print results of a normal top/topold query
+		G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sTop %s%d%s times on map %s%s%s\n",
+						S_COLOR_ORANGE, S_COLOR_YELLOW, count, S_COLOR_ORANGE, S_COLOR_YELLOW, mapname, S_COLOR_GREEN );
+
+		node = cJSON_GetObjectItem( data, "races" )->child;
+		if( node )
+			RS_Racetime( cJSON_GetObjectItem( node, "time" )->valueint, &top );
+
+		for( i = 0; node != NULL; i++, node=node->next )
+		{
+			// Calculate the racetime and difftime from top for each record
+			RS_Racetime( cJSON_GetObjectItem( node, "time" )->valueint, &racetime );
+			RS_Racetime( racetime.timedelta - top.timedelta, &timediff );
+			player = cJSON_GetObjectItem( node, "player" );
+			name = cJSON_GetObjectItem( player, "name" )->valuestring;
+			simplified = cJSON_GetObjectItem( player, "simplified" )->valuestring;
+
+			// add spaces for colorcodes to the indentation level
+			indent = 16 + (strlen(name) - strlen(simplified));
+
+			// Print the row
+			G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%2d. %-*s %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s(%s) %s%s%s\n",
+				S_COLOR_WHITE, i + 1,
+				indent, name,
+				S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
+				S_COLOR_YELLOW,
+				( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli / 10,
+				S_COLOR_WHITE, cJSON_GetObjectItem( node, "created" )->valuestring,
+				S_COLOR_YELLOW, ( i == 0 ? oneliner : "" ), S_COLOR_GREEN );
+		}
 	}
 }
 
-void RS_QueryTop( gclient_t *client, const char* mapname, int limit, bool old )
+void RS_QueryTop( gclient_t *client, const char* mapname, int limit, int cmd)
 {
 	stat_query_t *query;
 	char *url,
@@ -544,10 +655,18 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit, bool old )
 	}
 
 	// Form the query
-	if( old )
-		url = va( "%s/oldapi/race", rs_statsUrl->string );
-	else
+	if( cmd == RS_MAP_TOP)
 		url = va( "%s/api/race", rs_statsUrl->string );
+	else if( cmd == RS_MAP_TOPOLD )
+		url = va( "%s/oldapi/race", rs_statsUrl->string );
+	else if( cmd == RS_MAP_TOPALL )
+		url = va( "%s/api/raceall", rs_statsUrl->string );
+	else
+	{
+		G_PrintMsg( &game.edicts[playerNum +1], "%sError:%s Unrecognized command\n",
+					S_COLOR_RED, S_COLOR_WHITE );
+		return;
+	}
 
 	query = rs_sqapi->CreateRootQuery( url, qtrue );
 	rs_sqapi->SetField( query, "map", b64name );

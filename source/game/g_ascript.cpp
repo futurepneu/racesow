@@ -585,6 +585,17 @@ static const asEnumVal_t asMiscelaneaEnumVals[] =
 	ASLIB_ENUM_VAL_NULL
 };
 
+// racesow - RS_QueryTop parameter
+static const asEnumVal_t asRsCmdVals[] =
+{
+	ASLIB_ENUM_VAL( RS_MAP_TOP ),
+	ASLIB_ENUM_VAL( RS_MAP_TOPOLD ),
+	ASLIB_ENUM_VAL( RS_MAP_TOPALL ),
+
+	ASLIB_ENUM_VAL_NULL
+};
+// !racesow
+
 //=======================================================================
 
 static const asEnum_t asEnums[] =
@@ -618,6 +629,7 @@ static const asEnum_t asEnums[] =
 	{ "meaningsofdeath_e", asMeaningsOfDeathEnumVals },
 	{ "takedamage_e", asDamageEnumVals },
 	{ "miscelanea_e", asMiscelaneaEnumVals },
+	{ "rs_cmds_e", asRsCmdVals }, // racesow - RS_QueryTop parameters
 
 	ASLIB_ENUM_VAL_NULL
 };
@@ -2970,12 +2982,12 @@ static void asFunc_RS_Cancelvote( edict_t *ent, bool admin )
 	G_Cancelvote_f( ent, admin );
 }
 
-static void asFunc_RS_QueryTop( gclient_t *client, asstring_t *mapname, int limit, bool old )
+static void asFunc_RS_QueryTop( gclient_t *client, asstring_t *mapname, int limit, int cmd )
 {
 	if( !mapname )
-		RS_QueryTop( client, level.mapname, limit, old );
+		RS_QueryTop( client, level.mapname, limit, cmd );
 	else
-		RS_QueryTop( client, mapname->buffer, limit, old );
+		RS_QueryTop( client, mapname->buffer, limit, cmd );
 }
 
 static void asFunc_RS_QueryMaps( gclient_t *client, asstring_t *pattern, asstring_t *tags, int page )
@@ -2983,9 +2995,9 @@ static void asFunc_RS_QueryMaps( gclient_t *client, asstring_t *pattern, asstrin
 	RS_QueryMaps( client, pattern->buffer, tags->buffer, page );
 }
 
-static void asFunc_RS_ReportMap( asstring_t *tags, asstring_t *oneliner )
+static void asFunc_RS_ReportMap( asstring_t *tags, asstring_t *oneliner, bool force )
 {
-	RS_ReportMap( tags->buffer, oneliner->buffer );
+	RS_ReportMap( tags->buffer, oneliner->buffer, force );
 }
 
 static void asFunc_RS_UpdateMaplist( void )
@@ -3358,7 +3370,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "bool RS_QueryPjState( int playerNum )", asFUNCTION(asFunc_RS_QueryPjState), NULL },
 	{ "bool RS_ResetPjState( int playerNum )", asFUNCTION(asFunc_RS_ResetPjState), NULL },
 	{ "void RS_Cancelvote( Entity @ent, bool admin )", asFUNCTION(asFunc_RS_Cancelvote), NULL },
-	{ "void RS_QueryTop( Client @client, String @mapname, int limit, bool old )", asFUNCTION(asFunc_RS_QueryTop), NULL },
+	{ "void RS_QueryTop( Client @client, String @mapname, int limit, int cmd)", asFUNCTION(asFunc_RS_QueryTop), NULL },
 	{ "void RS_QueryMaps( Client @client, const String &pattern, const String &tags, int page )", asFUNCTION(asFunc_RS_QueryMaps), NULL },
 	{ "void RS_ReportMap( const String &tags, const String &oneliner )", asFUNCTION(asFunc_RS_ReportMap), NULL },
 	{ "void RS_UpdateMaplist()", asFUNCTION(asFunc_RS_UpdateMaplist), NULL },

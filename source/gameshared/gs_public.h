@@ -733,6 +733,15 @@ enum
 	, MAX_STATS = PS_MAX_STATS //64
 };
 
+// racesow - RS_QueryTop parameter
+enum
+{
+		RS_MAP_TOP,
+		RS_MAP_TOPOLD,
+		RS_MAP_TOPALL
+};
+// !racesow
+
 #define ISGAMETYPESTAT( x ) ( ( x >= GS_GAMETYPE_STATS_START ) && ( x < GS_GAMETYPE_STATS_END ) )
 
 #ifdef __GNUC__
