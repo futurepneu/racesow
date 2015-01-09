@@ -227,8 +227,9 @@ void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
  * @param rtime       Time of the race
  * @param cp          Checkpoints of the race
  * @param cpNum       Number of checkpoints
+ * @param oneliner	  Whether the current oneliner should be removed (in case of a new record)
  */
-void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum )
+void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum, bool oneliner )
 {
 	stat_query_t *query;
 	int i;
@@ -249,12 +250,17 @@ void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum )
 	rs_sqapi->SetField( query, "pid", va( "%d", player->id ) );
 	rs_sqapi->SetField( query, "mid", va( "%d", authmap.id ) );
 	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
+	if( oneliner )
+		rs_sqapi->SetField( query, "co", "1" );  // new record made: Clear Oneliner.
+	else
+		rs_sqapi->SetField( query, "co", "0" );
 	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
 
 	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)player );
 	rs_sqapi->Send( query );
 	query = NULL;
+	cJSON_Delete( arr );
 }
 
 /**
