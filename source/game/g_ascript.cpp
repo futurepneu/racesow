@@ -2606,7 +2606,7 @@ static void objectRSPlayer_incrementRace( rs_authplayer_t *self )
 	authmap.races++;
 }
 
-static void objectRSPlayer_reportRace( int rtime, CScriptArrayInterface &checkpoints, rs_authplayer_t *self )
+static void objectRSPlayer_reportRace( int rtime, CScriptArrayInterface &checkpoints, bool oneliner, rs_authplayer_t *self )
 {
 	int i;
 	int cpNum = checkpoints.GetSize();
@@ -2615,7 +2615,7 @@ static void objectRSPlayer_reportRace( int rtime, CScriptArrayInterface &checkpo
 	for( i = 0; i < cpNum; i++ )
 		cp[i] = *((int*)checkpoints.At( i ));
 
-	RS_ReportRace( self, rtime, cp, cpNum );
+	RS_ReportRace( self, rtime, cp, cpNum, oneliner );
 }
 
 static const asFuncdef_t rsplayer_Funcdefs[] =
@@ -2633,7 +2633,7 @@ static const asMethod_t rsplayer_Methods[] =
 	{ ASLIB_FUNCTION_DECL(const String @, getNick, () const), asFUNCTION(objectRSPlayer_getNick), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, setNick, ( const String &nick )), asFUNCTION(objectRSPlayer_setNick), asCALL_CDECL_OBJLAST },
 	{ ASLIB_FUNCTION_DECL(void, incrementRace, ( void )), asFUNCTION(objectRSPlayer_incrementRace), asCALL_CDECL_OBJLAST },
-	{ ASLIB_FUNCTION_DECL(void, reportRace, ( int rtime, array<int> &checkpoints )), asFUNCTION(objectRSPlayer_reportRace), asCALL_CDECL_OBJLAST },
+	{ ASLIB_FUNCTION_DECL(void, reportRace, ( int rtime, array<int> &checkpoints, bool oneliner )), asFUNCTION(objectRSPlayer_reportRace), asCALL_CDECL_OBJLAST },
 
 	ASLIB_METHOD_NULL
 };
