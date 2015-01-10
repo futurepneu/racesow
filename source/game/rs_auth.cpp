@@ -15,7 +15,7 @@ void RS_InitAuth( void )
 
 void RS_ShutdownAuth( void )
 {
-	RS_ReportMap( NULL, NULL );
+	RS_ReportMap( NULL, NULL, true );
 	G_Free( authplayers );
 	free( authmap.b64name );
 }
@@ -36,10 +36,11 @@ void RS_ThinkAuth( void )
 		if( player->client->team != TEAM_SPECTATOR )
 		{
 			player->playTime += game.frametime;
+			// If map's playtime hasn't been updated yet with elapsed time since previous frame, do it now
 			if( !maptime )
 			{
 				authmap.playTime += game.frametime;
-				maptime = true;
+				maptime = true; // maptime is only updated once for >0 players
 			}
 		}
 
@@ -120,6 +121,23 @@ bool RS_SetName( gclient_t *client, const char *name )
 }
 
 /**
+ * Print playtime for the given playtime on this map
+ * @param client  The client of which to print the playtime
+ */
+void RS_Playtime ( gclient_t *client ) {
+	rs_authplayer_t *player;
+	static char simpNew[MAX_NAME_CHARS];
+
+	int playerNum = (int)( client - game.clients );
+	if( playerNum < 0 && playerNum >= gs.maxclients ) {
+		return;
+	}
+
+	player = &authplayers[playerNum];
+	G_PrintMsg( &game.edicts[playerNum + 1], "player->playtime: %d\t authmap.playtime: %d\n", player->playTime, authmap.playTime );
+}
+
+/**
  * Print player info for debugging
  */
 static void RS_PlayerInfo( rs_authplayer_t *player )
@@ -169,6 +187,20 @@ void RS_PlayerDisconnect( gclient_t *client )
 	rs_authplayer_t *player = &authplayers[playerNum];
 	RS_ReportPlayer( player );
 	memset( player, 0, sizeof( rs_authplayer_t ) );
+}
+
+/**
+ * Finds rs_authplayer_t associated to the client and writes playtime to db
+ * @param client Client whose playtime is being written to db
+ */
+void RS_PlayerUpdatePlaytime( gclient_t *client )
+{
+	int playerNum = (int)( client - game.clients );
+	if( playerNum < 0 && playerNum >= gs.maxclients )
+		return;
+
+	rs_authplayer_t *player = &authplayers[playerNum];
+	RS_ReportPlayer( player );
 }
 
 /**

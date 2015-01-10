@@ -40,8 +40,10 @@ void RS_InitAuth( void );
 void RS_ShutdownAuth( void );
 void RS_ThinkAuth( void );
 bool RS_SetName( gclient_t *client, const char *name );
+void RS_Playtime ( gclient_t *client ); // racesow
 
 void RS_PlayerEnter( gclient_t *client );
 void RS_PlayerDisconnect( gclient_t *client );
+void RS_PlayerUpdatePlaytime( gclient_t *client ); // racesow
 void RS_PlayerReset( rs_authplayer_t *player );
 void RS_PlayerUserinfoChanged( rs_authplayer_t *player, char *oldname );

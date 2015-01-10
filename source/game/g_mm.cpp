@@ -929,12 +929,32 @@ static void G_Match_RaceReport( void )
 	stat_query_section_t *timesArray, *dummy;
 	raceRun_t *prr;
 	int i, j, size;
+	edict_t	*ent; // racesow
 
 	if( !GS_RaceGametype() )
 	{
 		G_Printf("G_Match_RaceReport.. not race gametype\n");
 		return;
 	}
+
+	// racesow
+	if( gs.gameState.stats[GAMESTAT_MATCHSTATE] == MATCH_STATE_POSTMATCH )
+	{
+		// force report map stats
+		RS_ReportMap( NULL, NULL, true );
+		for( i = 0; i < gs.maxclients; i++ )
+		{
+			ent = game.edicts + 1 + i;
+			if( !ent->r.inuse )
+				continue;
+			// force report player stats in postmatch state
+			RS_PlayerUpdatePlaytime( ent->r.client );
+		}
+	} else {
+		// report map stats
+		RS_ReportMap( NULL, NULL, false );
+	}
+	// !racesow
 
 	if( !game.raceruns || !LA_Size( game.raceruns ) )
 	{

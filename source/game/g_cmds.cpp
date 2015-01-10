@@ -1303,6 +1303,7 @@ void G_InitGameCommands( void )
 	G_AddCommand( "chasenext", Cmd_ChaseNext_f );
 	G_AddCommand( "chaseprev", Cmd_ChasePrev_f );
 	G_AddCommand( "spec", Cmd_Spec_f );
+	G_AddCommand( "playtime", Cmd_Playtime_f );  // racesow
 	G_AddCommand( "enterqueue", G_Teams_JoinChallengersQueue );
 	G_AddCommand( "leavequeue", G_Teams_LeaveChallengersQueue );
 	G_AddCommand( "camswitch", Cmd_SwitchChaseCamMode_f );

@@ -3372,7 +3372,7 @@ static const asglobfuncs_t asGlobFuncs[] =
 	{ "void RS_Cancelvote( Entity @ent, bool admin )", asFUNCTION(asFunc_RS_Cancelvote), NULL },
 	{ "void RS_QueryTop( Client @client, String @mapname, int limit, int cmd)", asFUNCTION(asFunc_RS_QueryTop), NULL },
 	{ "void RS_QueryMaps( Client @client, const String &pattern, const String &tags, int page )", asFUNCTION(asFunc_RS_QueryMaps), NULL },
-	{ "void RS_ReportMap( const String &tags, const String &oneliner )", asFUNCTION(asFunc_RS_ReportMap), NULL },
+	{ "void RS_ReportMap( const String &tags, const String &oneliner, bool force )", asFUNCTION(asFunc_RS_ReportMap), NULL },
 	{ "void RS_UpdateMaplist()", asFUNCTION(asFunc_RS_UpdateMaplist), NULL },
 	// !racesow
 

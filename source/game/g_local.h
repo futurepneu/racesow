@@ -833,6 +833,7 @@ void G_ChaseStep( edict_t *ent, int step );
 void Cmd_SwitchChaseCamMode_f( edict_t *ent );
 void Cmd_ChaseCam_f( edict_t *ent );
 void Cmd_Spec_f( edict_t *ent );
+void Cmd_Playtime_f( edict_t *ent ); // racesow
 void G_EndServerFrames_UpdateChaseCam( void );
 
 //

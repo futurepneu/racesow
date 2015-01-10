@@ -689,3 +689,7 @@ void Cmd_SwitchChaseCamMode_f( edict_t *ent )
 		}
 	}
 }
+
+void Cmd_Playtime_f (edict_t *ent ) {
+	RS_Playtime( ent->r.client );
+}

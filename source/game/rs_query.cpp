@@ -267,8 +267,9 @@ void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum, bool
  * Report Map data
  * @param tags     Space separated list of tags to add to the map
  * @param oneliner Oneliner message to leave for the map
+ * @param force	   report map regardless of playTime
  */
-void RS_ReportMap( const char *tags, const char *oneliner )
+void RS_ReportMap( const char *tags, const char *oneliner, bool force )
 {
 	char tagset[1024], *token, *b64tags;
 	stat_query_t *query;
@@ -276,6 +277,11 @@ void RS_ReportMap( const char *tags, const char *oneliner )
 
 	if( !rs_statsEnabled->integer )
 		return;
+
+	// if no tags/oneliner and playTime smaller than 5 seconds, refuse to avoid spamming the database
+	if( !force && tags == NULL && oneliner == NULL && authmap.playTime < 5000 ) {
+		return;
+	}
 
 	// Make the taglist
 	Q_strncpyz( tagset, ( tags ? tags : "" ), sizeof( tagset ) );
@@ -293,6 +299,7 @@ void RS_ReportMap( const char *tags, const char *oneliner )
 	rs_sqapi->SetField( query, "playTime", va( "%d", authmap.playTime ) );
 	rs_sqapi->SetField( query, "races", va( "%d", authmap.races ) );
 	rs_sqapi->SetField( query, "tags", b64tags );
+	free( b64tags );
 	if( oneliner )
 		rs_sqapi->SetField( query, "oneliner", oneliner );
 	else
@@ -304,6 +311,7 @@ void RS_ReportMap( const char *tags, const char *oneliner )
 
 	RS_SignQuery( query );
 	rs_sqapi->Send( query );
+	cJSON_Delete( arr );
 	query = NULL;
 }
 
