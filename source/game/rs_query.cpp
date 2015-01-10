@@ -780,6 +780,7 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 	free( b64pattern );
 	free( b64tags );
 	query = NULL;
+	cJSON_Delete( arr );
 }
 
 void RS_QueryRandmap_Done( stat_query_t *query, qboolean success, void *customp )
@@ -845,4 +846,5 @@ void RS_QueryRandmap( char* tags[], void *data )
 	rs_sqapi->Send( query );
 	query = NULL;
 	free( b64tags );
+	cJSON_Delete( arr );
 }
