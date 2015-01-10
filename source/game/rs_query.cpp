@@ -11,12 +11,14 @@ static stat_query_api_t *rs_sqapi;
 cvar_t *sv_mm_authkey;
 cvar_t *rs_statsEnabled;
 cvar_t *rs_statsUrl;
+cvar_t *rs_statsId;
 
 void RS_InitQuery( void )
 {
 	sv_mm_authkey = trap_Cvar_Get( "sv_mm_authkey", "", CVAR_ARCHIVE );
 	rs_statsEnabled = trap_Cvar_Get( "rs_statsEnabled", "0", CVAR_ARCHIVE );
 	rs_statsUrl = trap_Cvar_Get( "rs_statsUrl", "", CVAR_ARCHIVE );
+	rs_statsId = trap_Cvar_Get( "rs_statsId", "", CVAR_ARCHIVE );
 	rs_sqapi = trap_GetStatQueryAPI();
 	if( !rs_sqapi )
 		trap_Cvar_ForceSet( rs_statsEnabled->name, "0" );
@@ -74,7 +76,7 @@ static void RS_SignQuery( stat_query_t *query )
 	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, &outlen );
 
 	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "sToken", digest64 );
+	rs_sqapi->SetField( query, "sToken", va( "%d.%s", rs_statsId->integer, digest64 ) );
 	free( digest64 );
 }
 
