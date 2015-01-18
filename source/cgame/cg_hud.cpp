@@ -677,6 +677,9 @@ static const reference_numeric_t cg_numeric_references[] =
 
 	// racesow cvars
 	{ "SHOW_ANGLE_METER", CG_GetCvar, "cg_showAngleMeter" },
+	{ "SHOW_GUWASHI_SPEED", CG_GetCvar, "cg_showGuwashiSpeed" },
+	{ "SHOW_BOOST_SPEED", CG_GetCvar, "cg_showBoostSpeed" },
+	{ "SHOW_JUMP_INFO", CG_GetCvar, "cg_showJumpInfo" },
 	// !racesow
 
 	// cvars

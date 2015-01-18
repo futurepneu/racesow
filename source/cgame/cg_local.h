@@ -1001,6 +1001,9 @@ void CG_PLink( vec3_t start, vec3_t end, vec4_t color, int flags );
 
 // racesow
 extern cvar_t *cg_showAngleMeter;
+extern cvar_t *cg_showGuwashiSpeed;
+extern cvar_t *cg_showBoostSpeed;
+extern cvar_t *cg_showJumpInfo;
 extern cvar_t *cg_showPlayerTrails;
 extern cvar_t *cg_playerTrailsColor;
 extern cvar_t *cg_playerTrailsAlpha;
