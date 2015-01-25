@@ -9,10 +9,13 @@
 static int pj_jumps[MAX_CLIENTS] = {0};
 static int pj_dashes[MAX_CLIENTS] = {0};
 static int pj_walljumps[MAX_CLIENTS] = {0};
+static int pj_rockets[MAX_CLIENTS] = {0};
+static int pj_plasma[MAX_CLIENTS] = {0};
+static int pj_grenades[MAX_CLIENTS] = {0};
 
 /**
  * RS_ResetPjState
- * Reset the prejump state for a given player
+ * Fully reset the prejump state for a given player
  * @param playerNum the player's client number
  */
 void RS_ResetPjState(int playerNum)
@@ -20,6 +23,51 @@ void RS_ResetPjState(int playerNum)
 	pj_jumps[playerNum] = 0;
 	pj_dashes[playerNum] = 0;
 	pj_walljumps[playerNum] = 0;
+	pj_rockets[playerNum] = 0;
+	pj_plasma[playerNum] = 0;
+	pj_grenades[playerNum] = 0;
+}
+
+/**
+ * RS_ResetPmovePjPmoveState
+ * Reset the pmove prejump state for a given player
+ * @param playerNum the player's client number
+ */
+void RS_ResetPjPmoveState(int playerNum)
+{
+	pj_jumps[playerNum] = 0;
+	pj_dashes[playerNum] = 0;
+	pj_walljumps[playerNum] = 0;
+}
+
+/**
+ * RS_IncrementRockets
+ * Increment the rocket count for a given player
+ * @param playerNum the player's client number
+ */
+void RS_IncrementRockets(int playerNum)
+{
+	pj_rockets[playerNum]++;
+}
+
+/**
+ * RS_IncrementPlasma
+ * Increment the plasma count for a given player
+ * @param playerNum the player's client number
+ */
+void RS_IncrementPlasma(int playerNum)
+{
+	pj_plasma[playerNum]++;
+}
+
+/**
+ * RS_IncrementGrenades
+ * Increment the grenade count for a given player
+ * @param playerNum the player's client number
+ */
+void RS_IncrementGrenades(int playerNum)
+{
+	pj_grenades[playerNum]++;
 }
 
 /**
@@ -62,7 +110,10 @@ qboolean RS_QueryPjState(int playerNum)
 {
 	if ( pj_jumps[playerNum] > 1 ||
 		pj_dashes[playerNum] > 1 ||
-		pj_walljumps[playerNum] > 1 )
+		pj_walljumps[playerNum] > 1 ||
+		pj_rockets[playerNum] > 1 ||
+		pj_plasma[playerNum] > 20 ||
+		pj_grenades[playerNum] > 2 )
 		return qtrue;
 	else
 		return qfalse;

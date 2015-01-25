@@ -574,6 +574,21 @@ int GS_ThinkPlayerWeapon( player_state_t *playerState, int buttons, int msecs, i
 			if( firedef->ammo_id != AMMO_NONE && firedef->usage_count )
 				playerState->inventory[firedef->ammo_id] -= firedef->usage_count;
 		}
+		// racesow - pjcount
+		if( playerState->stats[STAT_WEAPON] == WEAP_ROCKETLAUNCHER )
+		{
+			RS_IncrementRockets( playerState->playerNum );
+		}
+		else if( playerState->stats[STAT_WEAPON] == WEAP_PLASMAGUN )
+		{
+			RS_IncrementPlasma( playerState->playerNum );
+		}
+		else if( playerState->stats[STAT_WEAPON] == WEAP_GRENADELAUNCHER )
+		{
+			RS_IncrementRockets( playerState->playerNum );
+		}
+		// !racesow
+
 	}
 done:
 	return playerState->stats[STAT_WEAPON];
