@@ -586,7 +586,7 @@ int GS_ThinkPlayerWeapon( player_state_t *playerState, int buttons, int msecs, i
 		}
 		else if( playerState->stats[STAT_WEAPON] == WEAP_GRENADELAUNCHER )
 		{
-			RS_IncrementRockets( playerState->playerNum );
+			RS_IncrementGrenades( playerState->playerNum );
 		}
 		// !racesow
 
