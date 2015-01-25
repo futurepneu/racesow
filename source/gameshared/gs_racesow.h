@@ -15,8 +15,9 @@ typedef struct rs_racetime_s
 } rs_racetime_t;
 
 void RS_ResetPjState(int playerNum);
-void RS_ResetPjPmoveState(int playerNum);
+void RS_ResetPsState(int playerNum);
 qboolean RS_QueryPjState(int playerNum);
+qboolean RS_QueryPsState(int playerNum);
 void RS_IncrementWallJumps(int playerNum);
 void RS_IncrementDashes(int playerNum);
 void RS_IncrementJumps(int playerNum);

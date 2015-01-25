@@ -788,7 +788,8 @@ static void PM_Move( void )
 		// racesow - if player is walking: clear prejump counters
 		float hspeed = VectorLengthFast( tv( pml.velocity[0], pml.velocity[1], 0 ) );
 		if( hspeed < DEFAULT_PLAYERSPEED_RACE + 5.0f )
-			RS_ResetPjPmoveState( pm->playerState->playerNum );
+			RS_ResetPjState( pm->playerState->playerNum );
+			RS_ResetPsState( pm->playerState->playerNum );
 		// !racesow
 
 		if( !pml.velocity[0] && !pml.velocity[1] )

@@ -5,13 +5,13 @@
 #include "q_collision.h"
 #include "gs_public.h"
 
-// Prejump validation
+// Prejump / Preshot validation
 static int pj_jumps[MAX_CLIENTS] = {0};
 static int pj_dashes[MAX_CLIENTS] = {0};
 static int pj_walljumps[MAX_CLIENTS] = {0};
-static int pj_rockets[MAX_CLIENTS] = {0};
-static int pj_plasma[MAX_CLIENTS] = {0};
-static int pj_grenades[MAX_CLIENTS] = {0};
+static int ps_rockets[MAX_CLIENTS] = {0};
+static int ps_plasma[MAX_CLIENTS] = {0};
+static int ps_grenades[MAX_CLIENTS] = {0};
 
 /**
  * RS_ResetPjState
@@ -23,21 +23,18 @@ void RS_ResetPjState(int playerNum)
 	pj_jumps[playerNum] = 0;
 	pj_dashes[playerNum] = 0;
 	pj_walljumps[playerNum] = 0;
-	pj_rockets[playerNum] = 0;
-	pj_plasma[playerNum] = 0;
-	pj_grenades[playerNum] = 0;
 }
 
 /**
- * RS_ResetPmovePjPmoveState
- * Reset the pmove prejump state for a given player
+ * RS_ResetPsState
+ * Reset the preshot state for a given player
  * @param playerNum the player's client number
  */
-void RS_ResetPjPmoveState(int playerNum)
+void RS_ResetPsState(int playerNum)
 {
-	pj_jumps[playerNum] = 0;
-	pj_dashes[playerNum] = 0;
-	pj_walljumps[playerNum] = 0;
+	ps_rockets[playerNum] = 0;
+	ps_plasma[playerNum] = 0;
+	ps_grenades[playerNum] = 0;
 }
 
 /**
@@ -47,7 +44,7 @@ void RS_ResetPjPmoveState(int playerNum)
  */
 void RS_IncrementRockets(int playerNum)
 {
-	pj_rockets[playerNum]++;
+	ps_rockets[playerNum]++;
 }
 
 /**
@@ -57,7 +54,7 @@ void RS_IncrementRockets(int playerNum)
  */
 void RS_IncrementPlasma(int playerNum)
 {
-	pj_plasma[playerNum]++;
+	ps_plasma[playerNum]++;
 }
 
 /**
@@ -67,7 +64,7 @@ void RS_IncrementPlasma(int playerNum)
  */
 void RS_IncrementGrenades(int playerNum)
 {
-	pj_grenades[playerNum]++;
+	ps_grenades[playerNum]++;
 }
 
 /**
@@ -110,15 +107,28 @@ qboolean RS_QueryPjState(int playerNum)
 {
 	if ( pj_jumps[playerNum] > 1 ||
 		pj_dashes[playerNum] > 1 ||
-		pj_walljumps[playerNum] > 1 ||
-		pj_rockets[playerNum] > 1 ||
-		pj_plasma[playerNum] > 20 ||
-		pj_grenades[playerNum] > 2 )
+		pj_walljumps[playerNum] > 1 )
 		return qtrue;
 	else
 		return qfalse;
 }
 
+/**
+ * RS_QueryPsState
+ * Determines if the player has preshot or not
+ * @param playerNum the player's client number
+ * @return qtrue if the player has preshot
+ */
+qboolean RS_QueryPsState(int playerNum)
+{
+	if ( ps_rockets[playerNum] > 1 ||
+		ps_plasma[playerNum] > 20 ||
+		ps_grenades[playerNum] > 2 )
+		return qtrue;
+	else
+		return qfalse;
+}
+		
 /**
  * Calculate the racetime of a race in readable units
  * Be sure to free the result when done
