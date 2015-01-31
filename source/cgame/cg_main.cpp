@@ -56,6 +56,9 @@ cvar_t *developer;
 
 // racesow
 cvar_t *cg_showAngleMeter;
+cvar_t *cg_showGuwashiSpeed;
+cvar_t *cg_showBoostSpeed;
+cvar_t *cg_showJumpInfo;
 cvar_t *cg_showPlayerTrails;
 cvar_t *cg_playerTrailsAlpha;
 cvar_t *cg_playerTrailsColor;
@@ -630,6 +633,9 @@ static void CG_RegisterVariables( void )
 {
 	// racesow
 	cg_showAngleMeter = trap_Cvar_Get( "cg_showAngleMeter", "3", CVAR_ARCHIVE );
+	cg_showGuwashiSpeed = trap_Cvar_Get( "cg_showGuwashiSpeed", "0", CVAR_ARCHIVE );
+	cg_showBoostSpeed = trap_Cvar_Get( "cg_showBoostSpeed", "1", CVAR_ARCHIVE );
+	cg_showJumpInfo = trap_Cvar_Get( "cg_showJumpInfo", "1", CVAR_ARCHIVE );
 	cg_showPlayerTrails = trap_Cvar_Get( "cg_showPlayerTrails", "0", CVAR_ARCHIVE );
 	cg_playerTrailsAlpha = trap_Cvar_Get( "cg_playerTrailsAlpha", "1.0", CVAR_ARCHIVE );
 	cg_playerTrailsColor = trap_Cvar_Get( "cg_playerTrailsColor", "0.0 1.0 0.0", CVAR_ARCHIVE );
