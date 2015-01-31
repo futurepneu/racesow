@@ -789,7 +789,6 @@ static void PM_Move( void )
 		float hspeed = VectorLengthFast( tv( pml.velocity[0], pml.velocity[1], 0 ) );
 		if( hspeed < DEFAULT_PLAYERSPEED_RACE + 5.0f )
 			RS_ResetPjState( pm->playerState->playerNum );
-			RS_ResetPsState( pm->playerState->playerNum );
 		// !racesow
 
 		if( !pml.velocity[0] && !pml.velocity[1] )
