@@ -137,8 +137,6 @@ void RB_StatsMessage( char *msg, size_t size )
 */
 static void RB_SetGLDefaults( void )
 {
-	qglClearColor( 1, 0, 0.5, 0.5 );
-
 	if( glConfig.stencilEnabled )
 	{
 		qglStencilMask( ( GLuint ) ~0 );
