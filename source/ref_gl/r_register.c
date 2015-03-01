@@ -298,11 +298,27 @@ static const gl_extension_func_t gl_ext_framebuffer_blit_EXT_funcs[] =
 
 #else // GL_ES_VERSION_2_0
 
-/* GL_EXT_multiview_draw_buffers */
-static const gl_extension_func_t gl_ext_multiview_draw_buffers_EXT_funcs[] =
+/* GL_ANGLE_framebuffer_blit */
+static const gl_extension_func_t gl_ext_framebuffer_blit_ANGLE_funcs[] =
 {
-	 GL_EXTENSION_FUNC(ReadBufferIndexedEXT)
-	,GL_EXTENSION_FUNC(DrawBuffersIndexedEXT)
+	GL_EXTENSION_FUNC(BlitFramebufferANGLE)
+
+	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
+};
+
+/* GL_NV_framebuffer_blit */
+static const gl_extension_func_t gl_ext_framebuffer_blit_NV_funcs[] =
+{
+	GL_EXTENSION_FUNC(BlitFramebufferNV)
+
+	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
+};
+
+/* GL_NV_multiview_draw_buffers */
+static const gl_extension_func_t gl_ext_multiview_draw_buffers_NV_funcs[] =
+{
+	 GL_EXTENSION_FUNC(ReadBufferIndexedNV)
+	,GL_EXTENSION_FUNC(DrawBuffersIndexedNV)
 };
 
 #endif // GL_ES_VERSION_2_0
@@ -355,7 +371,6 @@ static const gl_extension_t gl_extensions_decl[] =
 	,GL_EXTENSION_EXT( ARB, texture_compression, 0, false, false, NULL, _extMarker )
 	,GL_EXTENSION( EXT, texture_edge_clamp, true, true, NULL )
 	,GL_EXTENSION( ARB, texture_cube_map, false, false, NULL )
-	,GL_EXTENSION( EXT, bgra, true, false, NULL )
 	,GL_EXTENSION( ARB, depth_texture, false, false, NULL )
 	,GL_EXTENSION_EXT( ARB, shadow, 1, false, false, NULL, depth_texture )
 	,GL_EXTENSION( ARB, texture_non_power_of_two, false, false, NULL )
@@ -378,16 +393,18 @@ static const gl_extension_t gl_extensions_decl[] =
 	,GL_EXTENSION( ATI, meminfo, true, false, NULL )
 
 #else
-	 GL_EXTENSION( OES, depth_texture, false, false, NULL )
+	 GL_EXTENSION( NV, framebuffer_blit, true, false, &gl_ext_framebuffer_blit_NV_funcs )
+	,GL_EXTENSION( ANGLE, framebuffer_blit, true, false, &gl_ext_framebuffer_blit_ANGLE_funcs )
+	,GL_EXTENSION( OES, depth_texture, false, false, NULL )
 	,GL_EXTENSION_EXT( EXT, shadow_samplers, 1, false, false, NULL, depth_texture )
 	,GL_EXTENSION( OES, texture_npot, false, false, NULL )
 	,GL_EXTENSION( OES, vertex_half_float, false, false, NULL )
 	,GL_EXTENSION( OES, depth24, true, false, NULL )
-	,GL_EXTENSION( EXT, multiview_draw_buffers, true, false, &gl_ext_multiview_draw_buffers_EXT_funcs )
-	,GL_EXTENSION( NV, multiview_draw_buffers, true, false, &gl_ext_multiview_draw_buffers_EXT_funcs )
+	,GL_EXTENSION( NV, multiview_draw_buffers, true, false, &gl_ext_multiview_draw_buffers_NV_funcs )
 #endif
 
 	,GL_EXTENSION( EXT, texture_filter_anisotropic, true, false, NULL )
+	,GL_EXTENSION( EXT, bgra, true, false, NULL )
 
 #ifdef GLX_VERSION
 	,GL_EXTENSION( GLX_SGI, swap_control, true, false, &glx_ext_swap_control_SGI_funcs )
@@ -660,6 +677,19 @@ static void R_FinalizeGLExtensions( void )
 	if( strstr( glConfig.extensionsString, "GL_EXT_texture_filter_anisotropic" ) )
 		qglGetIntegerv( GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &glConfig.maxTextureFilterAnisotropic );
 
+	/* GL_EXT_framebuffer_blit */
+#ifdef GL_ES_VERSION_2_0
+	if( glConfig.ext.framebuffer_blit && !qglBlitFramebufferEXT )
+	{
+		if( qglBlitFramebufferNV )
+			qglBlitFramebufferEXT = qglBlitFramebufferNV;
+		else if( qglBlitFramebufferANGLE )
+			qglBlitFramebufferEXT = qglBlitFramebufferANGLE;
+		else
+			glConfig.ext.framebuffer_blit = qfalse;
+	}
+#endif
+
 	/* GL_OES_depth24 */
 #ifndef GL_ES_VERSION_2_0
 	glConfig.ext.depth24 = glConfig.ext.framebuffer_object;
@@ -670,7 +700,7 @@ static void R_FinalizeGLExtensions( void )
 	if( glConfig.ext.multiview_draw_buffers )
 	{
 		val = 0;
-		qglGetIntegerv( GL_MAX_MULTIVIEW_BUFFERS_EXT, &val );
+		qglGetIntegerv( GL_MAX_MULTIVIEW_BUFFERS_NV, &val );
 		if( val <= 1 )
 			glConfig.stereoEnabled = qfalse;
 	}

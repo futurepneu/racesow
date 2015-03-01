@@ -437,16 +437,16 @@ typedef unsigned short GLhalfARB;
 #endif
 #endif /* GL_ARB_half_float_vertex */
 
-/* GL_EXT_multiview_draw_buffers */
-#ifndef GL_EXT_multiview_draw_buffers
-#define GL_EXT_multiview_draw_buffers
+/* GL_NV_multiview_draw_buffers */
+#ifndef GL_NV_multiview_draw_buffers
+#define GL_NV_multiview_draw_buffers
 
-#define GL_COLOR_ATTACHMENT_EXT								0x90F0
-#define GL_MULTIVIEW_EXT									0x90F1
-#define GL_DRAW_BUFFER_EXT									0x0C01
-#define GL_READ_BUFFER_EXT									0x0C02
-#define GL_MAX_MULTIVIEW_BUFFERS_EXT						0x90F2
-#endif /* GL_EXT_multiview_draw_buffers */
+#define GL_COLOR_ATTACHMENT_NV								0x90F0
+#define GL_MULTIVIEW_NV										0x90F1
+#define GL_DRAW_BUFFER_NV									0x0C01
+#define GL_READ_BUFFER_NV									0x0C02
+#define GL_MAX_MULTIVIEW_BUFFERS_NV							0x90F2
+#endif /* GL_NV_multiview_draw_buffers */
 
 #endif // QGL_H
 
@@ -801,14 +801,16 @@ QGL_FUNC(void, glGenerateMipmap, (GLenum));
 QGL_EXT(void, glBlitFramebufferEXT, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum));
 #else
 QGL_FUNC_OPT(void, glBlitFramebuffer, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum));
+QGL_EXT(void, glBlitFramebufferANGLE, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum));
+QGL_EXT(void, glBlitFramebufferNV, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum));
 #ifndef qglBlitFramebufferEXT
 #define qglBlitFramebufferEXT qglBlitFramebuffer
 #endif
 #endif
 
 #ifdef GL_ES_VERSION_2_0
-QGL_EXT(void, glReadBufferIndexedEXT, (GLenum, GLint));
-QGL_EXT(void, glDrawBuffersIndexedEXT, (GLint, const GLenum *, const GLint *));
+QGL_EXT(void, glReadBufferIndexedNV, (GLenum, GLint));
+QGL_EXT(void, glDrawBuffersIndexedNV, (GLint, const GLenum *, const GLint *));
 #endif
 
 QGL_EXT(void, glSwapInterval, (int interval));
