@@ -116,7 +116,7 @@ static void SF_SoundInfo_f( void )
 /*
 * SF_FindName
 */
-static sfx_t *SF_FindName( const char *name, qboolean create )
+static sfx_t *SF_FindName( const char *name )
 {
 	int i;
 	sfx_t *sfx;
@@ -139,9 +139,6 @@ static sfx_t *SF_FindName( const char *name, qboolean create )
 			return &known_sfx[i];
 	}
 
-	if( !create )
-		return NULL;
-
 	// find a free sfx
 	for( i = 0; i < num_sfx; i++ )
 	{
@@ -160,7 +157,6 @@ static sfx_t *SF_FindName( const char *name, qboolean create )
 	memset( sfx, 0, sizeof( *sfx ) );
 	Q_strncpyz( sfx->name, name, sizeof( sfx->name ) );
 	sfx->isUrl = trap_FS_IsUrl( name );
-	sfx->registration_sequence = s_registration_sequence;
 
 	return sfx;
 }
@@ -190,16 +186,18 @@ sfx_t *SF_RegisterSound( const char *name )
 
 	assert( name );
 
-	sfx = SF_FindName( name, qtrue );
-	sfx->registration_sequence = s_registration_sequence;
+	sfx = SF_FindName( name );
+	if( sfx->registration_sequence != s_registration_sequence ) {
+		sfx->registration_sequence = s_registration_sequence;
 
-	// evenly balance the load between two threads during registration
-	sfxnum = sfx - known_sfx;
-	if( !s_registering || sfxnum & 1 ) {
-		S_IssueLoadSfxCmd( s_cmdQueue, sfxnum );
-	}
-	else {
-		S_LoadSound( sfx );
+		// evenly balance the load between two threads during registration
+		sfxnum = sfx - known_sfx;
+		if( !s_registering || sfxnum & 1 ) {
+			S_IssueLoadSfxCmd( s_cmdQueue, sfxnum );
+		}
+		else {
+			S_LoadSound( sfx );
+		}
 	}
 	return sfx;
 }
@@ -248,10 +246,6 @@ void SF_EndRegistration( void )
 			// we don't need this sound
 			S_Free( sfx->cache );
 			memset( sfx, 0, sizeof( *sfx ) );
-		}
-		else
-		{
-			S_LoadSound( sfx );
 		}
 	}
 }

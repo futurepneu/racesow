@@ -1163,13 +1163,6 @@ static void R_Clear( int bitMask )
 
 	bits &= bitMask;
 
-	if( rn.fbColorAttachment ) {
-		RFB_AttachTextureToObject( RFB_BoundObject(), rn.fbColorAttachment );
-	}
-	if( rn.fbDepthAttachment ) {
-		RFB_AttachTextureToObject( RFB_BoundObject(), rn.fbDepthAttachment );
-	}
-
 	if( !( rn.renderFlags & RF_SHADOWMAPVIEW ) ) {
 		RB_Clear( bits, envColor[0] / 255.0, envColor[1] / 255.0, envColor[2] / 255.0, 1 );
 	}
@@ -1694,6 +1687,7 @@ void R_EndFrame( void )
 */
 void R_AppActivate( qboolean active, qboolean destroy )
 {
+	qglFlush();
 	GLimp_AppActivate( active, destroy );
 }
 

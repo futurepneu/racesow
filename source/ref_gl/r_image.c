@@ -32,7 +32,9 @@ typedef struct
 
 static image_t images[MAX_GLIMAGES];
 static image_t images_hash_headnode[IMAGES_HASH_SIZE], *free_images;
-static unsigned int image_cur_hash;
+
+int	currentTMU;
+GLuint currentTextures[MAX_TEXTURE_UNITS];
 
 static int *r_8to24table;
 
@@ -80,6 +82,87 @@ glmode_t modes[] = {
 
 #define NUM_GL_MODES ( sizeof( modes ) / sizeof( glmode_t ) )
 
+
+/*
+* R_AllocTextureNum
+*/
+static void R_AllocTextureNum( image_t *tex )
+{
+	qglGenTextures( 1, &tex->texnum );
+}
+
+/*
+* R_FreeTextureNum
+*/
+static void R_FreeTextureNum( image_t *tex )
+{
+	if( tex->texnum ) {
+		qglDeleteTextures( 1, &tex->texnum );
+		tex->texnum = 0;
+		currentTMU = -1;
+	}
+}
+
+/*
+* R_SelectTextureUnit
+*/
+void R_SelectTextureUnit( int tmu )
+{
+	if( tmu == currentTMU )
+		return;
+
+	currentTMU = tmu;
+	qglActiveTextureARB( tmu + GL_TEXTURE0_ARB );
+#ifndef GL_ES_VERSION_2_0
+	qglClientActiveTextureARB( tmu + GL_TEXTURE0_ARB );
+#endif
+}
+
+/*
+* R_BindContextTexture
+*/
+static void R_BindContextTexture( const image_t *tex )
+{
+	qglBindTexture( tex->flags & IT_CUBEMAP ? 
+		GL_TEXTURE_CUBE_MAP_ARB : GL_TEXTURE_2D, tex->texnum );
+}
+
+/*
+* R_BindTexture
+*/
+void R_BindTexture( int tmu, const image_t *tex )
+{
+	GLuint texnum;
+
+	assert( tex != NULL );
+	assert( tex->texnum != 0 );
+
+	if( tex->missing ) {
+		tex = rsh.noTexture;
+	} else if( !tex->loaded ) {
+		// not yet loaded from disk
+		tex = tex->flags & IT_CUBEMAP ? rsh.whiteCubemapTexture : rsh.whiteTexture;
+	} else if( rsh.noTexture && ( r_nobind->integer && tex->texnum != 0 ) ) {
+		// performance evaluation option
+		tex = rsh.noTexture;
+	}
+
+	if( currentTMU < 0 ) {
+		// flush cached texture nums
+		memset( currentTextures, 0, sizeof( currentTextures ) );
+	}
+
+	R_SelectTextureUnit( tmu );
+
+	texnum = tex->texnum;
+	if( currentTextures[tmu] == texnum )
+		return;
+
+	currentTextures[tmu] = texnum;
+
+	R_BindContextTexture( tex );
+}
+
 /*
 * R_TextureMode
 */
@@ -113,7 +196,7 @@ void R_TextureMode( char *string )
 			continue;
 		}
 
-		RB_BindTexture( 0, glt );
+		R_BindTexture( 0, glt );
 
 		if( !( glt->flags & IT_NOMIPMAP ) )
 		{
@@ -154,7 +237,7 @@ void R_AnisotropicFilter( int value )
 			continue;
 		}
 
-		RB_BindTexture( 0, glt );
+		R_BindTexture( 0, glt );
 		qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, gl_anisotropic_filter );
 	}
 }
@@ -724,7 +807,10 @@ static void R_Upload32( int ctx, qbyte **data, int width, int height, int flags,
 	}
 }
 
-static void R_LoadImageFromDisk( int ctx, image_t *image )
+/*
+* R_LoadImageFromDisk
+*/
+static qboolean R_LoadImageFromDisk( int ctx, image_t *image, void (*bind)(int, const image_t *) )
 {
 	int flags = image->flags;
 	char *pathname = image->name;
@@ -806,24 +892,18 @@ static void R_LoadImageFromDisk( int ctx, image_t *image )
 			image->height = height;
 			image->samples = samples;
 
-			RB_BindContextTexture( 0, image );
+			bind( 0, image );
 
 			R_Upload32( ctx, pic, width, height, flags, &image->upload_width, 
 				&image->upload_height, samples, qfalse, qfalse );
 
-			if( ctx == QGL_CONTEXT_LOADER ) {
-				// let the main thread know about the new texture data
-				RB_Finish();
-			}
-
 			image->extension[0] = '.';
 			Q_strncpyz( &image->extension[1], &pathname[len+4], sizeof( image->extension )-1 );
-			image->loaded = qtrue;
+			return qtrue;
 		}
 		else
 		{
 			ri.Com_DPrintf( S_COLOR_YELLOW "Missing image: %s\n", image->name );
-			image->missing = qtrue;
 		}
 	}
 	else
@@ -835,45 +915,41 @@ static void R_LoadImageFromDisk( int ctx, image_t *image )
 
 		if( pic )
 		{
-			RB_BindContextTexture( 0, image );
-
 			pathname[len] = 0;
 			image->width = width;
 			image->height = height;
 			image->samples = samples;
 
+			bind( 0, image );
+
 			R_Upload32( ctx, &pic, width, height, flags, &image->upload_width, 
 				&image->upload_height, samples, qfalse, qfalse );
 
-			if( ctx == QGL_CONTEXT_LOADER ) {
-				// let the main thread know about the new texture data
-				RB_Finish();
-			}
-
 			image->extension[0] = '.';
 			Q_strncpyz( &image->extension[1], &pathname[len+1], sizeof( image->extension )-1 );
-			image->loaded = qtrue;
+			return qtrue;
 		}
 		else
 		{
 			ri.Com_DPrintf( S_COLOR_YELLOW "Missing image: %s\n", image->name );
-			image->missing = qtrue;
 		}
 	}
+
+	return qfalse;
 }
 
 /*
 * R_LinkPic
 */
-static image_t *R_LinkPic( void )
+static image_t *R_LinkPic( unsigned int hash )
 {
 	image_t *image;
-	unsigned int hash = image_cur_hash;
 
 	if( !free_images ) {
 		return NULL;
 	}
 
+	hash = hash % IMAGES_HASH_SIZE;
 	image = free_images;
 	free_images = image->next;
 
@@ -906,11 +982,11 @@ image_t *R_LoadImage( const char *name, qbyte **pic, int width, int height, int 
 {
 	image_t *image;
 	int name_len = strlen( name );
+	unsigned hash;
 
-	if( image_cur_hash >= IMAGES_HASH_SIZE )
-		image_cur_hash = COM_SuperFastHash( ( const qbyte *)name, name_len, name_len ) % IMAGES_HASH_SIZE;
+	hash = COM_SuperFastHash( ( const qbyte *)name, name_len, name_len );
 
-	image = R_LinkPic();
+	image = R_LinkPic( hash );
 	if( !image ) {
 		ri.Com_Error( ERR_DROP, "R_LoadImage: r_numImages == MAX_GLIMAGES" );
 	}
@@ -927,15 +1003,15 @@ image_t *R_LoadImage( const char *name, qbyte **pic, int width, int height, int 
 	image->registrationSequence = rsh.registrationSequence;
 	image->loaded = qtrue;
 	image->missing = qfalse;
+	image->extension[0] = '\0';
 
-	RB_AllocTextureNum( image );
+	R_AllocTextureNum( image );
 
-	RB_BindTexture( 0, image );
+	R_BindTexture( 0, image );
 
 	R_Upload32( QGL_CONTEXT_MAIN, pic, width, height, flags, 
 		&image->upload_width, &image->upload_height, image->samples, qfalse, qfalse );
 
-	image_cur_hash = IMAGES_HASH_SIZE+1;
 	return image;
 }
 
@@ -944,7 +1020,7 @@ image_t *R_LoadImage( const char *name, qbyte **pic, int width, int height, int 
 */
 static void R_FreeImage( image_t *image )
 {
-	RB_FreeTextureNum( image );
+	R_FreeTextureNum( image );
 
 	R_Free( image->name );
 
@@ -963,7 +1039,7 @@ void R_ReplaceImage( image_t *image, qbyte **pic, int width, int height, int fla
 	assert( image );
 	assert( image->texnum );
 
-	RB_BindTexture( 0, image );
+	R_BindTexture( 0, image );
 
 	if( image->width != width || image->height != height )
 		R_Upload32( QGL_CONTEXT_MAIN, pic, width, height, flags, 
@@ -991,7 +1067,7 @@ void R_ReplaceSubImage( image_t *image, qbyte **pic, int width, int height )
 	assert( image );
 	assert( image->texnum );
 
-	RB_BindTexture( 0, image );
+	R_BindTexture( 0, image );
 
 	R_Upload32( QGL_CONTEXT_MAIN, pic, width, height, image->flags,
 		&w, &h, image->samples, qtrue, qtrue );
@@ -1054,7 +1130,7 @@ image_t	*R_FindImage( const char *name, const char *suffix, int flags )
 	pathname[len] = 0;
 
 	// look for it
-	key = image_cur_hash = COM_SuperFastHash( ( const qbyte *)pathname, len, len ) % IMAGES_HASH_SIZE;
+	key = COM_SuperFastHash( ( const qbyte *)pathname, len, len ) % IMAGES_HASH_SIZE;
 	hnode = &images_hash_headnode[key];
 	for( image = hnode->prev; image != hnode; image = image->prev )
 	{
@@ -1076,8 +1152,8 @@ image_t	*R_FindImage( const char *name, const char *suffix, int flags )
 		return image;
 	}
 
-	R_LoadImageFromDisk( QGL_CONTEXT_MAIN, image );
-	if( image->missing ) {
+	image->loaded = R_LoadImageFromDisk( QGL_CONTEXT_MAIN, image, R_BindTexture );
+	if( !image->loaded ) {
 		R_FreeImage( image );
 		image = NULL;
 	}
@@ -1422,9 +1498,11 @@ void R_InitViewportTexture( image_t **texture, const char *name, int id,
 		}
 		else { 
 			t = *texture;
-			RB_BindTexture( 0, t );
 			t->width = width;
 			t->height = height;
+
+			R_BindTexture( 0, t );
+
 			R_Upload32( QGL_CONTEXT_MAIN, &data, width, height, flags, 
 				&t->upload_width, &t->upload_height, t->samples, qfalse, qfalse );
 		}
@@ -1543,10 +1621,11 @@ static void R_InitStretchRawTexture( void )
 	const char * const name = "*** raw ***";
 	int name_len = strlen( name );
 	image_t *rawtexture;
+	unsigned hash;
 
 	// reserve a dummy texture slot
-	image_cur_hash = COM_SuperFastHash( ( const qbyte *)name, name_len, name_len ) % IMAGES_HASH_SIZE;
-	rawtexture = R_LinkPic();
+	hash = COM_SuperFastHash( ( const qbyte *)name, name_len, name_len );
+	rawtexture = R_LinkPic( hash );
 
 	assert( rawtexture );
 	if( !rawtexture ) {
@@ -1556,7 +1635,7 @@ static void R_InitStretchRawTexture( void )
 	rawtexture->name = R_MallocExt( r_imagesPool, name_len + 1, 0, 1 );
 	rawtexture->flags = IT_CINEMATIC;
 	strcpy( rawtexture->name, name );
-	RB_AllocTextureNum( rawtexture );
+	R_AllocTextureNum( rawtexture );
 	rawtexture->loaded = qtrue;
 	rawtexture->missing = qfalse;
 
@@ -1575,9 +1654,10 @@ static void R_InitStretchRawYUVTextures( void )
 	for( i = 0; i < 3; i++ ) {
 		// reserve a dummy texture slot
 		int name_len = strlen( name[i] );
+		unsigned hash;
 
-		image_cur_hash = COM_SuperFastHash( ( const qbyte *)name, name_len, name_len ) % IMAGES_HASH_SIZE;
-		rawtexture = R_LinkPic();
+		hash = COM_SuperFastHash( ( const qbyte *)name, name_len, name_len );
+		rawtexture = R_LinkPic( hash );
 
 		assert( rawtexture );
 		if( !rawtexture ) {
@@ -1587,7 +1667,7 @@ static void R_InitStretchRawYUVTextures( void )
 		rawtexture->name = R_MallocExt( r_imagesPool, name_len + 1, 0, 1 );
 		rawtexture->flags = IT_CINEMATIC|IT_LUMINANCE;
 		strcpy( rawtexture->name, name[i] );
-		RB_AllocTextureNum( rawtexture );
+		R_AllocTextureNum( rawtexture );
 		rawtexture->loaded = qtrue;
 		rawtexture->missing = qfalse;
 
@@ -1736,7 +1816,6 @@ void R_InitImages( void )
 	qglPixelStorei( GL_PACK_ALIGNMENT, 1 );
 
 	r_imagesPool = R_AllocPool( r_mempool, "Images" );
-	image_cur_hash = IMAGES_HASH_SIZE+1;
 
 	r_imagePathBuf = r_imagePathBuf2 = NULL;
 	r_sizeof_imagePathBuf = r_sizeof_imagePathBuf2 = 0;
@@ -2000,8 +2079,6 @@ static unsigned R_HandleInitLoaderCmd( void *pcmd )
 {
 	GLimp_SharedContext_MakeCurrent( gl_loader_context );
 
-	RB_SelectContextTexture( 0 );
-
 	return sizeof( int );
 }
 
@@ -2016,13 +2093,30 @@ static unsigned R_HandleShutdownLoaderCmd( void *pcmd )
 }
 
 /*
+* R_BindLoaderTexture
+*/
+static void R_BindLoaderTexture( int tmu, const image_t *tex )
+{
+	R_BindContextTexture( tex );
+}
+
+/*
 * R_HandleLoadPicLoaderCmd
 */
 static unsigned R_HandleLoadPicLoaderCmd( void *pcmd )
 {
 	loaderPicCmd_t *cmd = pcmd;
 	image_t *image = images + cmd->pic;
-	R_LoadImageFromDisk( QGL_CONTEXT_LOADER, image );
+	qboolean loaded;
+
+	loaded = R_LoadImageFromDisk( QGL_CONTEXT_LOADER, image, R_BindLoaderTexture );
+	if( !loaded ) {
+		image->missing = qtrue;
+	} else {
+		qglFinish();
+		image->loaded = qtrue;
+	}
+
 	return sizeof( *cmd );
 }
 
@@ -2035,11 +2129,11 @@ static unsigned R_HandleUnbindLoaderCmd( void *pcmd )
 
 	memset( &tex, 0, sizeof( tex ) );
 
-	RB_BindContextTexture( 0, &tex );
+	R_BindContextTexture( &tex );
 
 	tex.flags |= IT_CUBEMAP;
 
-	RB_BindContextTexture( 0, &tex );
+	R_BindContextTexture( &tex );
 
 	return sizeof( int );
 }
@@ -2066,7 +2160,7 @@ static void *R_ImageLoaderThreadProc( void *param )
 			break;
 		}
 
-		ri.Sys_Sleep( 2 );
+		ri.Thread_Yield();
 	}
  
 	return NULL;	
