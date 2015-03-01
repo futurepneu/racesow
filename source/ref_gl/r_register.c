@@ -688,6 +688,7 @@ static void R_FinalizeGLExtensions( void )
 	glConfig.ext.shader_objects = qtrue;
 	glConfig.ext.shading_language_100 = qtrue;
 	glConfig.ext.GLSL = qtrue;
+	glConfig.ext.GLSL_core = qtrue;
 	if( glConfig.version >= 300 )
 	{
 		glConfig.ext.draw_range_elements = qtrue;
@@ -1141,7 +1142,7 @@ init_qgl:
 		return err;
 	}
 
-	glConfig.hwGamma = GLimp_GetGammaRamp( 256, glConfig.orignalGammaRamp );
+	glConfig.hwGamma = GLimp_GetGammaRamp( GAMMARAMP_STRIDE, &glConfig.gammaRampSize, glConfig.originalGammaRamp );
 	if( glConfig.hwGamma )
 		r_gamma->modified = qtrue;
 
@@ -1364,7 +1365,7 @@ void R_Shutdown( qboolean verbose )
 
 	// restore original gamma
 	if( glConfig.hwGamma )
-		GLimp_SetGammaRamp( 256, glConfig.orignalGammaRamp );
+		GLimp_SetGammaRamp( GAMMARAMP_STRIDE, glConfig.gammaRampSize, glConfig.originalGammaRamp );
 
 	// shut down OS specific OpenGL stuff like contexts, etc.
 	GLimp_Shutdown();
