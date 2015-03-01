@@ -516,6 +516,10 @@ static int Shader_SetImageFlags( shader_t *shader )
 		flags |= IT_NOCOMPRESS;
 	if( r_shaderNoFiltering )
 		flags |= IT_NOFILTERING;
+	if( shader->type == SHADER_TYPE_2D 
+		|| shader->type == SHADER_TYPE_2D_RAW 
+		|| shader->type == SHADER_TYPE_VIDEO )
+		flags |= IT_SYNC;
 	//if( r_shaderHasAutosprite )
 	//	flags |= IT_CLAMP;
 
@@ -2842,7 +2846,8 @@ shader_t *R_RegisterRawPic( const char *name, int width, int height, qbyte *data
 		image = s->passes[0].images[0];
 		if( !image || image == rsh.noTexture ) {
 			// try to load new image
-			image = R_LoadImage( name, &data, width, height, IT_CLAMP|IT_NOPICMIP|IT_NOMIPMAP|IT_NOCOMPRESS, 4 );
+			image = R_LoadImage( name, &data, width, height, 
+				IT_CLAMP|IT_NOPICMIP|IT_NOMIPMAP|IT_NOCOMPRESS, 4 );
 			s->passes[0].images[0] = image;
 		}
 		else {
