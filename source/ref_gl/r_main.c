@@ -432,7 +432,10 @@ void R_BatchSpriteSurf( const entity_t *e, const shader_t *shader, const mfog_t 
 	VectorMA( point, -radius, v_left, xyz[2] );
 
 	for( i = 0; i < 4; i++ )
+	{
+		VectorNegate( &rn.viewAxis[AXIS_FORWARD], normals[i] );
 		Vector4Copy( e->color, colors[i] );
+	}
 
 	// backend knows how to count elements for quads
 	mesh.elems = NULL;
@@ -1102,6 +1105,9 @@ static void R_SetupFrame( void )
 			rf.frameCount = 0;
 			rf.viewcluster = -1; // force R_MarkLeaves
 			rf.worldModelSequence = rsh.worldModelSequence;
+
+			// load all world images if not yet
+			R_FinishLoadingImages();
 		}
 	}
 	else
@@ -1478,8 +1484,10 @@ void R_PopRefInst( int clearBitMask )
 	if( !riStackSize ) {
 		return;
 	}
+
 	rn = riStack[--riStackSize];
 	R_BindRefInstFBO();
+
 	R_SetupGL( clearBitMask );
 }
 
@@ -1577,11 +1585,9 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 
 	if( r_clear->integer || forceClear )
 	{
-		byte_vec4_t color;
-
-		Vector4Copy( mapConfig.environmentColor, color );
-		qglClearColor( color[0]*( 1.0/255.0 ), color[1]*( 1.0/255.0 ), color[2]*( 1.0/255.0 ), 1 );
-		qglClear( GL_COLOR_BUFFER_BIT );
+		const qbyte *color = mapConfig.environmentColor;
+		RB_Clear( GL_COLOR_BUFFER_BIT, 
+			color[0]*( 1.0/255.0 ), color[1]*( 1.0/255.0 ), color[2]*( 1.0/255.0 ), 1 );
 	}
 
 	// update gamma

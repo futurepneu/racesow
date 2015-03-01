@@ -206,6 +206,9 @@ void SF_BeginRegistration( void )
 		s_registration_sequence = 1;
 	}
 	s_registering = qtrue;
+
+	// wait for the queue to be processed so that we can have the cmd buffer empty
+	S_FinishSoundQueue( s_cmdQueue );
 }
 
 void SF_EndRegistration( void )
@@ -234,9 +237,16 @@ sfx_t *SF_RegisterSound( const char *name )
 	assert( name );
 
 	sfx = S_FindBuffer( name );
-	S_IssueLoadSfxCmd( s_cmdQueue, sfx->id );
 	sfx->used = trap_Milliseconds();
 	sfx->registration_sequence = s_registration_sequence;
+
+	// evenly balance the load between two threads during registration
+	if( !s_registering || sfx->id & 1 ) {
+		S_IssueLoadSfxCmd( s_cmdQueue, sfx->id );
+	}
+	else {
+		S_LoadBuffer( sfx );
+	}
 	return sfx;
 }
 

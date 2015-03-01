@@ -575,14 +575,25 @@ static void R_Upload32( int ctx, qbyte **data, int width, int height, int flags,
 
 	if( flags & IT_DEPTH )
 	{
-		comp = GL_DEPTH_COMPONENT;
-		format = GL_DEPTH_COMPONENT;
+		comp = format = GL_DEPTH_COMPONENT;
 		type = glConfig.ext.depth24 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+	}
+	else if( flags & IT_FRAMEBUFFER )
+	{
+		if( samples == 4 )
+		{
+			comp = format = GL_RGBA;
+			type = glConfig.ext.rgb8_rgba8 ? GL_UNSIGNED_BYTE : GL_UNSIGNED_SHORT_4_4_4_4;
+		}
+		else
+		{
+			comp = format = GL_RGB;
+			type = glConfig.ext.rgb8_rgba8 ? GL_UNSIGNED_BYTE : GL_UNSIGNED_SHORT_5_6_5;
+		}
 	}
 	else if( flags & IT_LUMINANCE )
 	{
-		comp = GL_LUMINANCE;
-		format = GL_LUMINANCE;
+		comp = format = GL_LUMINANCE;
 		type = GL_UNSIGNED_BYTE;
 	}
 	else
@@ -1862,6 +1873,7 @@ enum
 	CMD_LOADER_INIT,
 	CMD_LOADER_SHUTDOWN,
 	CMD_LOADER_LOAD_PIC,
+	CMD_LOADER_UNBIND,
 
 	NUM_LOADER_CMDS
 };
@@ -1909,6 +1921,15 @@ static void R_IssueLoadPicLoaderCmd( int pic )
 }
 
 /*
+* R_IssueUnbindLoaderCmd
+*/
+static void R_IssueUnbindLoaderCmd( void )
+{
+	int cmd = CMD_LOADER_UNBIND;
+	ri.BufQueue_EnqueueCmd( loader_queue, &cmd, sizeof( cmd ) );
+}
+
+/*
 * R_InitImageLoader
 */
 static void R_InitImageLoader( void )
@@ -1932,6 +1953,7 @@ void R_FinishLoadingImages( void )
 	if( !gl_loader_context ) {
 		return;
 	}
+	R_IssueUnbindLoaderCmd();
 	ri.BufQueue_Finish( loader_queue );
 }
 
@@ -1950,7 +1972,10 @@ static void R_LoadAsyncImageFromDisk( image_t *image )
 */
 static void R_ShutdownImageLoader( void )
 {
-	if( !gl_loader_context ) {
+	void *context = gl_loader_context;
+
+	gl_loader_context = NULL;
+	if( !context ) {
 		return;
 	}
 
@@ -1963,8 +1988,7 @@ static void R_ShutdownImageLoader( void )
 
 	ri.BufQueue_Destroy( &loader_queue );
 
-	GLimp_SharedContext_Destroy( gl_loader_context );
-	gl_loader_context = NULL;
+	GLimp_SharedContext_Destroy( context );
 }
 
 //
@@ -2003,6 +2027,24 @@ static unsigned R_HandleLoadPicLoaderCmd( void *pcmd )
 }
 
 /*
+* R_HandleUnbindLoaderCmd
+*/
+static unsigned R_HandleUnbindLoaderCmd( void *pcmd )
+{
+	image_t tex;
+
+	memset( &tex, 0, sizeof( tex ) );
+
+	RB_BindContextTexture( 0, &tex );
+
+	tex.flags |= IT_CUBEMAP;
+
+	RB_BindContextTexture( 0, &tex );
+
+	return sizeof( int );
+}
+
+/*
 * R_ImageLoaderThreadProc
 */
 static void *R_ImageLoaderThreadProc( void *param )
@@ -2012,7 +2054,8 @@ static void *R_ImageLoaderThreadProc( void *param )
 	{
 		(queueCmdHandler_t)R_HandleInitLoaderCmd,
 		(queueCmdHandler_t)R_HandleShutdownLoaderCmd,
-		(queueCmdHandler_t)R_HandleLoadPicLoaderCmd
+		(queueCmdHandler_t)R_HandleLoadPicLoaderCmd,
+		(queueCmdHandler_t)R_HandleUnbindLoaderCmd
 	};
 
 	while ( 1 ){

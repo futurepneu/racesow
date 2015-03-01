@@ -442,6 +442,7 @@ static const gl_extension_t gl_extensions_decl[] =
 	,GL_EXTENSION( OES, get_program_binary, false, false, &gl_ext_get_program_binary_OES_funcs )
 	,GL_EXTENSION( OES, depth24, true, false, NULL )
 	,GL_EXTENSION( NV, multiview_draw_buffers, true, false, &gl_ext_multiview_draw_buffers_NV_funcs )
+	,GL_EXTENSION( OES, rgb8_rgba8, false, false, NULL )
 #endif
 
 	,GL_EXTENSION( EXT, texture_filter_anisotropic, true, false, NULL )
@@ -702,6 +703,7 @@ static void R_FinalizeGLExtensions( void )
 		glConfig.ext.get_program_binary = qtrue;
 		glConfig.ext.depth24 = qtrue;
 		glConfig.ext.GLSL130 = qtrue;
+		glConfig.ext.rgb8_rgba8 = qtrue;
 	}
 #endif
 
@@ -744,6 +746,12 @@ static void R_FinalizeGLExtensions( void )
 	qglGetIntegerv( GL_MAX_TEXTURE_UNITS_ARB, &glConfig.maxTextureUnits );
 	clamp( glConfig.maxTextureUnits, 1, MAX_TEXTURE_UNITS );
 
+	/* GL_EXT_framebuffer_object */
+#ifndef GL_ES_VERSION_2_0
+	glConfig.ext.depth24 = glConfig.ext.framebuffer_object;
+	glConfig.ext.rgb8_rgba8 = glConfig.ext.framebuffer_object;
+#endif
+
 	/* GL_EXT_texture_filter_anisotropic */
 	glConfig.maxTextureFilterAnisotropic = 0;
 	if( strstr( glConfig.extensionsString, "GL_EXT_texture_filter_anisotropic" ) )
@@ -769,11 +777,6 @@ static void R_FinalizeGLExtensions( void )
 		qglGetProgramBinary = qglGetProgramBinaryOES;
 		qglProgramBinary = qglProgramBinaryOES;
 	}
-#endif
-
-	/* GL_OES_depth24 */
-#ifndef GL_ES_VERSION_2_0
-	glConfig.ext.depth24 = glConfig.ext.framebuffer_object;
 #endif
 
 	/* GL_EXT_multiview_draw_buffers */
@@ -881,33 +884,27 @@ static void R_FinalizeGLExtensions( void )
 static void R_FillStartupBackgroundColor( void )
 {
 	qglClearColor( 0.1, 0.09, 0.12, 1.0 );
-#ifdef GL_ES_VERSION_2_0
-	if( glConfig.ext.multiview_draw_buffers && glConfig.stereoEnabled )
+	GLimp_BeginFrame();
+	if( glConfig.stereoEnabled )
 	{
+#ifdef GL_ES_VERSION_2_0
 		int location = GL_MULTIVIEW_NV;
 		int index = 1;
 		qglDrawBuffersIndexedNV( 1, &location, &index );
-		GLimp_BeginFrame();
 		qglClear( GL_COLOR_BUFFER_BIT );
-		GLimp_EndFrame();
 		index = 0;
 		qglDrawBuffersIndexedNV( 1, &location, &index );
-	}
-	GLimp_BeginFrame();
-	qglClear( GL_COLOR_BUFFER_BIT );
-	GLimp_EndFrame();
 #else
-	if( glConfig.stereoEnabled )
-	{
-		qglDrawBuffer( GL_FRONT_LEFT );
+		qglDrawBuffer( GL_BACK_LEFT );
 		qglClear( GL_COLOR_BUFFER_BIT );
-		qglDrawBuffer( GL_FRONT_RIGHT );
+		qglDrawBuffer( GL_BACK_RIGHT );
 		qglClear( GL_COLOR_BUFFER_BIT );
-	}
-	qglDrawBuffer( GL_FRONT );
-	qglClear( GL_COLOR_BUFFER_BIT );
-	qglDrawBuffer( GL_BACK );
+		qglDrawBuffer( GL_BACK );
 #endif
+	}
+	qglClear( GL_COLOR_BUFFER_BIT );
+	qglFinish();
+	GLimp_EndFrame();
 }
 
 static void R_Register( const char *screenshotsPrefix )
