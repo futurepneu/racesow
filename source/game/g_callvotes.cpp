@@ -385,9 +385,6 @@ static bool G_VoteRandmapValidate( callvotedata_t *vote, bool first )
 static void G_VoteRandmapPassed( callvotedata_t *vote )
 {
 	Q_strncpyz( level.forcemap, Q_strlwr( (char*)vote->data ), sizeof( level.forcemap ) );
-	// vote->data points to a static char[] in rs_query
-	// Set to null here to prevent trying to free it later
-	vote->data = NULL;
 	G_EndMatch();
 }
 // !racesow

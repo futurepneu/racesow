@@ -785,7 +785,7 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 
 void RS_QueryRandmap_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	static char mapname[MAX_STRING_CHARS];
+	char *mapname;
 	char **votedata = (char**)customp;
 	cJSON *data = (cJSON*)rs_sqapi->GetRoot( query );
 
@@ -806,19 +806,21 @@ void RS_QueryRandmap_Done( stat_query_t *query, qboolean success, void *customp 
 		return;
 	}
 
-	// copy the mapname
 	cJSON *map = cJSON_GetObjectItem( cJSON_GetObjectItem( data, "maps" )->child, "name" );
-	Q_strncpyz( mapname, map->valuestring, sizeof( mapname ) );
 
 	// do we have the map or is it the current map?
-	if( !trap_ML_FilenameExists( mapname ) || !Q_stricmp( mapname, level.mapname ) )
+	if( !trap_ML_FilenameExists( map->valuestring ) || !Q_stricmp( map->valuestring, level.mapname ) )
 	{
 		G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
 		G_CallVotes_Reset();
 		return;
 	}
 
-	// Save the mapname
+	// allocate memory for the mapname and store it
+	mapname = ( char * ) G_Malloc( MAX_STRING_CHARS );
+	Q_strncpyz( mapname, map->valuestring, MAX_STRING_CHARS );
+
+	// Point callvote data to the mapname. It can safely be freed by G_CallVotes_Reset() in g_callvotes.cpp
 	*votedata = mapname;
 	G_PrintMsg( NULL, "Randmap picked: %s\n", mapname );
 }
