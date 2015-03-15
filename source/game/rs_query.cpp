@@ -700,6 +700,7 @@ void RS_QueryMaps_Done( stat_query_t *query, qboolean success, void *customp )
 	edict_t *ent;
 	int playerNum, start, i, j;
 	cJSON *data, *node, *tag;
+	static char tag_string[1024];
 
 	gclient_t *client = (gclient_t *)customp;
 	playerNum = (int)( client - game.clients );
@@ -723,17 +724,19 @@ void RS_QueryMaps_Done( stat_query_t *query, qboolean success, void *customp )
 	node = cJSON_GetObjectItem( data, "maps" )->child;
 	for( i = 0; node != NULL; i++, node=node->next )
 	{
-		// Print the row
-		G_PrintMsg( ent, "%s# %d%s: %-25s ",
-			S_COLOR_ORANGE, start + i + 1, S_COLOR_WHITE,
-			cJSON_GetObjectItem( node, "name" )->valuestring );
-
+		// Clear tag string
+		memset( tag_string, 0, sizeof( tag_string ) );
 		tag = cJSON_GetObjectItem( node, "tags" )->child;
-		for( j = 0; tag != NULL; j++, tag=tag->next )
-		{
-			G_PrintMsg( ent, "%s%s", ( j == 0 ? "" : ", " ), tag->valuestring );
-		}
-		G_PrintMsg( ent, "\n" );
+
+		// Form a string of max 20 tags
+		for( j = 0; tag != NULL && j < 20 ; j++, tag=tag->next )
+			Q_strncatz( tag_string, va( "%s%s", ( j == 0 ? "" : ", " ), tag->valuestring ),
+						sizeof( tag_string ) - 1 );
+
+		// Print the row
+		G_PrintMsg( ent, "%s# %d%s: %-25s %s\n",
+						S_COLOR_ORANGE, start + i + 1, S_COLOR_WHITE,
+						cJSON_GetObjectItem( node, "name" )->valuestring, tag_string );
 	}
 }
 
