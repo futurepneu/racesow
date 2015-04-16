@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "../cgame/ref.h"
 
-#define REF_API_VERSION 10
+#define REF_API_VERSION 13
 
 struct mempool_s;
 struct cinematics_s;
@@ -61,7 +61,7 @@ typedef struct
 	void ( *Cmd_SetCompletionFunc )( const char *cmd_name, char **( *completion_func )( const char *partial ) );
 
 	unsigned int ( *Sys_Milliseconds )( void );
-	quint64 ( *Sys_Microseconds )( void );
+	uint64_t ( *Sys_Microseconds )( void );
 	void ( *Sys_Sleep )( unsigned int milliseconds );
 
 	int ( *FS_FOpenFile )( const char *filename, int *filenum, int mode );
@@ -74,23 +74,25 @@ typedef struct
 	int ( *FS_Eof )( int file );
 	int ( *FS_Flush )( int file );
 	void ( *FS_FCloseFile )( int file );
-	qboolean ( *FS_RemoveFile )( const char *filename );
+	bool ( *FS_RemoveFile )( const char *filename );
 	int ( *FS_GetFileList )( const char *dir, const char *extension, char *buf, size_t bufsize, int start, int end );
 	int ( *FS_GetGameDirectoryList )( char *buf, size_t bufsize );
 	const char *( *FS_FirstExtension )( const char *filename, const char *extensions[], int num_extensions );
-	qboolean ( *FS_MoveFile )( const char *src, const char *dst );
-	qboolean ( *FS_IsUrl )( const char *url );
+	bool ( *FS_MoveFile )( const char *src, const char *dst );
+	bool ( *FS_IsUrl )( const char *url );
 	time_t ( *FS_FileMTime )( const char *filename );
-	qboolean ( *FS_RemoveDirectory )( const char *dirname );
+	bool ( *FS_RemoveDirectory )( const char *dirname );
 	const char * ( *FS_GameDirectory )( void );
 	const char * ( *FS_WriteDirectory )( void );
+	const char * ( *FS_MediaDirectory )( fs_mediatype_t type );
+	void ( *FS_AddFileToMedia )( const char *filename );
 
-	struct cinematics_s *( *CIN_Open )( const char *name, unsigned int start_time, qboolean loop, qboolean *yuv, float *framerate );
-	qboolean ( *CIN_NeedNextFrame )( struct cinematics_s *cin, unsigned int curtime );
-	qbyte *( *CIN_ReadNextFrame )( struct cinematics_s *cin, int *width, int *height, 
-		int *aspect_numerator, int *aspect_denominator, qboolean *redraw );
+	struct cinematics_s *( *CIN_Open )( const char *name, unsigned int start_time, bool *yuv, float *framerate );
+	bool ( *CIN_NeedNextFrame )( struct cinematics_s *cin, unsigned int curtime );
+	uint8_t *( *CIN_ReadNextFrame )( struct cinematics_s *cin, int *width, int *height, 
+		int *aspect_numerator, int *aspect_denominator, bool *redraw );
 	ref_yuv_t *( *CIN_ReadNextFrameYUV )( struct cinematics_s *cin, int *width, int *height, 
-		int *aspect_numerator, int *aspect_denominator, qboolean *redraw );
+		int *aspect_numerator, int *aspect_denominator, bool *redraw );
 	void ( *CIN_Reset )( struct cinematics_s *cin, unsigned int cur_time );
 	void ( *CIN_Close )( struct cinematics_s *cin );
 
@@ -116,6 +118,8 @@ typedef struct
 	void ( *BufQueue_Finish )( qbufQueue_t *queue );
 	void ( *BufQueue_EnqueueCmd )( qbufQueue_t *queue, const void *cmd, unsigned cmd_size );
 	int ( *BufQueue_ReadCmds )( qbufQueue_t *queue, unsigned (**cmdHandlers)( const void * ) );
+	void ( *BufQueue_Wait )( qbufQueue_t *queue, int (*read)( qbufQueue_t *, unsigned( ** )(const void *), bool ), 
+		unsigned (**cmdHandlers)( const void * ), unsigned timeout_msec );
 } ref_import_t;
 
 typedef struct
@@ -126,11 +130,11 @@ typedef struct
 	rserr_t		( *Init )( const char *applicationName, const char *screenshotsPrefix, int startupColor,
 					void *hinstance, void *wndproc, void *parenthWnd, 
 					int x, int y, int width, int height, int displayFrequency,
-					qboolean fullScreen, qboolean wideScreen, qboolean verbose );
+					bool fullScreen, bool wideScreen, bool verbose );
 	rserr_t		( *SetMode )( int x, int y, int width, int height, int displayFrequency,
-					qboolean fullScreen, qboolean wideScreen );
-	qboolean	( *SetWindow )( void *hinstance, void *wndproc, void *parenthWnd );
-	void		( *Shutdown )( qboolean verbose );
+					bool fullScreen, bool wideScreen );
+	bool	( *SetWindow )( void *hinstance, void *wndproc, void *parenthWnd );
+	void		( *Shutdown )( bool verbose );
 
 	// All data that will be used in a level should be
 	// registered before rendering any frames to prevent disk hits,
@@ -149,14 +153,16 @@ typedef struct
 	void		( *RegisterWorldModel )( const char *model, const dvis_t *pvsData );
 	struct model_s *( *RegisterModel )( const char *name );
 	struct shader_s *( *RegisterPic )( const char *name );
-	struct shader_s *( *RegisterRawPic )( const char *name, int width, int height, qbyte *data );
-	struct shader_s *( *RegisterLevelshot )( const char *name, struct shader_s *defaultShader, qboolean *matchesDefault );
+	struct shader_s *( *RegisterRawPic )( const char *name, int width, int height, uint8_t *data, int samples );
+	struct shader_s *( *RegisterLevelshot )( const char *name, struct shader_s *defaultShader, bool *matchesDefault );
 	struct shader_s *( *RegisterSkin )( const char *name );
 	struct skinfile_s *( *RegisterSkinFile )( const char *name );
 	struct shader_s *( *RegisterVideo )( const char *name );
 
 	void		( *RemapShader )( const char *from, const char *to, int timeOffset );
 	void		( *GetShaderDimensions )( const struct shader_s *shader, int *width, int *height );
+
+	void		( *ReplaceRawSubPic )( struct shader_s *shader, int x, int y, int width, int height, uint8_t *data );
 
 	void		( *ClearScene )( void );
 	void		( *AddEntityToScene )( const entity_t *ent );
@@ -172,7 +178,7 @@ typedef struct
 
 	// Passing NULL for data redraws last uploaded frame
 	void		( *DrawStretchRaw )( int x, int y, int w, int h, int cols, int rows, 
-									float s1, float t1, float s2, float t2, qbyte *data );
+									float s1, float t1, float s2, float t2, uint8_t *data );
 
 	// Passing NULL for yuv redraws last uploaded frame
 	void		( *DrawStretchRawYUV )( int x, int y, int w, int h, 
@@ -186,7 +192,7 @@ typedef struct
 	void		( *SetCustomColor )( int num, int r, int g, int b );
 	void		( *LightForOrigin )( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t diffuse, float radius );
 
-	qboolean	( *LerpTag )( orientation_t *orient, const struct model_s *mod, int oldframe, int frame, float lerpfrac,
+	bool	( *LerpTag )( orientation_t *orient, const struct model_s *mod, int oldframe, int frame, float lerpfrac,
 						  const char *name );
 
 	int			( *SkeletalGetNumBones )( const struct model_s *mod, int *numFrames );
@@ -201,16 +207,16 @@ typedef struct
 
 	void		( *TransformVectorToScreen )( const refdef_t *rd, const vec3_t in, vec2_t out );
 
-	qboolean	( *ScreenEnabled )( void );
-	void		( *BeginFrame )( float cameraSeparation, qboolean forceClear, qboolean forceVsync );
+	bool		( *ScreenEnabled )( void );
+	void		( *BeginFrame )( float cameraSeparation, bool forceClear, bool forceVsync );
 	void		( *EndFrame )( void );
 	const char *( *SpeedsMessage )( char *out, size_t size );
 
 	void		( *BeginAviDemo )( void );
-	void		( *WriteAviFrame )( int frame, qboolean scissor );
+	void		( *WriteAviFrame )( int frame, bool scissor );
 	void		( *StopAviDemo )( void );
 
-	void		( *AppActivate )( qboolean active, qboolean destroy );
+	void		( *AppActivate )( bool active, bool destroy );
 } ref_export_t;
 
 typedef ref_export_t *(*GetRefAPI_t)(const ref_import_t *imports);

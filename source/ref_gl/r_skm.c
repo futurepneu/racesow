@@ -124,7 +124,7 @@ static int Mod_SkeletalModel_AddBlend( mskmodel_t *model, const mskblend_t *newb
 	for( i = 0; i < SKM_MAX_WEIGHTS; i++ ) {
 		for( j = i + 1; j < SKM_MAX_WEIGHTS; j++ ) {
 			if( t.weights[i] < t.weights[j] ) {
-				qbyte bi, bw;
+				uint8_t bi, bw;
 				bi = t.indices[i];
 				bw = t.weights[i];
 				t.indices[i] = t.indices[j];
@@ -158,9 +158,9 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 {
 	unsigned int i, j, k;
 	size_t filesize;
-	qbyte *pbase;
+	uint8_t *pbase;
 	size_t memsize;
-	qbyte *pmem;
+	uint8_t *pmem;
 	iqmheader_t *header;
 	char *texts;
 	iqmvertexarray_t *vas, va;
@@ -173,7 +173,7 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 	iqmmesh_t *inmeshes, inmesh;
 	iqmbounds_t *inbounds, inbound;
 	float *vposition, *vtexcoord, *vnormal, *vtangent;
-	qbyte *vblendindices_byte, *vblendweights_byte;
+	uint8_t *vblendindices_byte, *vblendweights_byte;
 	int *vblendindexes_int;
 	float *vblendweights_float;
 	mskmodel_t *poutmodel;
@@ -228,6 +228,10 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 		ri.Com_Printf( S_COLOR_RED "ERROR: %s has no geometry\n", mod->name );
 		goto error;
 	}
+	if( header->num_vertexes >= USHRT_MAX ) {
+		ri.Com_Printf( S_COLOR_RED "ERROR: %s has too many vertices\n", mod->name );
+		goto error;
+	}
 	if( header->num_frames < 1 || header->num_anims < 1 ) {
 		ri.Com_Printf( S_COLOR_RED "ERROR: %s has no animations\n", mod->name );
 		goto error;
@@ -241,7 +245,7 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 		goto error;
 	}
 
-	pbase = ( qbyte * )buffer;
+	pbase = ( uint8_t * )buffer;
 	filesize = header->filesize;
 
 	// check data offsets against the filesize
@@ -336,7 +340,7 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 				if( va.size != SKM_MAX_WEIGHTS )
 					break;
 				if( va.format == IQM_BYTE || va.format == IQM_UBYTE ) {
-					vblendindices_byte = ( qbyte * )( pbase + va.offset );
+					vblendindices_byte = ( uint8_t * )( pbase + va.offset );
 				}
 				else if( va.format == IQM_INT || va.format == IQM_UINT ) {
 					vblendindexes_int = ( int * )( pbase + va.offset );
@@ -346,7 +350,7 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 				if( va.size != SKM_MAX_WEIGHTS )
 					break;
 				if( va.format == IQM_UBYTE ) {
-					vblendweights_byte = ( qbyte * )( pbase + va.offset );
+					vblendweights_byte = ( uint8_t * )( pbase + va.offset );
 				}
 				else if( va.format == IQM_FLOAT ) {
 					vblendweights_float = ( float * )( pbase + va.offset );
@@ -577,12 +581,12 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 	}
 
 	// blend indices
-	poutmodel->blendIndices = ( qbyte * )pmem; pmem += sizeof( *poutmodel->blendIndices ) * header->num_vertexes * SKM_MAX_WEIGHTS;
+	poutmodel->blendIndices = ( uint8_t * )pmem; pmem += sizeof( *poutmodel->blendIndices ) * header->num_vertexes * SKM_MAX_WEIGHTS;
 	if( vblendindices_byte ) {
-		memcpy( poutmodel->blendIndices, vblendindices_byte, sizeof( qbyte ) * header->num_vertexes * SKM_MAX_WEIGHTS );
+		memcpy( poutmodel->blendIndices, vblendindices_byte, sizeof( uint8_t ) * header->num_vertexes * SKM_MAX_WEIGHTS );
 	} else if( vblendindexes_int ) {
 		int bi[SKM_MAX_WEIGHTS];
-		qbyte *pbi = poutmodel->blendIndices;
+		uint8_t *pbi = poutmodel->blendIndices;
 		for( j = 0; j < header->num_vertexes; j++ ) {
 			memcpy( bi, &vblendindexes_int[j * SKM_MAX_WEIGHTS], sizeof( int ) * SKM_MAX_WEIGHTS );
 			for( k = 0; k < SKM_MAX_WEIGHTS; k++ ) {
@@ -592,13 +596,13 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 	}
 
 	// blend weights
-	poutmodel->blendWeights = ( qbyte * )pmem; pmem += sizeof( *poutmodel->blendWeights ) * header->num_vertexes * SKM_MAX_WEIGHTS;
+	poutmodel->blendWeights = ( uint8_t * )pmem; pmem += sizeof( *poutmodel->blendWeights ) * header->num_vertexes * SKM_MAX_WEIGHTS;
 	if( vblendweights_byte ) {
-		memcpy( poutmodel->blendWeights, vblendweights_byte, sizeof( qbyte ) * header->num_vertexes * SKM_MAX_WEIGHTS );
+		memcpy( poutmodel->blendWeights, vblendweights_byte, sizeof( uint8_t ) * header->num_vertexes * SKM_MAX_WEIGHTS );
 	}
 	else if( vblendweights_float ) {
 		float bw[SKM_MAX_WEIGHTS];
-		qbyte *pbw = poutmodel->blendWeights;
+		uint8_t *pbw = poutmodel->blendWeights;
 		for( j = 0; j < header->num_vertexes; j++ ) {
 			memcpy( bw, &vblendweights_float[j * SKM_MAX_WEIGHTS], sizeof( float ) * SKM_MAX_WEIGHTS );
 			for( k = 0; k < SKM_MAX_WEIGHTS; k++ ) {
@@ -897,7 +901,7 @@ static float R_SkeletalModelLerpBBox( const entity_t *e, const model_t *mod, vec
 typedef struct skmcacheentry_s
 {
 	size_t size;
-	qbyte *data;
+	uint8_t *data;
 	struct skmcacheentry_s *next;
 } skmcacheentry_t;
 
@@ -923,7 +927,7 @@ void R_InitSkeletalCache( void )
 /*
 * R_SkeletalModelLerpBBox
 */
-static qbyte *R_GetSketalCache( int entNum, int lodNum )
+static uint8_t *R_GetSketalCache( int entNum, int lodNum )
 {
 	skmcacheentry_t *cache;
 	
@@ -942,7 +946,7 @@ static qbyte *R_GetSketalCache( int entNum, int lodNum )
 * all of the entries in the "allocation" list are moved to the "free" list, to be reused in the 
 * later function calls.
 */
-static qbyte *R_AllocSkeletalDataCache( int entNum, int lodNum, size_t size )
+static uint8_t *R_AllocSkeletalDataCache( int entNum, int lodNum, size_t size )
 {
 	size_t best_size;
 	skmcacheentry_t *cache, *prev;
@@ -1151,7 +1155,7 @@ static void R_SkeletalTransformNormalsAndSVecs( int numverts, const unsigned int
 /*
 * R_DrawSkeletalSurf
 */
-qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfaceSkeletal_t *drawSurf )
+bool R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfaceSkeletal_t *drawSurf )
 {
 	unsigned int i, j;
 	int framenum = e->frame;
@@ -1168,7 +1172,7 @@ qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mf
 	const model_t *mod = drawSurf->model;
 	const mskmodel_t *skmodel = ( const mskmodel_t * )mod->extradata;
 	const mskmesh_t *skmesh = drawSurf->mesh;
-	qboolean hardwareTransform = skmesh->vbo != NULL && glConfig.maxGLSLBones > 0 ? qtrue : qfalse;
+	bool hardwareTransform = skmesh->vbo != NULL && glConfig.maxGLSLBones > 0 ? true : false;
 	vattribmask_t vattribs;
 
 	bonePoseRelativeMat = NULL;
@@ -1218,7 +1222,7 @@ qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mf
 		RB_DrawElements( 0, skmesh->numverts, 0, skmesh->numtris * 3, 
 			0, skmesh->numverts, 0, skmesh->numtris * 3 );
 
-		return qfalse;
+		return false;
 	}
 
 	// see what vertex attribs backend needs
@@ -1231,7 +1235,7 @@ qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mf
 	// fetch bones tranforms from cache (both matrices and dual quaternions)
 	bonePoseRelativeDQ = ( dualquat_t * )R_GetSketalCache( R_ENT2NUM( e ), mod->lodnum );
 	if( bonePoseRelativeDQ ) {
-		bonePoseRelativeMat = ( mat4_t * )(( qbyte * )bonePoseRelativeDQ + bonePoseRelativeDQSize);
+		bonePoseRelativeMat = ( mat4_t * )(( uint8_t * )bonePoseRelativeDQ + bonePoseRelativeDQSize);
 	}
 	else {
 		// lerp boneposes and store results in cache
@@ -1304,7 +1308,7 @@ qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mf
 
 		// CPU transforms
 		if( !hardwareTransform ) {
-			bonePoseRelativeMat = ( mat4_t * )(( qbyte * )bonePoseRelativeDQ + bonePoseRelativeDQSize);
+			bonePoseRelativeMat = ( mat4_t * )(( uint8_t * )bonePoseRelativeDQ + bonePoseRelativeDQSize);
 
 			// generate matrices for all bones
 			for( i = 0; i < skmodel->numbones; i++ ) {
@@ -1333,7 +1337,7 @@ qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mf
 		if( !rb_mesh ) {
 			ri.Com_DPrintf( S_COLOR_YELLOW "R_DrawAliasSurf: RB_MapBatchMesh returned NULL for (%s)(%s)", 
 				drawSurf->model->name, skmesh->name );
-			return qfalse;
+			return false;
 		}
 
 		R_SkeletalTransformVerts( skmesh->numverts, skmesh->vertexBlends, bonePoseRelativeMat,
@@ -1357,7 +1361,7 @@ qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mf
 		RB_EndBatch();
 	}
 
-	return qfalse;
+	return false;
 }
 
 /*
@@ -1405,7 +1409,7 @@ void R_SkeletalModelFrameBounds( const model_t *mod, int frame, vec3_t mins, vec
 /*
 * R_AddSkeletalModelToDrawList
 */
-qboolean R_AddSkeletalModelToDrawList( const entity_t *e )
+bool R_AddSkeletalModelToDrawList( const entity_t *e )
 {
 	int i;
 	const mfog_t *fog;
@@ -1420,20 +1424,20 @@ qboolean R_AddSkeletalModelToDrawList( const entity_t *e )
 
 	mod = R_SkeletalModelLOD( e );
 	if( !( skmodel = ( ( mskmodel_t * )mod->extradata ) ) || !skmodel->nummeshes )
-		return qfalse;
+		return false;
 
 	radius = R_SkeletalModelLerpBBox( e, mod, mins, maxs );
-	clipped = R_CullModelEntity( e, mins, maxs, radius, qtrue );
+	clipped = R_CullModelEntity( e, mins, maxs, radius, true );
 	if( clipped )
-		return qfalse;
+		return false;
 
 	// never render weapon models or non-occluders into shadowmaps
 	if( rn.renderFlags & RF_SHADOWMAPVIEW ) {
 		if( e->renderfx & RF_WEAPONMODEL ) {
-			return qtrue;
+			return true;
 		}
 		if( rsc.entShadowGroups[R_ENT2NUM(e)] != rn.shadowGroup->id ) {
-			return qtrue;
+			return true;
 		}
 	}
 
@@ -1451,7 +1455,7 @@ qboolean R_AddSkeletalModelToDrawList( const entity_t *e )
 	{
 		R_SkeletalModelLerpBBox( e, mod );
 		if( R_CompletelyFogged( fog, e->origin, skm_radius ) )
-			return qfalse;
+			return false;
 	}
 #endif
 
@@ -1471,5 +1475,5 @@ qboolean R_AddSkeletalModelToDrawList( const entity_t *e )
 		}
 	}
 
-	return qtrue;
+	return true;
 }

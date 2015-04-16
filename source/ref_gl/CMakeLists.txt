@@ -8,6 +8,14 @@ endif()
 
 file(GLOB REF_GL_HEADERS
     "*.h"
+	"../gameshared/q_*.h"
+	"../gameshared/anorms.h"
+	"../gameshared/config.h"
+	"../qcommon/bsp.h"
+	"../qcommon/patch.h"
+	"../qcommon/iqm.h"
+	"../qcommon/qfiles.h"
+	"../qalgo/*.h"
 )
 
 file(GLOB REF_GL_COMMON_SOURCES
@@ -47,5 +55,5 @@ else()
 endif()
 
 add_library(ref_gl SHARED ${REF_GL_HEADERS} ${REF_GL_COMMON_SOURCES} ${REF_GL_PLATFORM_SOURCES})
-target_link_libraries(ref_gl ${JPEG_LIBRARIES} ${PNG_LIBRARIES} ${REF_GL_PLATFORM_LIBRARIES})
+target_link_libraries(ref_gl PRIVATE ${JPEG_LIBRARIES} ${PNG_LIBRARIES} ${REF_GL_PLATFORM_LIBRARIES})
 qf_set_output_dir(ref_gl libs)

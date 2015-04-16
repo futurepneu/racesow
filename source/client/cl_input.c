@@ -146,15 +146,15 @@ static void CL_MouseExtrapolate( int mx, int my, float *extra_x, float *extra_y 
 
 	static unsigned int frameNo = 0;
 	static float sub_x = 0, sub_y = 0;
-	static qint64 lastMicros = 0;
-	static qint64 avgMicros = 0;
+	static int64_t lastMicros = 0;
+	static int64_t avgMicros = 0;
 
 	float add_x = 0.0, add_y = 0.0;
 	float decay = 1.0;
 	float decaySum = buf_size > 1 ? 0.0 : decay;
 	unsigned int i;
 
-	qint64 micros;
+	int64_t micros;
 	if( !lastMicros )
 		lastMicros = Sys_Microseconds() - 10000;    // start at 100 FPS
 	micros = Sys_Microseconds();                        // get current time in us
@@ -334,7 +334,7 @@ state bit 1 is edge triggered on the up to down transition
 state bit 2 is edge triggered on the down to up transition
 
 
-Key_Event (int key, qboolean down, unsigned time);
+Key_Event (int key, bool down, unsigned time);
 
 ===============================================================================
 */
@@ -506,13 +506,13 @@ void CL_TouchEvent( int id, touchevent_t type, int x, int y, unsigned int time )
 	switch( cls.key_dest )
 	{
 		case key_game:
-			CL_GameModule_TouchEvent( id, type, x, y );
+			CL_GameModule_TouchEvent( id, type, x, y, time );
 			break;
 
 		case key_console:
 		case key_message:
 			if( id == 0 )
-				Con_TouchEvent( ( type != TOUCH_UP ) ? qtrue : qfalse, x, y );
+				Con_TouchEvent( ( type != TOUCH_UP ) ? true : false, x, y );
 			break;
 		
 		case key_menu:
@@ -524,10 +524,10 @@ void CL_TouchEvent( int id, touchevent_t type, int x, int y, unsigned int time )
 			switch( type )
 			{
 				case TOUCH_DOWN:
-					Key_MouseEvent( K_MOUSE1, qtrue, time );
+					Key_MouseEvent( K_MOUSE1, true, time );
 					break;
 				case TOUCH_UP:
-					Key_MouseEvent( K_MOUSE1, qfalse, time );
+					Key_MouseEvent( K_MOUSE1, false, time );
 					CL_UIModule_MouseSet( 0, 0 );
 					break;
 				default:
@@ -551,7 +551,7 @@ void CL_CancelTouches( void )
 			break;
 		case key_console:
 		case key_message:
-			Con_TouchEvent( qfalse, -1, -1 );
+			Con_TouchEvent( false, -1, -1 );
 			break;
 		default:
 			break;
@@ -564,12 +564,11 @@ cvar_t *cl_yawspeed;
 cvar_t *cl_pitchspeed;
 cvar_t *cl_run;
 cvar_t *cl_anglespeedkey;
-cvar_t *cl_zoom;
 
 /*
 * CL_AddButtonBits
 */
-static void CL_AddButtonBits( qbyte *buttons )
+static void CL_AddButtonBits( uint8_t *buttons )
 {
 	// figure button bits
 
@@ -596,7 +595,7 @@ static void CL_AddButtonBits( qbyte *buttons )
 	if( cls.key_dest != key_game )
 		*buttons |= BUTTON_BUSYICON;
 
-	if( ( ( in_zoom.state & 3 ) ? 1 : 0 ) ^ ( cl_zoom->integer ? 1 : 0 ) )
+	if( in_zoom.state & 3 )
 		*buttons |= BUTTON_ZOOM;
 	in_zoom.state &= ~2;
 }
@@ -607,9 +606,6 @@ static void CL_AddButtonBits( qbyte *buttons )
 static void CL_AddAnglesFromKeys( int frametime )
 {
 	float speed;
-
-	if( !frametime )
-		return;
 
 	if( in_speed.state & 1 )
 		speed = ( (float)frametime * 0.001f ) * cl_anglespeedkey->value;
@@ -636,9 +632,6 @@ static void CL_AddAnglesFromKeys( int frametime )
 */
 static void CL_AddMovementFromKeys( short *forwardmove, short *sidemove, short *upmove, int frametime )
 {
-	if( !frametime )
-		return;
-
 	if( in_strafe.state & 1 )
 	{
 		*sidemove += frametime * CL_KeyState( &in_right );
@@ -655,6 +648,51 @@ static void CL_AddMovementFromKeys( short *forwardmove, short *sidemove, short *
 	{
 		*forwardmove += frametime * CL_KeyState( &in_forward );
 		*forwardmove -= frametime * CL_KeyState( &in_back );
+	}
+}
+
+extern cvar_t *joy_forwardthreshold;
+extern cvar_t *joy_sidethreshold;
+extern cvar_t *joy_pitchthreshold;
+extern cvar_t *joy_yawthreshold;
+extern cvar_t *joy_pitchspeed;
+extern cvar_t *joy_yawspeed;
+extern cvar_t *joy_inverty;
+extern cvar_t *joy_movement_stick;
+
+/*
+* CL_AddMovementFromJoystick
+*/
+static void CL_AddMovementFromJoystick( usercmd_t *cmd, int frametime )
+{
+	vec4_t sticks;
+	int swap;
+	float value;
+
+	IN_GetThumbsticks( sticks );
+
+	swap = ( joy_movement_stick->integer ? 2 : 0 );
+
+	value = sticks[swap];
+	if( fabs( value ) > joy_sidethreshold->value )
+		cmd->sidemove += frametime * value;
+	value = sticks[1 ^ swap];
+	if( fabs( value ) > joy_forwardthreshold->value )
+		cmd->forwardmove += frametime * value;
+
+	value = sticks[2 ^ swap];
+	if( fabs( value ) > joy_yawthreshold->value )
+	{
+		cl.viewangles[YAW] += frametime * -0.001f *
+			value * value * value * joy_yawspeed->value *
+			CL_GameModule_GetSensitivityScale( joy_yawspeed->value, 0.0f );
+	}
+	value = sticks[3 ^ swap];
+	if( fabs( value ) > joy_pitchthreshold->value )
+	{
+		cl.viewangles[PITCH] += frametime * ( joy_inverty->integer ? 0.001f : -0.001f ) *
+			value * value * value * joy_pitchspeed->value *
+			CL_GameModule_GetSensitivityScale( joy_pitchspeed->value, 0.0f );
 	}
 }
 
@@ -682,7 +720,8 @@ void CL_UpdateCommandInput( void )
 
 		CL_AddAnglesFromKeys( keys_frame_time );
 		CL_AddMovementFromKeys( &cmd->forwardmove, &cmd->sidemove, &cmd->upmove, keys_frame_time );
-		IN_JoyMove( cmd, keys_frame_time );
+		if( cls.key_dest == key_game )
+			CL_AddMovementFromJoystick( cmd, keys_frame_time );
 		old_keys_frame_time = sys_frame_time;
 	}
 
@@ -697,7 +736,45 @@ void CL_UpdateCommandInput( void )
 	cmd->angles[1] = ANGLE2SHORT( cl.viewangles[1] );
 	cmd->angles[2] = ANGLE2SHORT( cl.viewangles[2] );
 
-	cl.inputRefreshed = qtrue;
+	cl.inputRefreshed = true;
+}
+
+/*
+* CL_CursorMovementFromJoystick
+*/
+void CL_CursorMovementFromJoystick( void )
+{
+	vec4_t sticks;
+	float sx, sy;
+	static float x, y;
+	int mx, my;
+	float scale;
+
+	if( cls.key_dest != key_menu )
+		return;
+
+	IN_GetThumbsticks( sticks );
+
+	sx = sticks[0] * ( ( float )( fabsf( sticks[0] ) > joy_forwardthreshold->value ) );
+	sx += sticks[2] * ( ( float )( fabsf( sticks[2] ) > joy_forwardthreshold->value ) );
+	clamp( sx, -1.0f, 1.0f );
+	sy = sticks[1] * ( ( float )( fabsf( sticks[1] ) > joy_forwardthreshold->value ) );
+	sy += sticks[3] * ( ( float )( fabsf( sticks[3] ) > joy_forwardthreshold->value ) );
+	clamp( sy, -1.0f, 1.0f );
+
+	if( !sx && !sy )
+		return;
+
+	scale = ( float )( min( viddef.width, viddef.height ) );
+	x += sx * sx * sx * cls.frametime * scale * 1.5f;
+	y += sy * sy * sy * cls.frametime * scale * -1.5f;
+
+	mx = x;
+	my = y;
+	x -= ( float )mx;
+	y -= ( float )my;
+
+	CL_UIModule_MouseMove( mx, my );
 }
 
 /*
@@ -713,7 +790,7 @@ void IN_CenterView( void )
 	}
 }
 
-static qboolean in_initialized = qfalse;
+static bool in_initialized = false;
 
 /*
 * CL_InitInput
@@ -778,7 +855,7 @@ void CL_InitInput( void )
 	}
 #endif
 
-	in_initialized = qtrue;
+	in_initialized = true;
 }
 
 /*
@@ -786,8 +863,8 @@ void CL_InitInput( void )
 */
 void CL_InitInputDynvars( void )
 {
-	Dynvar_Create( "m_filterBufferSize", qtrue, CL_MouseFilterBufferSizeGet_f, CL_MouseFilterBufferSizeSet_f );
-	Dynvar_Create( "m_filterBufferDecay", qtrue, CL_MouseFilterBufferDecayGet_f, CL_MouseFilterBufferDecaySet_f );
+	Dynvar_Create( "m_filterBufferSize", true, CL_MouseFilterBufferSizeGet_f, CL_MouseFilterBufferSizeSet_f );
+	Dynvar_Create( "m_filterBufferDecay", true, CL_MouseFilterBufferDecayGet_f, CL_MouseFilterBufferDecaySet_f );
 	// we could simply call Dynvar_SetValue(m_filterBufferSize, "5") here, but then the user would get a warning in the console if m_filter was != M_FILTER_EXTRAPOLATE
 	buf_size = DEFAULT_BUF_SIZE;
 	buf_x = (float *) Mem_ZoneMalloc( sizeof( float ) * buf_size );
@@ -849,7 +926,7 @@ void CL_ShutdownInput( void )
 	Mem_ZoneFree( buf_x );
 	Mem_ZoneFree( buf_y );
 
-	in_initialized = qtrue;
+	in_initialized = true;
 }
 
 //===============================================================================
@@ -942,7 +1019,7 @@ void CL_WriteUcmdsToMessage( msg_t *msg )
 
 	// write the id number of first ucmd to be sent, and the count
 	MSG_WriteLong( msg, ucmdHead );
-	MSG_WriteByte( msg, (qbyte)( ucmdHead - ucmdFirst ) );
+	MSG_WriteByte( msg, (uint8_t)( ucmdHead - ucmdFirst ) );
 
 	// write the ucmds
 	for( i = ucmdFirst; i < ucmdHead; i++ )
@@ -967,7 +1044,7 @@ void CL_WriteUcmdsToMessage( msg_t *msg )
 /*
 * CL_NextUserCommandTimeReached
 */
-static qboolean CL_NextUserCommandTimeReached( int realmsec )
+static bool CL_NextUserCommandTimeReached( int realmsec )
 {
 	static int minMsec = 1, allMsec = 0, extraMsec = 0;
 	static float roundingMsec = 0.0f;
@@ -1003,7 +1080,7 @@ static qboolean CL_NextUserCommandTimeReached( int realmsec )
 	{
 		//if( !cls.netchan.unsentFragments ) {
 		//	NET_Sleep( minMsec - allMsec );
-		return qfalse;
+		return false;
 	}
 
 	extraMsec = allMsec - minMsec;
@@ -1013,7 +1090,7 @@ static qboolean CL_NextUserCommandTimeReached( int realmsec )
 	allMsec = 0;
 
 	// send a new user command message to the server
-	return qtrue;
+	return true;
 }
 
 /*

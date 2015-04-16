@@ -36,8 +36,6 @@ FIXME:  This will be remidied once a native Mac port is complete
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
 #include <string.h>
 #include <ctype.h>
 #include <sys/wait.h>
@@ -55,7 +53,7 @@ FIXME:  This will be remidied once a native Mac port is complete
 #if !defined(USE_SDL2) || defined(DEDICATED_ONLY)
 
 cvar_t *nostdout;
-qboolean nostdout_backup_val = qfalse;
+bool nostdout_backup_val = false;
 
 unsigned sys_frame_time;
 
@@ -125,10 +123,10 @@ void Sys_Quit( void )
 {
 	// Qcommon_Shutdown is going destroy the cvar, so backup its value now
 	// and invalidate the pointer
-	nostdout_backup_val = (nostdout && nostdout->integer ? qtrue : qfalse);
+	nostdout_backup_val = (nostdout && nostdout->integer ? true : false);
 	nostdout = NULL;
 
-	fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) & ~FNDELAY );
+	fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) & ~O_NONBLOCK );
 
 	Qcommon_Shutdown();
 
@@ -154,12 +152,12 @@ void Sys_InitDynvars( void )
 */
 void Sys_Error( const char *format, ... )
 {
-	static qboolean	recursive = qfalse;
+	static bool	recursive = false;
 	va_list	argptr;
 	char string[1024];
 
 	// change stdin to non blocking
-	fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) & ~FNDELAY );
+	fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) & ~O_NONBLOCK );
 
 	va_start( argptr, format );
 	Q_vsnprintfz( string, sizeof( string ), format, argptr );
@@ -171,7 +169,7 @@ void Sys_Error( const char *format, ... )
 		_exit( 1 );
 	}
 
-	recursive = qtrue;
+	recursive = true;
 
 	fprintf( stderr, "Error: %s\n", string );
 
@@ -310,16 +308,16 @@ int main( int argc, char **argv )
 
 	Qcommon_Init( argc, argv );
 
-	fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) | FNDELAY );
+	fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) | O_NONBLOCK );
 
 	nostdout = Cvar_Get( "nostdout", "0", 0 );
 	if( !nostdout->integer )
 	{
-		fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) | FNDELAY );
+		fcntl( 0, F_SETFL, fcntl( 0, F_GETFL, 0 ) | O_NONBLOCK );
 	}
 
 	oldtime = Sys_Milliseconds();
-	while( qtrue )
+	while( true )
 	{
 		// find time spent rendering last frame
 		do

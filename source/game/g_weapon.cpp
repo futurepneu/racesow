@@ -279,7 +279,7 @@ static edict_t *W_Fire_LinearProjectile( edict_t *self, vec3_t start, vec3_t ang
 	GS_SnapVelocity( projectile->velocity );
 
 	projectile->movetype = MOVETYPE_LINEARPROJECTILE;
-	projectile->s.linearProjectile = qtrue;
+	projectile->s.linearProjectile = true;
 
 	projectile->r.solid = SOLID_YES;
 	projectile->r.clipmask = ( !GS_RaceGametype() && !level.gametype.playerInteraction ) ? MASK_SHOT : MASK_SOLID; // racesow

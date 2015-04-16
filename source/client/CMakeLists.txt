@@ -8,6 +8,12 @@ endif()
 
 file(GLOB CLIENT_HEADERS
     "*.h"
+	"../gameshared/q_*.h"
+	"../gameshared/anorms.h"
+	"../gameshared/config.h"
+	"../qcommon/*.h"
+	"../qalgo/*.h"
+	"../matchmaker/*.h"
 )
 
 file(GLOB CLIENT_COMMON_SOURCES
@@ -17,6 +23,7 @@ file(GLOB CLIENT_COMMON_SOURCES
     "../gameshared/q_*.c"
     "../qalgo/*.c"
     "../matchmaker/*.c"
+	"libmumblelink/*.c"
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -25,17 +32,18 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     if (USE_SDL2)
         file(GLOB CLIENT_PLATFORM_SOURCES
             "../win32/win_fs.c"
-            "../win32/win_lib.c"
             "../win32/win_net.c"
             "../win32/win_sys.c"
             "../win32/win_threads.c"
             "../null/sys_vfs_null.c"
 
             "../sdl/sdl_input.c"
+            "../sdl/sdl_input_win.c"
             "../sdl/sdl_vid.c"
             "../sdl/sdl_sys.c"
             "../sdl/sdl_clipboard.c"
             "../sdl/sdl_time.c"
+            "../sdl/sdl_lib.c"
 
             "../win32/qfusion.rc"
         )
@@ -73,7 +81,6 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
     file(GLOB CLIENT_PLATFORM_SOURCES
         "../unix/unix_fs.c"
-        "../unix/unix_lib.c"
         "../unix/unix_net.c"
         "../unix/unix_sys.c"
         "../unix/unix_threads.c"
@@ -85,6 +92,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         "../sdl/sdl_sys.c"
         "../sdl/sdl_clipboard.c"
         "../sdl/sdl_time.c"
+        "../sdl/sdl_lib.c"
 
         "../mac/mac_sys.m"
         "../mac/Warsow-Info.plist"
@@ -106,15 +114,18 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     if (USE_SDL2)
         file(GLOB CLIENT_PLATFORM_SOURCES
             "../unix/unix_fs.c"
-            "../unix/unix_lib.c"
             "../unix/unix_net.c"
             "../unix/unix_sys.c"
             "../unix/unix_threads.c"
             "../null/sys_vfs_null.c"
 
             "../sdl/sdl_input.c"
+            "../sdl/sdl_input_unix.c"
             "../sdl/sdl_vid.c"
             "../sdl/sdl_sys.c"
+            "../sdl/sdl_clipboard.c"
+            "../sdl/sdl_time.c"
+            "../sdl/sdl_lib.c"
         )
 
         set(CLIENT_PLATFORM_LIBRARIES ${SDL2_LIBRARY} "pthread" "m" "dl" "rt")
@@ -143,10 +154,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 endif()
 
 add_executable(${QFUSION_CLIENT_NAME} ${CLIENT_BINARY_TYPE} ${CLIENT_HEADERS} ${CLIENT_COMMON_SOURCES} ${CLIENT_PLATFORM_SOURCES} ${BUNDLE_RESOURCES})
+add_dependencies(${QFUSION_CLIENT_NAME} angelwrap cgame cin ftlib game irc ref_gl snd_openal snd_qf steamlib ui)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    add_dependencies(${QFUSION_CLIENT_NAME} angelwrap cgame cin ftlib game irc ref_gl snd_openal snd_qf ui)
-
     set_target_properties(${QFUSION_CLIENT_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ../mac/Warsow-Info.plist)
     set_target_properties(${QFUSION_CLIENT_NAME} PROPERTIES XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/../Frameworks @executable_path/../Resources/base @executable_path/../Resources/libs")
     set_source_files_properties(../mac/wsw_icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
@@ -167,5 +177,5 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     add_custom_command(TARGET ${QFUSION_CLIENT_NAME} POST_BUILD COMMAND ${COPY_DYLIBS})
 endif()
 
-target_link_libraries(${QFUSION_CLIENT_NAME} cin ${CURL_LIBRARY} ${ZLIB_LIBRARY} ${CLIENT_PLATFORM_LIBRARIES})
+target_link_libraries(${QFUSION_CLIENT_NAME} PRIVATE ${CURL_LIBRARY} ${ZLIB_LIBRARY} ${CLIENT_PLATFORM_LIBRARIES})
 qf_set_output_dir(${QFUSION_CLIENT_NAME} "")

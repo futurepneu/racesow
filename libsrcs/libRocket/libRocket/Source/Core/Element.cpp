@@ -35,7 +35,7 @@
 #include "ElementStyle.h"
 #include "EventDispatcher.h"
 #include "ElementDecoration.h"
-#include "FontFaceHandle.h"
+#include <Rocket/Core/FontFaceHandle.h>
 #include "LayoutEngine.h"
 #include "PluginRegistry.h"
 #include "StyleSheetParser.h"
@@ -102,6 +102,7 @@ Element::Element(const String& _tag) : relative_offset_base(0, 0), relative_offs
 	clipping_ignore_depth = 0;
 	clipping_enabled = false;
 	clipping_state_dirty = true;
+	structure_update_id = 0;
 
 	event_dispatcher = new EventDispatcher(this);
 	style = new ElementStyle(this);
@@ -1094,6 +1095,32 @@ void Element::ScrollIntoView(bool align_with_top)
 	}
 }
 
+void Element::InformDirty(Element *ROCKET_UNUSED_PARAMETER(child))
+{
+	ROCKET_UNUSED(child);
+}
+
+void Element::UpdateStructure(unsigned structure_update_id)
+{
+	if (this->structure_update_id == structure_update_id)
+		return;
+
+	this->structure_update_id = structure_update_id;
+
+	// Inform all children that the structure is drity
+	for (size_t i = 0; i < children.size(); ++i)
+	{
+		const ElementDefinition* element_definition = children[i]->GetStyle()->GetDefinition();
+		if (element_definition != NULL &&
+			element_definition->IsStructurallyVolatile())
+		{
+			children[i]->GetStyle()->DirtyDefinition();
+		}
+
+		children[i]->UpdateStructure(structure_update_id);
+	}
+}
+
 // Appends a child to this element
 void Element::AppendChild(Element* child, bool dom_element)
 {
@@ -1110,7 +1137,9 @@ void Element::AppendChild(Element* child, bool dom_element)
 	}
 
 	child->GetStyle()->DirtyDefinition();
-	child->GetStyle()->DirtyProperties();
+	// local properties should have already been dirtied at this point
+	// so only dirty inherited properites now
+	child->GetStyle()->DirtyInheritedProperties();
 
 	child->OnChildAdd(child);
 	DirtyStackingContext();
@@ -1158,7 +1187,9 @@ void Element::InsertBefore(Element* child, Element* adjacent_element)
 		children.insert(children.begin() + child_index, child);
 
 		child->GetStyle()->DirtyDefinition();
-		child->GetStyle()->DirtyProperties();
+		// local properties should have already been dirtied at this point
+		// so only dirty inherited properites now
+		child->GetStyle()->DirtyInheritedProperties();
 
 		child->OnChildAdd(child);
 		DirtyStackingContext();
@@ -1196,7 +1227,9 @@ bool Element::ReplaceChild(Element* inserted_element, Element* replaced_element)
 	RemoveChild(replaced_element);
 
 	inserted_element->GetStyle()->DirtyDefinition();
-	inserted_element->GetStyle()->DirtyProperties();
+	// local properties should have already been dirtied at this point
+	// so only dirty inherited properites now
+	inserted_element->GetStyle()->DirtyInheritedProperties();
 	inserted_element->OnChildAdd(inserted_element);
 
 	LockLayout(false);
@@ -1442,7 +1475,7 @@ void Element::OnAttributeChange(const AttributeNameList& changed_attributes)
 // Called when properties on the element are changed.
 void Element::OnPropertyChange(const PropertyNameList& changed_properties)
 {
-	bool all_dirty = StyleSheetSpecification::GetRegisteredProperties() == changed_properties;
+	bool all_dirty = structure_update_id == 0 || StyleSheetSpecification::GetRegisteredProperties() == changed_properties;
 
 	if (!IsLayoutDirty())
 	{
@@ -1810,6 +1843,9 @@ void Element::ReleaseElements(ElementList& released_elements)
 
 void Element::DirtyOffset()
 {
+	if (offset_dirty)
+		return;
+
 	offset_dirty = true;
 
 	// Not strictly true ... ?
@@ -1952,20 +1988,11 @@ void Element::DirtyStackingContext()
 
 void Element::DirtyStructure()
 {
-	// Clear the cached owner document
-	owner_document = NULL;
-	
-	// Inform all children that the structure is drity
-	for (size_t i = 0; i < children.size(); ++i)
-	{
-		const ElementDefinition* element_definition = children[i]->GetStyle()->GetDefinition();
-		if (element_definition != NULL &&
-			element_definition->IsStructurallyVolatile())
-		{
-			children[i]->GetStyle()->DirtyDefinition();
-		}
-
-		children[i]->DirtyStructure();
+	if (owner_document) {
+		owner_document->InformDirty(this);
+		// Clear the cached owner document
+		owner_document = NULL;
+		return;
 	}
 }
 

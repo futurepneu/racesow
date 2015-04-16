@@ -396,8 +396,6 @@ void CG_RegisterMediaShaders( void )
 	cgs.media.shaderKeyIcon[KEYICON_SPECIAL] = CG_RegisterMediaShader( PATH_KEYICON_SPECIAL, true );
 
 	cgs.media.shaderSbNums = CG_RegisterMediaShader( "gfx/hud/sbnums", true );
-	for( i = 0; i < NUM_CROSSHAIRS; i++ )
-		cgs.media.shaderCrosshair[i] = CG_RegisterMediaShader( va( "gfx/hud/crosshair%i", i ), true );
 
 	// VSAY icons
 	cgs.media.shaderVSayIcon[VSAY_GENERIC] = CG_RegisterMediaShader( PATH_VSAY_GENERIC_ICON, true );
@@ -485,7 +483,7 @@ void CG_RegisterFonts( void )
 	if( !cgs.fontSystemSmall )
 	{
 		Q_strncpyz( cgs.fontSystemFamily, DEFAULT_SYSTEM_FONT_FAMILY, sizeof( cgs.fontSystemFamily ) );
-		cgs.fontSystemSmallSize = DEFAULT_SYSTEM_FONT_SMALL_SIZE;
+		cgs.fontSystemSmallSize = ceilf( DEFAULT_SYSTEM_FONT_SMALL_SIZE * scale );
 
 		cgs.fontSystemSmall = trap_SCR_RegisterFont( cgs.fontSystemFamily, QFONT_STYLE_NONE, cgs.fontSystemSmallSize );
 		if( !cgs.fontSystemSmall )
@@ -495,14 +493,14 @@ void CG_RegisterFonts( void )
 	cgs.fontSystemMediumSize = ceilf( con_fontSystemMediumSize->integer * scale );
 	cgs.fontSystemMedium = trap_SCR_RegisterFont( cgs.fontSystemFamily, QFONT_STYLE_NONE, cgs.fontSystemMediumSize );
 	if( !cgs.fontSystemMedium ) {
-		cgs.fontSystemMediumSize = DEFAULT_SYSTEM_FONT_MEDIUM_SIZE;
+		cgs.fontSystemMediumSize = ceilf( DEFAULT_SYSTEM_FONT_MEDIUM_SIZE * scale );
 		cgs.fontSystemMedium = trap_SCR_RegisterFont( cgs.fontSystemFamily, QFONT_STYLE_NONE, cgs.fontSystemMediumSize );
 	}
 
 	cgs.fontSystemBigSize = ceilf( con_fontSystemBigSize->integer * scale );
 	cgs.fontSystemBig = trap_SCR_RegisterFont( cgs.fontSystemFamily, QFONT_STYLE_NONE, cgs.fontSystemBigSize );
 	if( !cgs.fontSystemBig ) {
-		cgs.fontSystemBigSize = DEFAULT_SYSTEM_FONT_BIG_SIZE;
+		cgs.fontSystemBigSize = ceilf( DEFAULT_SYSTEM_FONT_BIG_SIZE * scale );
 		cgs.fontSystemBig = trap_SCR_RegisterFont( cgs.fontSystemFamily, QFONT_STYLE_NONE, cgs.fontSystemBigSize );
 	}
 }

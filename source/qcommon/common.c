@@ -31,8 +31,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define MAX_NUM_ARGVS	50
 
-static qboolean	dynvars_initialized = qfalse;
-static qboolean	commands_intialized = qfalse;
+static bool	dynvars_initialized = false;
+static bool	commands_intialized = false;
 
 static int com_argc;
 static char *com_argv[MAX_NUM_ARGVS+1];
@@ -48,7 +48,6 @@ cvar_t *dedicated;
 cvar_t *versioncvar;
 cvar_t *revisioncvar;
 cvar_t *tv_server;
-cvar_t *mm_server;
 
 static cvar_t *fixedtime;
 static cvar_t *logconsole = NULL;
@@ -65,7 +64,7 @@ static int log_file = 0;
 
 static int server_state = CA_UNINITIALIZED;
 static int client_state = CA_UNINITIALIZED;
-static qboolean	demo_playing = qfalse;
+static bool	demo_playing = false;
 
 struct cmodel_state_s *server_cms = NULL;
 unsigned server_map_checksum = 0;
@@ -87,7 +86,7 @@ DYNVARS
 static dynvar_get_status_t Com_Sys_Uptime_f( void **val )
 {
 	static char buf[32];
-	const quint64 us = Sys_Microseconds();
+	const uint64_t us = Sys_Microseconds();
 	const unsigned int h = us / 3600000000u;
 	const unsigned int min = ( us / 60000000 ) % 60;
 	const unsigned int sec = ( us / 1000000 ) % 60;
@@ -147,6 +146,9 @@ void Com_BeginRedirect( int target, char *buffer, int buffersize,
 {
 	if( !target || !buffer || !buffersize || !flush )
 		return;
+	
+	QMutex_Lock( com_print_mutex );
+
 	rd_target = target;
 	rd_buffer = buffer;
 	rd_buffersize = buffersize;
@@ -165,6 +167,8 @@ void Com_EndRedirect( void )
 	rd_buffersize = 0;
 	rd_flush = NULL;
 	rd_extra = NULL;
+
+	QMutex_Unlock( com_print_mutex );
 }
 
 /*
@@ -189,6 +193,8 @@ void Com_Printf( const char *format, ... )
 	Q_vsnprintfz( msg, sizeof( msg ), format, argptr );
 	va_end( argptr );
 
+	QMutex_Lock( com_print_mutex );
+
 	if( rd_target )
 	{
 		if( (int)( strlen( msg ) + strlen( rd_buffer ) ) > ( rd_buffersize - 1 ) )
@@ -197,12 +203,17 @@ void Com_Printf( const char *format, ... )
 			*rd_buffer = 0;
 		}
 		strcat( rd_buffer, msg );
+
+		QMutex_Unlock( com_print_mutex );
 		return;
 	}
 
-	QMutex_Lock( com_print_mutex );
+	QMutex_Unlock( com_print_mutex );
 
+	// console is protected with its own mutex
 	Con_Print( msg );
+
+	QMutex_Lock( com_print_mutex );
 
 	// also echo to debugging console
 	Sys_ConsoleOutput( msg );
@@ -210,7 +221,7 @@ void Com_Printf( const char *format, ... )
 	// logconsole
 	if( logconsole && logconsole->modified )
 	{
-		logconsole->modified = qfalse;
+		logconsole->modified = false;
 
 		if( log_file )
 		{
@@ -231,6 +242,8 @@ void Com_Printf( const char *format, ... )
 			if( FS_FOpenFile( name, &log_file, ( logconsole_append && logconsole_append->integer ? FS_APPEND : FS_WRITE ) ) == -1 )
 			{
 				log_file = 0;
+				// no dead lock here as both posix mutexes and critical sections 
+				// are reenterant for the thread, which owns the mutex/CS
 				Com_Printf( "Couldn't open: %s\n", name );
 			}
 
@@ -283,14 +296,14 @@ void Com_Error( com_error_code_t code, const char *format, ... )
 	va_list	argptr;
 	char *msg = com_errormsg;
 	const size_t sizeof_msg = sizeof( com_errormsg );
-	static qboolean	recursive = qfalse;
+	static bool	recursive = false;
 
 	if( recursive )
 	{
 		Com_Printf( "recursive error after: %s", msg ); // wsw : jal : log it
 		Sys_Error( "recursive error after: %s", msg );
 	}
-	recursive = qtrue;
+	recursive = true;
 
 	va_start( argptr, format );
 	Q_vsnprintfz( msg, sizeof_msg, format, argptr );
@@ -299,9 +312,9 @@ void Com_Error( com_error_code_t code, const char *format, ... )
 	if( code == ERR_DROP )
 	{
 		Com_Printf( "********************\nERROR: %s\n********************\n", msg );
-		SV_ShutdownGame( va( "Server crashed: %s\n", msg ), qfalse );
+		SV_ShutdownGame( va( "Server crashed: %s\n", msg ), false );
 		CL_Disconnect( msg );
-		recursive = qfalse;
+		recursive = false;
 		longjmp( abortframe, -1 );
 	}
 	else
@@ -399,12 +412,12 @@ void Com_SetClientState( int state )
 	client_state = state;
 }
 
-qboolean Com_DemoPlaying( void )
+bool Com_DemoPlaying( void )
 {
 	return demo_playing;
 }
 
-void Com_SetDemoPlaying( qboolean state )
+void Com_SetDemoPlaying( bool state )
 {
 	demo_playing = state;
 }
@@ -493,7 +506,7 @@ void COM_AddParm( char *parm )
 	com_argv[com_argc++] = parm;
 }
 
-int Com_GlobMatch( const char *pattern, const char *text, const qboolean casecmp )
+int Com_GlobMatch( const char *pattern, const char *text, const bool casecmp )
 {
 	return glob_match( pattern, text, casecmp );
 }
@@ -558,7 +571,7 @@ void Info_Print( char *s )
 */
 int paged_total;
 
-void Com_PageInMemory( qbyte *buffer, int size )
+void Com_PageInMemory( uint8_t *buffer, int size )
 {
 	int i;
 
@@ -577,7 +590,7 @@ void Com_AddPakToPureList( purelist_t **purelist, const char *pakname, const uns
 	const size_t len = strlen( pakname ) + 1;
 
 	purefile = ( purelist_t* )Mem_Alloc( mempool ? mempool : zoneMemPool, sizeof( purelist_t ) + len );
-	purefile->filename = ( char * )(( qbyte * )purefile + sizeof( *purefile ));
+	purefile->filename = ( char * )(( uint8_t * )purefile + sizeof( *purefile ));
 	memcpy( purefile->filename, pakname, len );
 	purefile->checksum = checksum;
 	purefile->next = *purelist;
@@ -845,7 +858,7 @@ void Qcommon_InitCommands( void )
 	if( dedicated->integer )
 		Cmd_AddCommand( "quit", Com_Quit );
 
-	commands_intialized = qtrue;
+	commands_intialized = true;
 }
 
 /*
@@ -870,7 +883,7 @@ void Qcommon_ShutdownCommands( void )
 	if( dedicated->integer )
 		Cmd_RemoveCommand( "quit" );
 
-	commands_intialized = qfalse;
+	commands_intialized = false;
 }
 
 /*
@@ -903,7 +916,7 @@ void Qcommon_Init( int argc, char **argv )
 	Cmd_Init();
 	Cvar_Init();
 	Dynvar_Init();
-	dynvars_initialized = qtrue;
+	dynvars_initialized = true;
 
 	wswcurl_init();
 
@@ -913,14 +926,14 @@ void Qcommon_Init( int argc, char **argv )
 	// a basepath or cdpath needs to be set before execing
 	// config files, but we want other parms to override
 	// the settings of the config files
-	Cbuf_AddEarlyCommands( qfalse );
+	Cbuf_AddEarlyCommands( false );
 	Cbuf_Execute();
 
 	// wsw : aiwa : create dynvars (needs to be completed before .cfg scripts are executed)
-	Dynvar_Create( "sys_uptime", qtrue, Com_Sys_Uptime_f, DYNVAR_READONLY );
-	Dynvar_Create( "frametick", qfalse, DYNVAR_WRITEONLY, DYNVAR_READONLY );
-	Dynvar_Create( "quit", qfalse, DYNVAR_WRITEONLY, DYNVAR_READONLY );
-	Dynvar_Create( "irc_connected", qfalse, Irc_GetConnected_f, Irc_SetConnected_f );
+	Dynvar_Create( "sys_uptime", true, Com_Sys_Uptime_f, DYNVAR_READONLY );
+	Dynvar_Create( "frametick", false, DYNVAR_WRITEONLY, DYNVAR_READONLY );
+	Dynvar_Create( "quit", false, DYNVAR_WRITEONLY, DYNVAR_READONLY );
+	Dynvar_Create( "irc_connected", false, Irc_GetConnected_f, Irc_SetConnected_f );
 
 	Sys_InitDynvars();
 	CL_InitDynvars();
@@ -939,13 +952,6 @@ void Qcommon_Init( int argc, char **argv )
 	dedicated =	    Cvar_Get( "dedicated", "0", CVAR_NOSET );
 #endif
 
-#ifdef MATCHMAKER
-	mm_server =	    Cvar_Get( "mm_server", "1", CVAR_READONLY );
-	Cvar_ForceSet( "mm_server", "1" );
-#else
-	mm_server =	    Cvar_Get( "mm_server", "0", CVAR_READONLY );
-#endif
-
 	FS_Init();
 
 	Cbuf_AddText( "exec default.cfg\n" );
@@ -953,10 +959,6 @@ void Qcommon_Init( int argc, char **argv )
 	{
 		Cbuf_AddText( "exec config.cfg\n" );
 		Cbuf_AddText( "exec autoexec.cfg\n" );
-	}
-	else if( mm_server->integer )
-	{
-		Cbuf_AddText( "exec mmaker_autoexec.cfg\n" );
 	}
 	else if( tv_server->integer )
 	{
@@ -967,7 +969,7 @@ void Qcommon_Init( int argc, char **argv )
 		Cbuf_AddText( "exec dedicated_autoexec.cfg\n" );
 	}
 
-	Cbuf_AddEarlyCommands( qtrue );
+	Cbuf_AddEarlyCommands( true );
 	Cbuf_Execute();
 
 	//
@@ -1027,10 +1029,6 @@ void Qcommon_Init( int argc, char **argv )
 	{
 		Cbuf_AddText( "exec stuffcmds.cfg\n" );
 	}
-	else if( mm_server->integer )
-	{
-		Cbuf_AddText( "exec mmaker_stuffcmds.cfg\n" );
-	}
 	else if( tv_server->integer )
 	{
 		Cbuf_AddText( "exec tvserver_stuffcmds.cfg\n" );
@@ -1075,7 +1073,7 @@ void Qcommon_Init( int argc, char **argv )
 void Qcommon_Frame( unsigned int realmsec )
 {
 	static dynvar_t	*frametick = NULL;
-	static quint64 fc = 0;
+	static uint64_t fc = 0;
 	char *s;
 	int time_before = 0, time_between = 0, time_after = 0;
 	static unsigned int gamemsec;
@@ -1085,7 +1083,7 @@ void Qcommon_Frame( unsigned int realmsec )
 
 	if( log_stats->modified )
 	{
-		log_stats->modified = qfalse;
+		log_stats->modified = false;
 
 		if( log_stats->integer && !log_stats_file )
 		{
@@ -1193,14 +1191,14 @@ void Qcommon_Frame( unsigned int realmsec )
 */
 void Qcommon_Shutdown( void )
 {
-	static qboolean isdown = qfalse;
+	static bool isdown = false;
 
 	if( isdown )
 	{
 		printf( "Recursive shutdown\n" );
 		return;
 	}
-	isdown = qtrue;
+	isdown = true;
 
 	Com_ScriptModule_Shutdown();
 	CM_Shutdown();
@@ -1229,7 +1227,7 @@ void Qcommon_Shutdown( void )
 	wswcurl_cleanup();
 
 	Dynvar_Shutdown();
-	dynvars_initialized = qfalse;
+	dynvars_initialized = false;
 	Cvar_Shutdown();
 	Cmd_Shutdown();
 	Cbuf_Shutdown();

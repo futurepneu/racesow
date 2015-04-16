@@ -39,8 +39,11 @@ cvar_t *cg_placebo;
 cvar_t *cg_strafeHUD;
 cvar_t *cg_touch_flip;
 cvar_t *cg_touch_scale;
+cvar_t *cg_touch_zoomThres;
+cvar_t *cg_touch_zoomTime;
 
 static int cg_hud_touch_buttons, cg_hud_touch_upmove;
+static unsigned int cg_hud_touch_zoomSeq, cg_hud_touch_zoomLastTouch;
 
 enum
 {
@@ -112,6 +115,13 @@ static const constant_numeric_t cg_numeric_constants[] = {
 	{ "NOGUN", 0 },
 	{ "GUN", 1 },
 
+	// player movement types
+	{ "PMOVE_TYPE_NORMAL", PM_NORMAL },
+	{ "PMOVE_TYPE_SPECTATOR", PM_SPECTATOR },
+	{ "PMOVE_TYPE_GIB", PM_GIB },
+	{ "PMOVE_TYPE_FREEZE", PM_FREEZE },
+	{ "PMOVE_TYPE_CHASECAM", PM_CHASECAM },
+
 	{ NULL, 0 }
 };
 
@@ -132,24 +142,29 @@ static int CG_GetStatEnemyTeam( const void *parameter )
 static int CG_GetLongStatValue( const void *parameter )
 {
 	int result;
-	assert( (qintptr)parameter >= 0 && (qintptr)( parameter ) + 1 < MAX_STATS );
+	assert( (intptr_t)parameter >= 0 && (intptr_t)( parameter ) + 1 < MAX_STATS );
 
-	result = ( cg.predictedPlayerState.stats[(qintptr)parameter] & 0xFFFF ) << 16;
-	result |= ( cg.predictedPlayerState.stats[(qintptr)(parameter)+1] & 0xFFFF );
+	result = ( cg.predictedPlayerState.stats[(intptr_t)parameter] & 0xFFFF ) << 16;
+	result |= ( cg.predictedPlayerState.stats[(intptr_t)(parameter)+1] & 0xFFFF );
 	return result;
 }
 // !racesow
 
 static int CG_GetStatValue( const void *parameter )
 {
-	assert( (qintptr)parameter >= 0 && (qintptr)parameter < MAX_STATS );
+	assert( (intptr_t)parameter >= 0 && (intptr_t)parameter < MAX_STATS );
 
-	return cg.predictedPlayerState.stats[(qintptr)parameter];
+	return cg.predictedPlayerState.stats[(intptr_t)parameter];
 }
 
 static int CG_GetRaceStatValue( const void *parameter )
 {
 	return CG_GetStatValue( parameter );
+}
+
+static int CG_GetLayoutStatFlag( const void *parameter )
+{
+	return ( cg.predictedPlayerState.stats[STAT_LAYOUTS] & (intptr_t)parameter ) ? 1 : 0;
 }
 
 static int CG_GetPOVnum( const void *parameter )
@@ -220,7 +235,7 @@ static int CG_GetFPS( const void *parameter )
 
 static int CG_GetPowerupTime( const void *parameter )
 {
-	int powerup = (qintptr)parameter;
+	int powerup = (intptr_t)parameter;
 	return cg.predictedPlayerState.inventory[powerup];
 }
 
@@ -261,6 +276,11 @@ static int CG_RaceGameType( const void *parameter )
 	return GS_RaceGametype();
 }
 
+static int CG_TutorialGameType( const void *parameter )
+{
+	return GS_TutorialGametype();
+}
+
 static int CG_Paused( const void *parameter )
 {
 	return GS_MatchPaused();
@@ -294,7 +314,7 @@ static int CG_GetCvar( const void *parameter )
 static int CG_GetDamageIndicatorDirValue( const void *parameter )
 {
 	float frac = 0;
-	int index = (qintptr)parameter;
+	int index = (intptr_t)parameter;
 
 	if( cg.damageBlends[index] > cg.time && !cg.view.thirdperson )
 	{
@@ -311,7 +331,7 @@ static int CG_GetCurrentWeaponInventoryData( const void *parameter )
 	firedef_t *firedef;
 	int result;
 
-	switch( (qintptr)parameter )
+	switch( (intptr_t)parameter )
 	{
 	case 0: // AMMO_ITEM
 	default:
@@ -327,6 +347,17 @@ static int CG_GetCurrentWeaponInventoryData( const void *parameter )
 	}
 
 	return result;
+}
+
+static int CG_GetPmoveType( const void *parameter )
+{
+	// the real pmove type of the client, which is chasecam or spectator when playing a demo
+	return cg.frame.playerState.pmove.pm_type;
+}
+
+static int CG_IsDemoPlaying( const void *parameter )
+{
+	return ( cgs.demoPlaying ? 1 : 0 );
 }
 
 static int CG_DownloadInProgress( const void *parameter )
@@ -348,7 +379,7 @@ static int CG_GetShowItemTimers( const void *parameter )
 
 static int CG_GetItemTimer( const void *parameter )
 {
-	int num = (qintptr)parameter;
+	int num = (intptr_t)parameter;
 	centity_t *cent;
 
 	cent = CG_GetItemTimerEnt( num );
@@ -359,7 +390,7 @@ static int CG_GetItemTimer( const void *parameter )
 
 static int CG_GetItemTimerCount( const void *parameter )
 {
-	int num = (qintptr)parameter;
+	int num = (intptr_t)parameter;
 	centity_t *cent;
 
 	cent = CG_GetItemTimerEnt( num );
@@ -370,7 +401,7 @@ static int CG_GetItemTimerCount( const void *parameter )
 
 static int CG_GetItemTimerLocation( const void *parameter )
 {
-	int num = (qintptr)parameter;
+	int num = (intptr_t)parameter;
 	centity_t *cent;
 
 	cent = CG_GetItemTimerEnt( num );
@@ -381,13 +412,18 @@ static int CG_GetItemTimerLocation( const void *parameter )
 
 static int CG_GetItemTimerTeam( const void *parameter )
 {
-	int num = (qintptr)parameter;
+	int num = (intptr_t)parameter;
 	centity_t *cent;
 
 	cent = CG_GetItemTimerEnt( num );
 	if( !cent )
 		return 0;
 	return max( (int)cent->current.modelindex-1, 0 );
+}
+
+static int CG_SoftKeyboardAvailable( const void *parameter )
+{
+	return ( trap_IN_SoftKeyboardAvailable() ? 1 : 0 );
 }
 
 // ch : backport some of racesow hud elements
@@ -416,7 +452,7 @@ int race_jump = 0; // racesow
 
 static int CG_GetRaceVars( const void* parameter )
 {
-	int index = (qintptr)parameter;
+	int index = (intptr_t)parameter;
 	int iNum;
 	vec3_t hor_vel, view_dir, an;
 
@@ -573,7 +609,7 @@ static int CG_GetAccel( const void* parameter )
 
 static int CG_GetTouchButtonPressed( const void *parameter )
 {
-	return ( cg_hud_touch_buttons & ( qintptr )parameter ) ? 1 : 0;
+	return ( cg_hud_touch_buttons & ( intptr_t )parameter ) ? 1 : 0;
 }
 
 static int CG_GetTouchUpmove( const void *parameter )
@@ -634,6 +670,9 @@ static const reference_numeric_t cg_numeric_references[] =
 	{ "MESSAGE_ALPHA", CG_GetStatValue, (void *)STAT_MESSAGE_ALPHA },
 	{ "MESSAGE_BETA", CG_GetStatValue, (void *)STAT_MESSAGE_BETA },
 
+	{ "IMAGE_CLASSACTION1", CG_GetStatValue, (void *)STAT_IMAGE_CLASSACTION1 },
+	{ "IMAGE_CLASSACTION2", CG_GetStatValue, (void *)STAT_IMAGE_CLASSACTION2 },
+
 	// inventory grabs
 	{ "AMMO_ITEM", CG_GetCurrentWeaponInventoryData, (void *)0 },
 	{ "AMMO", CG_GetCurrentWeaponInventoryData, (void *)1 },
@@ -641,6 +680,7 @@ static const reference_numeric_t cg_numeric_references[] =
 
 	// other
 	{ "CHASING", CG_GetPOVnum, NULL },
+	{ "SPECDEAD", CG_GetLayoutStatFlag, (void *)STAT_LAYOUT_SPECDEAD },
 	{ "ARMOR_ITEM", CG_GetArmorItem, NULL },
 	{ "SPEED", CG_GetSpeed, NULL },
 	{ "SPEED_VERTICAL", CG_GetSpeedVertical, NULL },
@@ -652,11 +692,15 @@ static const reference_numeric_t cg_numeric_references[] =
 	{ "TEAMBASED", CG_GetTeamBased, NULL },
 	{ "INDIVIDUAL", CG_InvidualGameType, NULL },
 	{ "RACE", CG_RaceGameType, NULL },
+	{ "TUTORIAL", CG_TutorialGameType, NULL },
 	{ "PAUSED", CG_Paused, NULL },
 	{ "ZOOM", CG_GetZoom, NULL },
 	{ "VIDWIDTH", CG_GetVidWidth, NULL },
 	{ "VIDHEIGHT", CG_GetVidHeight, NULL },
 	{ "STUNNED", CG_GetStunned, NULL },
+	{ "SCOREBOARD", CG_GetLayoutStatFlag, (void *)STAT_LAYOUT_SCOREBOARD },
+	{ "PMOVE_TYPE", CG_GetPmoveType, NULL },
+	{ "DEMOPLAYING", CG_IsDemoPlaying, NULL },
 
 	{ "POWERUP_QUAD_TIME", CG_GetPowerupTime, (void *)POWERUP_QUAD },
 	{ "POWERUP_WARSHELL_TIME", CG_GetPowerupTime, (void *)POWERUP_SHELL },
@@ -728,6 +772,7 @@ static const reference_numeric_t cg_numeric_references[] =
 	{ "DOWNLOAD_PERCENT", CG_GetCvar, "cl_download_percent" },
 
 	{ "CHAT_MODE", CG_GetCvar, "con_messageMode" },
+	{ "SOFTKEYBOARD", CG_SoftKeyboardAvailable, NULL },
 
 	{ "TOUCH_FLIP", CG_GetCvar, "cg_touch_flip" },
 	{ "TOUCH_SCALE", CG_GetCvar, "cg_touch_scale" },
@@ -798,7 +843,7 @@ static int cg_obituaries_current = -1;
 void CG_SC_PrintObituary( const char *format, ... )
 {
 	va_list	argptr;
-	char msg[1024];
+	char msg[GAMECHAT_STRING_SIZE];
 
 	va_start( argptr, format );
 	Q_vsnprintfz( msg, sizeof( msg ), format, argptr );
@@ -878,13 +923,13 @@ void CG_SC_Obituary( void )
 				current->type = OBITUARY_TEAM;
 				if( cg_showObituaries->integer & CG_OBITUARY_CONSOLE )
 				{
-					CG_LocalPrint( "%s%s%s %s %s%s %s%s%s\n", S_COLOR_RED, "TEAMKILL:", S_COLOR_WHITE, victim->name,
+					CG_LocalPrint( "%s%s%s %s %s%s %s%s%s\n", S_COLOR_RED, "TEAMFRAG:", S_COLOR_WHITE, victim->name,
 					           S_COLOR_WHITE, message, attacker->name, S_COLOR_WHITE, message2 );
 				}
 
 				if( ISVIEWERENTITY( attackerNum ) && ( cg_showObituaries->integer & CG_OBITUARY_CENTER ) )
 				{
-					CG_CenterPrintToUpper( va( "%s%s%s %s\n", S_COLOR_RED, "YOU TEAMFRAGGED", S_COLOR_WHITE, victim->name ) );
+					CG_CenterPrintToUpper( S_COLOR_RED "YOU TEAMFRAGGED %s", victim->name );
 				}
 			}
 			else // good kill
@@ -896,7 +941,7 @@ void CG_SC_Obituary( void )
 
 				if( ISVIEWERENTITY( attackerNum ) && ( cg_showObituaries->integer & CG_OBITUARY_CENTER ) )
 				{
-					CG_CenterPrintToUpper( va( "%s%s %s\n", S_COLOR_WHITE, "YOU FRAGGED", victim->name ) );
+					CG_CenterPrintToUpper( "YOU FRAGGED %s", victim->name );
 				}
 			}
 		}
@@ -919,7 +964,7 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
                                int internal_align, unsigned int icon_size )
 {
 	int i, num, skip, next, w, num_max;
-	int line_height;
+	unsigned line_height;
 	int xoffset, yoffset;
 	obituary_t *obr;
 	struct shader_s *pic;
@@ -928,7 +973,7 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
 	if( !( cg_showObituaries->integer & CG_OBITUARY_HUD ) )
 		return;
 
-	line_height = max( trap_SCR_strHeight( font ), icon_size );
+	line_height = max( (unsigned)trap_SCR_FontHeight( font ), icon_size );
 	num_max = height / line_height;
 
 	if( width < (int)icon_size || !num_max )
@@ -1062,8 +1107,8 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
 			{
 				Vector4Set( teamcolor, 255, 255, 255, 255 );
 			}
-			trap_SCR_DrawStringWidth( x + xoffset, y + yoffset + ( line_height - trap_SCR_strHeight( font ) ) / 2,
-			                          ALIGN_LEFT_TOP, COM_RemoveColorTokensExt( obr->attacker, qtrue ), ( width - icon_size ) / 2,
+			trap_SCR_DrawStringWidth( x + xoffset, y + yoffset + ( line_height - trap_SCR_FontHeight( font ) ) / 2,
+			                          ALIGN_LEFT_TOP, COM_RemoveColorTokensExt( obr->attacker, true ), ( width - icon_size ) / 2,
 			                          font, teamcolor );
 			xoffset += min( trap_SCR_strWidth( obr->attacker, font, 0 ), ( width - icon_size ) / 2 );
 		}
@@ -1079,7 +1124,7 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
 			Vector4Set( teamcolor, 255, 255, 255, 255 );
 		}
 		trap_SCR_DrawStringWidth( x + xoffset, y + yoffset + line_height / 2, ALIGN_LEFT_MIDDLE,
-		                          COM_RemoveColorTokensExt( obr->victim, qtrue ), ( width - icon_size ) / 2, font, teamcolor );
+		                          COM_RemoveColorTokensExt( obr->victim, true ), ( width - icon_size ) / 2, font, teamcolor );
 		xoffset += min( trap_SCR_strWidth( obr->victim, font, 0 ), ( width - icon_size ) / 2 );
 
 		yoffset += line_height;
@@ -1089,12 +1134,15 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
 
 //=============================================================================
 
-static void CG_DrawAwards( int x, int y, int align, struct qfontface_s *font, vec4_t basecolor )
+#define AWARDS_OVERSHOOT_DURATION 0.2f
+#define AWARDS_OVERSHOOT_FREQUENCY 6.0f
+#define AWARDS_OVERSHOOT_DECAY 10.0f
+
+static void CG_DrawAwards( int x, int y, int align, struct qfontface_s *font, vec4_t color )
 {
 	int i, count, current;
 	int yoffset;
-	vec4_t color;
-	float frac;
+	int s_x, e_x, m_x;
 
 	if( !cg_showAwards->integer )
 		return;
@@ -1118,32 +1166,27 @@ static void CG_DrawAwards( int x, int y, int align, struct qfontface_s *font, ve
 	if( !count )
 		return;
 
-	y = CG_VerticalAlignForHeight( y, align, trap_SCR_strHeight( font ) * MAX_AWARD_LINES );
+	y = CG_VerticalAlignForHeight( y, align, trap_SCR_FontHeight( font ) * MAX_AWARD_LINES );
+
+	s_x = CG_HorizontalMovementForAlign( align ) < 0 ? cgs.vidWidth : 0;
+	e_x = x;
 
 	for( i = count; i > 0; i-- )
 	{
-		unsigned int fadeTime;
+		float moveTime;
+		const char *str;
 
 		current = ( cg.award_head - i ) % MAX_AWARD_LINES;
+		str = cg.award_lines[ current ];
 
-		yoffset = trap_SCR_strHeight( font ) * ( MAX_AWARD_LINES - i );
+		yoffset = trap_SCR_FontHeight( font ) * ( MAX_AWARD_LINES - i );
+		moveTime = ( cg.time - cg.award_times[ current ] ) / 1000.0f;
 
-		Vector4Copy( basecolor, color );
+		m_x = LinearMovementWithOvershoot( s_x, e_x, 
+			AWARDS_OVERSHOOT_DURATION, AWARDS_OVERSHOOT_FREQUENCY, AWARDS_OVERSHOOT_DECAY, 
+			moveTime );
 
-		fadeTime = MAX_AWARD_DISPLAYTIME * 0.66;
-		if( cg.time - cg.award_times[ current ] < fadeTime )
-		{
-			frac = 1.0f;
-		}
-		else
-		{
-			frac = 1.0f - ( (float)( ( cg.time - cg.award_times[ current ] ) - fadeTime ) / (float)( MAX_AWARD_DISPLAYTIME - fadeTime ) );
-			clamp( frac, 0.0f, 1.0f );
-		}
-
-		color[3] *= frac;
-
-		trap_SCR_DrawStringWidth( x, y + yoffset, align % 3, cg.award_lines[ current ], 0, font, color );
+		trap_SCR_DrawStringWidth( m_x, y + yoffset, align, str, 0, font, color );
 	}
 }
 
@@ -1165,8 +1208,8 @@ static void CG_DrawWeaponIcons( int x, int y, int offx, int offy, int iw, int ih
 	int curx, cury, curw, curh;
 	int i, j, n;
 	float fj, fn;
-	vec4_t color;
 	bool selected_weapon;
+	vec4_t colorTrans = { 1.0f, 1.0f, 1.0f, 0.5f };
 
 	if( !cg_weaponlist || !cg_weaponlist->integer )
 		return;
@@ -1189,8 +1232,6 @@ static void CG_DrawWeaponIcons( int x, int y, int offx, int offy, int iw, int ih
 			n++;
 	}
 
-	VectorCopy( colorWhite, color );
-
 	for( i = j = 0; i < WEAP_TOTAL-1; i++ )
 	{
 		// racesow - only consider ammo count if not infinite ammo
@@ -1201,10 +1242,6 @@ static void CG_DrawWeaponIcons( int x, int y, int offx, int offy, int iw, int ih
 		// !racesow
 
 		selected_weapon = CG_IsWeaponSelected( WEAP_GUNBLADE+i );
-		if( !selected_weapon )
-			color[3] = 1.0;
-		else
-			color[3] = 0.5;
 
 		fj = (float)j;
 		fn = (float)n;
@@ -1232,20 +1269,20 @@ static void CG_DrawWeaponIcons( int x, int y, int offx, int offy, int iw, int ih
 				if( selected_weapon )
 				{
 					if( customWeaponSelectPic )
-						trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, color, trap_R_RegisterPic( customWeaponSelectPic ) );
+						trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, colorTrans, trap_R_RegisterPic( customWeaponSelectPic ) );
 					else
-						trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, color, CG_MediaShader( cgs.media.shaderSelect ) );
+						trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, colorTrans, CG_MediaShader( cgs.media.shaderSelect ) );
 				}
 				if( customWeaponPics[i] )
-					trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, color, trap_R_RegisterPic( customWeaponPics[i] ) );
+					trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, colorWhite, trap_R_RegisterPic( customWeaponPics[i] ) );
 				else
-					trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, color, CG_MediaShader( cgs.media.shaderWeaponIcon[i] ) );
+					trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, colorWhite, CG_MediaShader( cgs.media.shaderWeaponIcon[i] ) );
 			}
 			else
 				if( customNoGunWeaponPics[i] )
-					trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, color, trap_R_RegisterPic( customNoGunWeaponPics[i] ) );
+					trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, colorWhite, trap_R_RegisterPic( customNoGunWeaponPics[i] ) );
 				else
-					trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, color, CG_MediaShader( cgs.media.shaderNoGunWeaponIcon[i] ) );
+					trap_R_DrawStretchPic( curx, cury, curw, curh, 0, 0, 1, 1, colorWhite, CG_MediaShader( cgs.media.shaderNoGunWeaponIcon[i] ) );
 		}
 		j++;
 	}
@@ -1311,6 +1348,96 @@ static void CG_DrawWeaponAmmos( int x, int y, int offx, int offy, int fontsize, 
 			CG_DrawHUDNumeric( curx, cury, align, color, curwh, curwh, cg.predictedPlayerState.inventory[i+startammo] );
 		j++;
 	}
+}
+
+static float cg_hud_weaponcrosstime;
+
+/*
+* CG_DrawWeaponCrossQuarter
+*/
+static void CG_DrawWeaponCrossQuarter( int ammopass, int quarter, int x, int y, int dirx, int diry, int iw, int ih, int ammoofs, int ammosize )
+{
+	int i;
+	int first = quarter << 1;
+	int w[2], count = 0, t;
+	vec4_t color, colorTrans;
+
+	x += dirx * iw - ( iw >> 1 );
+	y += diry * ih - ( ih >> 1 );
+
+	for( i = 0; i < 2; i++ )
+	{
+		if( !cg.predictedPlayerState.inventory[WEAP_GUNBLADE + first + i] )
+		{
+			continue;
+		}
+		if( !cg.predictedPlayerState.inventory[AMMO_GUNBLADE + first + i] &&
+			!cg.predictedPlayerState.inventory[AMMO_WEAK_GUNBLADE + first + i] )
+		{
+			continue;
+		}
+
+		w[count] = first + i;
+		count++;
+	}
+
+	if( !count )
+		return;
+
+	if( ( count == 2 ) && !CG_IsWeaponSelected( WEAP_GUNBLADE + w[0] ) &&
+		( CG_IsWeaponSelected( WEAP_GUNBLADE + w[1] ) || ( cg.lastCrossWeapons & ( 1 << quarter ) ) ) )
+	{
+		t = w[0];
+		w[0] = w[1];
+		w[1] = t;
+	}
+
+	VectorCopy( colorWhite, color );
+	color[3] = cg_hud_weaponcrosstime * 4.0f;
+	clamp_high( color[3], 1.0f );
+	VectorCopy( colorWhite, colorTrans );
+	colorTrans[3] = color[3] * 0.5f;
+
+	if( !ammopass && CG_IsWeaponSelected( WEAP_GUNBLADE + w[0] ) )
+	{
+		if( customWeaponSelectPic )
+			trap_R_DrawStretchPic( x, y, iw, ih, 0.0f, 0.0f, 1.0f, 1.0f, colorTrans, trap_R_RegisterPic( customWeaponSelectPic ) );
+		else
+			trap_R_DrawStretchPic( x, y, iw, ih, 0.0f, 0.0f, 1.0f, 1.0f, colorTrans, CG_MediaShader( cgs.media.shaderSelect ) );
+	}
+
+	for( i = 0; i < count; i++ )
+	{
+		if( !ammopass )
+		{
+			if( customWeaponPics[w[i]] )
+				trap_R_DrawStretchPic( x, y, iw, ih, 0.0f, 0.0f, 1.0f, 1.0f, color, trap_R_RegisterPic( customWeaponPics[w[i]] ) );
+			else
+				trap_R_DrawStretchPic( x, y, iw, ih, 0.0f, 0.0f, 1.0f, 1.0f, color, CG_MediaShader( cgs.media.shaderWeaponIcon[w[i]] ) );
+		}
+
+		if( ammopass )
+		{
+			CG_DrawHUDNumeric( x + ( iw >> 1 ), y + ( ih >> 1 ) + ammoofs, ALIGN_CENTER_MIDDLE,
+				CG_IsWeaponSelected( WEAP_GUNBLADE + w[i] ) ? color : colorTrans, ammosize, ammosize,
+				cg.predictedPlayerState.inventory[AMMO_GUNBLADE + w[i]] );
+		}
+
+		x += dirx * iw;
+		y += diry * ih;
+	}
+}
+
+static void CG_CheckWeaponCross( void )
+{
+	if( cg.frame.playerState.pmove.pm_type != PM_NORMAL )
+		cg_hud_weaponcrosstime = 0.0f;
+}
+
+void CG_ShowWeaponCross( void )
+{
+	cg_hud_weaponcrosstime = 0.6f;
+	CG_CheckWeaponCross();
 }
 
 //=============================================================================
@@ -1525,6 +1652,10 @@ static struct qfontface_s *layout_cursor_font;
 static char layout_cursor_font_name[MAX_QPATH];
 static int layout_cursor_font_size;
 static int layout_cursor_font_style;
+struct qfontface_s *(*layout_cursor_font_regfunc)( const char *, int , unsigned int );
+static bool layout_cursor_font_dirty = true;
+
+static struct qfontface_s *CG_GetLayoutCursorFont( void );
 
 enum
 {
@@ -1555,7 +1686,7 @@ static bool CG_LFuncDrawTimer( struct cg_layoutnode_s *commandnode, struct cg_la
 	// we want MM:SS:m
 	Q_snprintfz( time, sizeof( time ), "%02d:%02d.%02d", min, sec, milli );
 	// !racesow
-	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, time, layout_cursor_font, layout_cursor_color );
+	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, time, CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
@@ -1683,6 +1814,26 @@ static bool CG_LFuncDrawPicByName( struct cg_layoutnode_s *commandnode, struct c
 	x = CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width );
 	y = CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height );
 	trap_R_DrawStretchPic( x, y, layout_cursor_width, layout_cursor_height, 0, 0, 1, 1, layout_cursor_color, trap_R_RegisterPic( CG_GetStringArg( &argumentnode ) ) );
+	return true;
+}
+
+static bool CG_LFuncDrawSubPicByName( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	int x, y;
+	struct shader_s *shader;
+	float s1, t1, s2, t2;
+
+	x = CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width );
+	y = CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height );
+
+	shader = trap_R_RegisterPic( CG_GetStringArg( &argumentnode ) );
+
+	s1 = CG_GetNumericArg( &argumentnode );
+	t1 = CG_GetNumericArg( &argumentnode );
+	s2 = CG_GetNumericArg( &argumentnode );
+	t2 = CG_GetNumericArg( &argumentnode );
+
+	trap_R_DrawStretchPic( x, y, layout_cursor_width, layout_cursor_height, s1, t1, s2, t2, layout_cursor_color, shader );
 	return true;
 }
 
@@ -1876,19 +2027,26 @@ static bool CG_LFuncAlign( struct cg_layoutnode_s *commandnode, struct cg_layout
 	return true;
 }
 
-static bool CG_LFuncFontFamilyExt( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, 
-	int numArguments, struct qfontface_s *(*register_font)( const char *, int , unsigned int ) )
+static struct qfontface_s *CG_GetLayoutCursorFont( void )
 {
 	struct qfontface_s *font;
 
-	font = register_font( layout_cursor_font_name, layout_cursor_font_style, layout_cursor_font_size );
-	if( font )
-	{
-		layout_cursor_font = font;
-		return true;
+	if( !layout_cursor_font_dirty ) {
+		return layout_cursor_font;
+	}
+	if( !layout_cursor_font_regfunc ) {
+		layout_cursor_font_regfunc = trap_SCR_RegisterFont;
 	}
 
-	return false;
+	font = layout_cursor_font_regfunc( layout_cursor_font_name, layout_cursor_font_style, layout_cursor_font_size );
+	if( font ) {
+		layout_cursor_font = font;
+	} else {
+		layout_cursor_font = cgs.fontSystemSmall;
+	}
+	layout_cursor_font_dirty = false;
+
+	return layout_cursor_font;
 }
 
 static bool CG_LFuncFontFamily( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
@@ -1903,20 +2061,25 @@ static bool CG_LFuncFontFamily( struct cg_layoutnode_s *commandnode, struct cg_l
 	{
 		Q_strncpyz( layout_cursor_font_name, fontname, sizeof( layout_cursor_font_name ) );
 	}
+	layout_cursor_font_dirty = true;
+	layout_cursor_font_regfunc = trap_SCR_RegisterFont;
 
-	return CG_LFuncFontFamilyExt( commandnode, argumentnode, numArguments, trap_SCR_RegisterFont );
+	return true;
 }
 
 static bool CG_LFuncSpecialFontFamily( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	const char *fontname = CG_GetStringArg( &argumentnode );
+
 	Q_strncpyz( layout_cursor_font_name, fontname, sizeof( layout_cursor_font_name ) );
-	return CG_LFuncFontFamilyExt( commandnode, argumentnode, numArguments, trap_SCR_RegisterSpecialFont );
+	layout_cursor_font_regfunc = trap_SCR_RegisterSpecialFont;
+	layout_cursor_font_dirty = true;
+
+	return true;
 }
 
 static bool CG_LFuncFontSize( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	struct qfontface_s *font;
 	struct cg_layoutnode_s *charnode = argumentnode;
 	const char *fontsize = CG_GetStringArg( &charnode );
 
@@ -1929,19 +2092,13 @@ static bool CG_LFuncFontSize( struct cg_layoutnode_s *commandnode, struct cg_lay
 	else
 		layout_cursor_font_size = (int)ceilf( CG_GetNumericArg( &argumentnode ) );
 
-	font = trap_SCR_RegisterFont( layout_cursor_font_name, layout_cursor_font_style, layout_cursor_font_size );
-	if( font )
-	{
-		layout_cursor_font = font;
-		return true;
-	}
+	layout_cursor_font_dirty = true;
 
-	return false;
+	return true;
 }
 
 static bool CG_LFuncFontStyle( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	struct qfontface_s *font;
 	const char *fontstyle = CG_GetStringArg( &argumentnode );
 
 	if( !Q_stricmp( fontstyle, "normal" ) )
@@ -1963,16 +2120,12 @@ static bool CG_LFuncFontStyle( struct cg_layoutnode_s *commandnode, struct cg_la
 	else
 	{
 		CG_Printf( "WARNING 'CG_LFuncFontStyle' Unknown font style '%s'", fontstyle );
+		return false;
 	}
 
-	font = trap_SCR_RegisterFont( layout_cursor_font_name, layout_cursor_font_style, layout_cursor_font_size );
-	if( font )
-	{
-		layout_cursor_font = font;
-		return true;
-	}
+	layout_cursor_font_dirty = true;
 
-	return false;
+	return true;
 }
 
 static bool CG_LFuncDrawObituaries( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
@@ -1980,28 +2133,32 @@ static bool CG_LFuncDrawObituaries( struct cg_layoutnode_s *commandnode, struct 
 	int internal_align = (int)CG_GetNumericArg( &argumentnode );
 	int icon_size = (int)CG_GetNumericArg( &argumentnode );
 
-	CG_DrawObituaries( layout_cursor_x, layout_cursor_y, layout_cursor_align, layout_cursor_font, layout_cursor_color,
+	CG_DrawObituaries( layout_cursor_x, layout_cursor_y, layout_cursor_align, CG_GetLayoutCursorFont(), layout_cursor_color,
 	                   layout_cursor_width, layout_cursor_height, internal_align, icon_size * cgs.vidHeight / 600 );
 	return true;
 }
 
 static bool CG_LFuncDrawAwards( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	CG_DrawAwards( layout_cursor_x, layout_cursor_y, layout_cursor_align, layout_cursor_font, layout_cursor_color );
+	CG_DrawAwards( layout_cursor_x, layout_cursor_y, layout_cursor_align, CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
 static bool CG_LFuncDrawClock( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	CG_DrawClock( layout_cursor_x, layout_cursor_y, layout_cursor_align, layout_cursor_font, layout_cursor_color, false );
+	CG_DrawClock( layout_cursor_x, layout_cursor_y, layout_cursor_align, CG_GetLayoutCursorFont(), layout_cursor_color, false );
 	return true;
 }
 
 static bool CG_LFuncTouchClock( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	CG_DrawClock( layout_cursor_x, layout_cursor_y, layout_cursor_align, layout_cursor_font, layout_cursor_color, true );
+	CG_DrawClock( layout_cursor_x, layout_cursor_y, layout_cursor_align, CG_GetLayoutCursorFont(), layout_cursor_color, true );
 	return true;
 }
+
+#define HELPMESSAGE_OVERSHOOT_DURATION 0.2f
+#define HELPMESSAGE_OVERSHOOT_FREQUENCY 6.0f
+#define HELPMESSAGE_OVERSHOOT_DECAY 10.0f
 
 static bool CG_LFuncDrawHelpMessage( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
@@ -2012,17 +2169,41 @@ static bool CG_LFuncDrawHelpMessage( struct cg_layoutnode_s *commandnode, struct
 		{
 			int i;
 			int y = layout_cursor_y;
-			int font_height = trap_SCR_strHeight( layout_cursor_font );
+			int font_height = trap_SCR_FontHeight( CG_GetLayoutCursorFont() );
 			const char *helpmessage = "";
+			vec4_t color;
+			bool showhelp = cg_showhelp->integer || GS_TutorialGametype();
+
+			// scale alpha to text appears more faint if the player's moving
+			Vector4Copy( layout_cursor_color, color );
 
 			for( i = 0; i < 3; i++ )
 			{
 				size_t len;
+				int x = layout_cursor_x;
 
 				switch( i )
 				{
 				case 0:
-					helpmessage = ( cg_showhelp->integer && cg.matchmessage ? cg.matchmessage : "" );
+					helpmessage = "";
+					if( showhelp ) {
+						if( cg.helpmessage && cg.helpmessage[0] ) {
+							int s_x, e_x;
+							float moveTime = ( cg.time - cg.helpmessage_time ) / 1000.0f;
+
+							s_x = CG_HorizontalMovementForAlign( layout_cursor_align ) < 0 ? cgs.vidWidth : 0;
+							e_x = x;
+
+							x = LinearMovementWithOvershoot( s_x, e_x, 
+								HELPMESSAGE_OVERSHOOT_DURATION, HELPMESSAGE_OVERSHOOT_FREQUENCY, HELPMESSAGE_OVERSHOOT_DECAY, 
+								moveTime );
+
+							helpmessage = cg.helpmessage;
+						}
+						else if( cg.matchmessage ) {
+							helpmessage = cg.matchmessage;
+						}
+					}
 					break;
 				case 1:
 					if( !cg.motd )
@@ -2041,8 +2222,8 @@ static bool CG_LFuncDrawHelpMessage( struct cg_layoutnode_s *commandnode, struct
 				{
 					do
 					{
-						len = trap_SCR_DrawStringWidth( layout_cursor_x, y, layout_cursor_align, 
-							helpmessage, layout_cursor_width, layout_cursor_font, layout_cursor_color );
+						len = trap_SCR_DrawStringWidth( x, y, layout_cursor_align, 
+							helpmessage, layout_cursor_width, CG_GetLayoutCursorFont(), color );
 						if( !len )
 						{
 							if( *helpmessage == '\r' || *helpmessage == '\n' )
@@ -2074,7 +2255,7 @@ static bool CG_LFuncDrawTeamMates( struct cg_layoutnode_s *commandnode, struct c
 
 static bool CG_LFuncDrawPointed( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	CG_DrawPlayerNames( layout_cursor_font, layout_cursor_color );
+	CG_DrawPlayerNames( CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
@@ -2085,7 +2266,7 @@ static bool CG_LFuncDrawString( struct cg_layoutnode_s *commandnode, struct cg_l
 	if( !string || !string[0] )
 		return false;
 	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, 
-		CG_TranslateString( string ), layout_cursor_font, layout_cursor_color );
+		CG_TranslateString( string ), CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
@@ -2113,7 +2294,7 @@ static bool CG_LFuncDrawStringRepeat_x( const char *string, int num_draws )
 	}
 	temps[pos] = '\0';
 
-	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, temps, layout_cursor_font, layout_cursor_color );
+	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, temps, CG_GetLayoutCursorFont(), layout_cursor_color );
 
 	return true;
 }
@@ -2149,7 +2330,7 @@ static bool CG_LFuncDrawItemNameFromIndex( struct cg_layoutnode_s *commandnode, 
 	if( !item || !item->name )
 		return false;
 	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, 
-		CG_TranslateString( item->name ), layout_cursor_font, layout_cursor_color );
+		CG_TranslateString( item->name ), CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
@@ -2162,7 +2343,7 @@ static bool CG_LFuncDrawConfigstring( struct cg_layoutnode_s *commandnode, struc
 		CG_Printf( "WARNING 'CG_LFuncDrawConfigstring' Bad stat_string index" );
 		return false;
 	}
-	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, cgs.configStrings[index], layout_cursor_font, layout_cursor_color );
+	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, cgs.configStrings[index], CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
@@ -2175,7 +2356,7 @@ static bool CG_LFuncDrawPlayername( struct cg_layoutnode_s *commandnode, struct 
 
 	if( ( index >= 0 && index < gs.maxclients ) && cgs.clientInfo[index].name[0] )
 	{
-		trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, cgs.clientInfo[index].name, layout_cursor_font, layout_cursor_color );
+		trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, cgs.clientInfo[index].name, CG_GetLayoutCursorFont(), layout_cursor_color );
 		return true;
 	}
 	return false;
@@ -2211,7 +2392,7 @@ static bool CG_LFuncDrawNumeric2( struct cg_layoutnode_s *commandnode, struct cg
 {
 	int value = (int)CG_GetNumericArg( &argumentnode );
 
-	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, va( "%i", value ), layout_cursor_font, layout_cursor_color );
+	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, va( "%i", value ), CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
@@ -2252,6 +2433,18 @@ static bool CG_LFuncCustomWeaponIcons( struct cg_layoutnode_s *commandnode, stru
 	return true;
 }
 
+static bool CG_LFuncResetCustomWeaponIcons( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	int weapon;
+	for( weapon = 0; weapon < WEAP_TOTAL-1; weapon++ )
+	{
+		customWeaponPics[weapon] = NULL;
+		customNoGunWeaponPics[weapon] = NULL;
+	}
+	customWeaponSelectPic = NULL;
+	return true;
+}
+
 static bool CG_LFuncCustomWeaponSelect( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	customWeaponSelectPic = CG_GetStringArg( &argumentnode );
@@ -2279,6 +2472,27 @@ static bool CG_LFuncDrawWeaponIcons( struct cg_layoutnode_s *commandnode, struct
 static bool CG_LFuncTouchWeaponIcons( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	CG_LFuncsWeaponIcons( argumentnode, true );
+	return true;
+}
+
+static bool CG_LFuncDrawWeaponCross( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	int ammoofs = (int)( CG_GetNumericArg( &argumentnode ) * cgs.vidHeight/600 );
+	int ammosize = (int)( CG_GetNumericArg( &argumentnode ) * cgs.vidHeight/600 );
+	int ammopass;
+
+	if( cg_hud_weaponcrosstime > 0.0f )
+	{
+		for( ammopass = 0; ammopass < 2; ammopass++ )
+		{
+			CG_DrawWeaponCrossQuarter( ammopass, 0, layout_cursor_x, layout_cursor_y,  0, -1, layout_cursor_width, layout_cursor_height, ammoofs, ammosize );
+			CG_DrawWeaponCrossQuarter( ammopass, 1, layout_cursor_x, layout_cursor_y,  1,  0, layout_cursor_width, layout_cursor_height, ammoofs, ammosize );
+			CG_DrawWeaponCrossQuarter( ammopass, 2, layout_cursor_x, layout_cursor_y,  0,  1, layout_cursor_width, layout_cursor_height, ammoofs, ammosize );
+			CG_DrawWeaponCrossQuarter( ammopass, 3, layout_cursor_x, layout_cursor_y, -1,  0, layout_cursor_width, layout_cursor_height, ammoofs, ammosize );
+			if( ammosize <= 0 )
+				break;
+		}
+	}
 	return true;
 }
 
@@ -2310,7 +2524,7 @@ static bool CG_LFuncDrawLocationName( struct cg_layoutnode_s *commandnode, struc
 
 	trap_GetConfigString( CS_LOCATIONS + loc_tag, string, sizeof( string ) );
 
-	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, string, layout_cursor_font, layout_cursor_color );
+	trap_SCR_DrawString( layout_cursor_x, layout_cursor_y, layout_cursor_align, CG_TranslateString( string ), CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
@@ -2342,19 +2556,13 @@ static bool CG_LFuncDrawWeaponStrongAmmo( struct cg_layoutnode_s *commandnode, s
 
 static bool CG_LFuncDrawTeamInfo( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	CG_DrawTeamInfo( layout_cursor_x, layout_cursor_y, layout_cursor_align, layout_cursor_font, layout_cursor_color );
+	CG_DrawTeamInfo( layout_cursor_x, layout_cursor_y, layout_cursor_align, CG_GetLayoutCursorFont(), layout_cursor_color );
 	return true;
 }
 
 static bool CG_LFuncDrawCrossHair( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	CG_DrawCrosshair( layout_cursor_x, layout_cursor_y, layout_cursor_align, false );
-	return true;
-}
-
-static bool CG_LFuncTouchCrossHair( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
-{
-	CG_DrawCrosshair( layout_cursor_x, layout_cursor_y, layout_cursor_align, true );
+	CG_DrawCrosshair( layout_cursor_x, layout_cursor_y, layout_cursor_align );
 	return true;
 }
 
@@ -2381,12 +2589,12 @@ static bool CG_LFuncDrawChat( struct cg_layoutnode_s *commandnode, struct cg_lay
 	padding_y = (int)( CG_GetNumericArg( &argumentnode ) )*cgs.vidHeight/600;
 	shader = trap_R_RegisterPic( CG_GetStringArg( &argumentnode ) );
 
-	CG_DrawChat( &cg.chat, layout_cursor_x, layout_cursor_y, layout_cursor_font_name, layout_cursor_font, layout_cursor_font_size,
+	CG_DrawChat( &cg.chat, layout_cursor_x, layout_cursor_y, layout_cursor_font_name, CG_GetLayoutCursorFont(), layout_cursor_font_size,
 		layout_cursor_width, layout_cursor_height, padding_x, padding_y, layout_cursor_color, shader );
 	return true;
 }
 
-static void CG_MoveUpFunc( int id )
+static void CG_MoveUpFunc( int id, unsigned int time )
 {
 	CG_SetTouchpad( TOUCHPAD_MOVE, -1 );
 }
@@ -2402,23 +2610,59 @@ static bool CG_LFuncTouchMove( struct cg_layoutnode_s *commandnode, struct cg_la
 	return true;
 }
 
-static void CG_ViewUpFunc( int id )
+static void CG_ViewUpFunc( int id, unsigned int time )
 {
+	if( cg_hud_touch_zoomSeq )
+	{
+		float x, y;
+		if( !time || ( (int)( time - cg_hud_touch_zoomLastTouch ) > cg_touch_zoomTime->integer ) ||
+			!CG_GetTouchpadOffset( TOUCHPAD_VIEW, x, y, true ) ||
+			( fabsf( x ) > cg_touch_zoomThres->value ) ||
+			( fabsf( y ) > cg_touch_zoomThres->value ) )
+		{
+			cg_hud_touch_zoomSeq = 0;
+		}
+
+		if( ( cg_hud_touch_zoomSeq == 1 ) || ( cg_hud_touch_zoomSeq == 3 ) )
+		{
+			cg_hud_touch_zoomSeq = ( cg_hud_touch_zoomSeq + 1 ) & 3;
+			if( !cg_hud_touch_zoomSeq ) // toggle zoom after a double tap
+				cg_hud_touch_buttons ^= BUTTON_ZOOM;
+
+			cg_hud_touch_zoomLastTouch = time;
+		}
+	}
+
 	CG_SetTouchpad( TOUCHPAD_VIEW, -1 );
 }
 
 static bool CG_LFuncTouchView( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
-	int touch = CG_TouchArea( TOUCHAREA_HUD_VIEW,
+	int touchID = CG_TouchArea( TOUCHAREA_HUD_VIEW,
 		CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width ),
 		CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height ),
 		layout_cursor_width, layout_cursor_height, CG_ViewUpFunc );
-	if( touch >= 0 )
-		CG_SetTouchpad( TOUCHPAD_VIEW, touch );
+	if( touchID >= 0 )
+	{
+		CG_SetTouchpad( TOUCHPAD_VIEW, touchID );
+
+		cg_touch_t &touch = cg_touches[touchID];
+		if( cg_hud_touch_zoomSeq )
+		{
+			if( (int)( touch.time - cg_hud_touch_zoomLastTouch ) > cg_touch_zoomTime->integer )
+				cg_hud_touch_zoomSeq = 0;
+		}
+		if( !cg_hud_touch_zoomSeq || ( cg_hud_touch_zoomSeq == 2 ) )
+		{
+			cg_hud_touch_zoomSeq++;
+			cg_hud_touch_zoomLastTouch = touch.time;
+		}
+	}
+
 	return true;
 }
 
-static void CG_UpmoveUpFunc( int id )
+static void CG_UpmoveUpFunc( int id, unsigned int time )
 {
 	cg_hud_touch_upmove = 0;
 }
@@ -2447,7 +2691,7 @@ static bool CG_LFuncTouchCrouch( struct cg_layoutnode_s *commandnode, struct cg_
 	return true;
 }
 
-static void CG_AttackUpFunc( int id )
+static void CG_AttackUpFunc( int id, unsigned int time )
 {
 	cg_hud_touch_buttons &= ~BUTTON_ATTACK;
 }
@@ -2464,7 +2708,7 @@ static bool CG_LFuncTouchAttack( struct cg_layoutnode_s *commandnode, struct cg_
 	return true;
 }
 
-static void CG_SpecialUpFunc( int id )
+static void CG_SpecialUpFunc( int id, unsigned int time )
 {
 	cg_hud_touch_buttons &= ~BUTTON_SPECIAL;
 }
@@ -2535,6 +2779,12 @@ static bool CG_LFuncDrawCheckpoint( struct cg_layoutnode_s *commandnode, struct 
 	return true;
 }
 // !racesow
+
+
+static bool CG_LFuncIfNot( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	return (int)CG_GetNumericArg( &argumentnode ) == 0;
+}
 
 
 typedef struct cg_layoutcommand_s
@@ -2708,6 +2958,15 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 		NULL,
 		3,
 		"Sets a custom shader for weapon icons",
+		false
+	},
+
+	{
+		"resetCustomWeaponIcons",
+		CG_LFuncResetCustomWeaponIcons,
+		NULL,
+		0,
+		"Resets the custom shaders for weapon icons",
 		false
 	},
 
@@ -2887,7 +3146,7 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 	{
 		"drawCrosshair",
 		CG_LFuncDrawCrossHair,
-		CG_LFuncTouchCrossHair,
+		NULL,
 		0,
 		"Draws the game crosshair",
 		false
@@ -2948,6 +3207,15 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 	},
 
 	{
+		"drawSubPicByName",
+		CG_LFuncDrawSubPicByName,
+		NULL,
+		5,
+		"Draws a part of a pic with arguments being the file path and the texture coordinates",
+		true
+	},
+
+	{
 		"drawModelByIndex",
 		CG_LFuncDrawModelByIndex,
 		NULL,
@@ -2980,6 +3248,15 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 		CG_LFuncTouchWeaponIcons,
 		4,
 		"Draws the icons of weapon/ammo owned by the player, arguments are offset x, offset y, size x, size y",
+		false
+	},
+
+	{
+		"drawWeaponCross",
+		CG_LFuncDrawWeaponCross,
+		NULL,
+		2,
+		"Draws the weapon selection cross, cursor sets the center, size sets the size of each icon, arguments are ammo y offset and size",
 		false
 	},
 
@@ -3033,6 +3310,15 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 		CG_LFuncIf,
 		1,
 		"Conditional expression. Argument accepts operations >, <, ==, >=, <=, etc",
+		false
+	},
+
+	{
+		"ifnot",
+		CG_LFuncIfNot,
+		CG_LFuncIfNot,
+		1,
+		"Negative conditional expression. Argument accepts operations >, <, ==, >=, <=, etc",
 		false
 	},
 
@@ -3648,7 +3934,7 @@ static cg_layoutnode_t *CG_RecurseParseLayoutScript( char **ptr, int level )
 			}
 
 			// special case: last command was "if", we create a new sub-thread and ignore the new command
-			if( command && !Q_stricmp( command->string, "if" ) )
+			if( command && ( !Q_stricmp( command->string, "if" ) || !Q_stricmp( command->string, "ifnot" ) ) )
 			{
 				*ptr = s_tokenback; // step back one token
 				command->ifthread = CG_RecurseParseLayoutScript( ptr, level + 1 );
@@ -3994,11 +4280,11 @@ static char *CG_LoadHUDFile( char *path )
 		{
 			break;
 		}
-		token = COM_ParseExt2( ( const char ** )&rec_ptr[rec_lvl], qtrue, qfalse );
+		token = COM_ParseExt2( ( const char ** )&rec_ptr[rec_lvl], true, false );
 		if( !Q_stricmp( "include", token ) )
 		{
 			// Handle include
-			token = COM_ParseExt2( ( const char ** )&rec_ptr[rec_lvl], qfalse, qfalse );
+			token = COM_ParseExt2( ( const char ** )&rec_ptr[rec_lvl], false, false );
 			if( ( ( rec_lvl + 1 ) < HUD_MAX_LVL ) && ( rec_ptr[rec_lvl] ) && ( token ) && ( token[0] != '\0' ) )
 			{
 				// Go to next recursive level and prepare it's filename :)
@@ -4033,7 +4319,7 @@ static char *CG_LoadHUDFile( char *path )
 			}
 			else
 			{
-				token = COM_ParseExt2( ( const char ** )&rec_ptr[rec_lvl], qfalse, qfalse );
+				token = COM_ParseExt2( ( const char ** )&rec_ptr[rec_lvl], false, false );
 				if( ( token ) && ( token[0] != '\0' ) )
 				{
 					if( developer->integer )
@@ -4264,6 +4550,12 @@ static void CG_LoadStatusBarFile( char *path )
 		CG_Printf( "HUD: failed to load %s file\n", path );
 		return;
 	}
+
+	CG_CancelTouches();
+	cg_hud_touch_buttons = 0;
+	cg_hud_touch_upmove = 0;
+	cg_hud_touch_zoomSeq = 0;
+
 	// load the new status bar program
 	CG_ParseLayoutScript( opt, cg.statusBar );
 	// Free the opt buffer!
@@ -4273,14 +4565,17 @@ static void CG_LoadStatusBarFile( char *path )
 	Q_strncpyz( layout_cursor_font_name, DEFAULT_SYSTEM_FONT_FAMILY, sizeof( layout_cursor_font_name ) );
 	layout_cursor_font_style = QFONT_STYLE_NONE;
 	layout_cursor_font_size = DEFAULT_SYSTEM_FONT_SMALL_SIZE;
+	layout_cursor_font_dirty = true;
+	layout_cursor_font_regfunc = trap_SCR_RegisterFont;
 
-	layout_cursor_font = trap_SCR_RegisterFont( layout_cursor_font_name, layout_cursor_font_style, layout_cursor_font_size );
 	for( i = 0; i < WEAP_TOTAL-1; i++ )
 	{
 		customWeaponPics[i] = NULL;
 		customNoGunWeaponPics[i] = NULL;
 	}
 	customWeaponSelectPic = NULL;
+
+	trap_Cvar_ForceSet( "con_chatCGame", "0" );
 }
 
 /*
@@ -4324,4 +4619,22 @@ void CG_GetHUDTouchButtons( int &buttons, int &upmove )
 {
 	buttons = cg_hud_touch_buttons;
 	upmove = cg_hud_touch_upmove;
+}
+
+/*
+* CG_UpdateHUDPostDraw
+*/
+void CG_UpdateHUDPostDraw( void )
+{
+	cg_hud_weaponcrosstime -= cg.frameTime;
+	CG_CheckWeaponCross();
+}
+
+/*
+* CG_UpdateHUDPostTouch
+*/
+void CG_UpdateHUDPostTouch( void )
+{
+	if( cg.frame.playerState.pmove.pm_type != PM_NORMAL )
+		cg_hud_touch_buttons &= ~BUTTON_ZOOM;
 }

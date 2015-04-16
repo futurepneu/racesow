@@ -58,6 +58,8 @@ static dynvar_set_status_t Sys_SetAffinity_f( void *affinity );
 void Sys_InitTimeDynvar( void );
 void Sys_InitTime( void );
 
+void Sys_InitThreads( void );
+
 /*
 ===============================================================================
 
@@ -82,6 +84,10 @@ void Sys_Error( const char *format, ... )
 	// shut down QHOST hooks if necessary
 	DeinitConProc();
 
+#ifndef DEDICATED_ONLY
+	IN_WinIME_Shutdown();
+#endif
+
 	Qcommon_Shutdown();
 
 	exit( 1 );
@@ -98,6 +104,10 @@ void Sys_Quit( void )
 
 	// shut down QHOST hooks if necessary
 	DeinitConProc();
+
+#ifndef DEDICATED_ONLY
+	IN_WinIME_Shutdown();
+#endif
 
 	Qcommon_Shutdown();
 
@@ -135,6 +145,8 @@ void Sys_Init( void )
 
 	Sys_InitTime();
 
+	Sys_InitThreads();
+
 	if( dedicated->integer )
 	{
 		SetPriorityClass( GetCurrentProcess(), HIGH_PRIORITY_CLASS );
@@ -147,6 +159,10 @@ void Sys_Init( void )
 		// let QHOST hook in
 		InitConProc( argc, argv );
 	}
+
+#ifndef DEDICATED_ONLY
+	IN_WinIME_Init();
+#endif
 }
 
 /*
@@ -157,7 +173,7 @@ void Sys_InitDynvars( void )
 	char *dummyStr;
 	dynvar_t *affinity_var;
 
-	affinity_var = Dynvar_Create( "sys_affinity", qtrue, Sys_GetAffinity_f, Sys_SetAffinity_f );
+	affinity_var = Dynvar_Create( "sys_affinity", true, Sys_GetAffinity_f, Sys_SetAffinity_f );
 	assert( affinity_var );
 	Dynvar_GetValue( affinity_var, (void **)&dummyStr );
 	assert( dummyStr );
@@ -175,7 +191,7 @@ void Sys_InitDynvars( void )
 #define myTranslateMessage(msg) TranslateMessage(msg)
 #else
 int IN_MapKey( int key );
-qboolean Key_IsNonPrintable( int key );
+bool Key_IsNonPrintable( int key );
 static BOOL myTranslateMessage (MSG *msg)
 {
 	if (msg->message == WM_KEYDOWN) {
@@ -351,7 +367,7 @@ static void ParseCommandLine( LPSTR lpCmdLine )
 
 static dynvar_get_status_t Sys_GetAffinity_f( void **affinity )
 {
-	static qboolean affinityAutoSet = qfalse;
+	static bool affinityAutoSet = false;
 	static char affinityString[33];
 	DWORD_PTR procAffinity, sysAffinity;
 	HANDLE proc = GetCurrentProcess();
@@ -385,7 +401,7 @@ static dynvar_get_status_t Sys_GetAffinity_f( void **affinity )
 					affinityString[i] = '0';
 			}
 #endif
-			affinityAutoSet = qtrue;
+			affinityAutoSet = true;
 		}
 
 		*affinity = affinityString;

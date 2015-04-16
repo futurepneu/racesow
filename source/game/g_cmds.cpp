@@ -46,7 +46,7 @@ static bool G_Teleport( edict_t *ent, vec3_t origin, vec3_t angles )
 	VectorCopy( origin, ent->s.origin );
 	VectorCopy( origin, ent->s.old_origin );
 	VectorCopy( origin, ent->olds.origin );
-	ent->s.teleported = qtrue;
+	ent->s.teleported = true;
 
 	VectorClear( ent->velocity );
 	ent->r.client->ps.pmove.pm_time = 1;
@@ -280,7 +280,7 @@ static void Cmd_GameOperator_f( edict_t *ent )
 	if( !Q_stricmp( trap_Cmd_Argv( 1 ), g_operator_password->string ) )
 	{
 		if( !ent->r.client->isoperator )
-			G_PrintMsg( NULL, "%s"S_COLOR_WHITE" is now a game operator\n", ent->r.client->netname );
+			G_PrintMsg( NULL, "%s" S_COLOR_WHITE " is now a game operator\n", ent->r.client->netname );
 
 		ent->r.client->isoperator = true;
 		return;
@@ -543,7 +543,7 @@ bool CheckFlood( edict_t *ent, bool teamonly )
 			trap_Cvar_Set( "g_floodprotection_messages", "0" );
 		if( g_floodprotection_messages->integer > MAX_FLOOD_MESSAGES )
 			trap_Cvar_Set( "g_floodprotection_messages", va( "%i", MAX_FLOOD_MESSAGES ) );
-		g_floodprotection_messages->modified = qfalse;
+		g_floodprotection_messages->modified = false;
 	}
 
 	if( g_floodprotection_team->modified )
@@ -552,21 +552,21 @@ bool CheckFlood( edict_t *ent, bool teamonly )
 			trap_Cvar_Set( "g_floodprotection_team", "0" );
 		if( g_floodprotection_team->integer > MAX_FLOOD_MESSAGES )
 			trap_Cvar_Set( "g_floodprotection_team", va( "%i", MAX_FLOOD_MESSAGES ) );
-		g_floodprotection_team->modified = qfalse;
+		g_floodprotection_team->modified = false;
 	}
 
 	if( g_floodprotection_seconds->modified )
 	{
 		if( g_floodprotection_seconds->value <= 0 )
 			trap_Cvar_Set( "g_floodprotection_seconds", "4" );
-		g_floodprotection_seconds->modified = qfalse;
+		g_floodprotection_seconds->modified = false;
 	}
 
 	if( g_floodprotection_penalty->modified )
 	{
 		if( g_floodprotection_penalty->value < 0 )
 			trap_Cvar_Set( "g_floodprotection_penalty", "10" );
-		g_floodprotection_penalty->modified = qfalse;
+		g_floodprotection_penalty->modified = false;
 	}
 
 	// old protection still active
@@ -671,6 +671,7 @@ void Cmd_Say_f( edict_t *ent, bool arg0, bool checkflood )
 {
 	char *p;
 	char text[2048];
+	size_t arg0len = 0;
 
 	if( sv_mm_enable->integer && ent->r.client && ent->r.client->mm_session <= 0 )
 	{
@@ -700,6 +701,7 @@ void Cmd_Say_f( edict_t *ent, bool arg0, bool checkflood )
 	{
 		Q_strncatz( text, trap_Cmd_Argv( 0 ), sizeof( text ) );
 		Q_strncatz( text, " ", sizeof( text ) );
+		arg0len = strlen( text );
 		Q_strncatz( text, trap_Cmd_Args(), sizeof( text ) );
 	}
 	else
@@ -716,8 +718,7 @@ void Cmd_Say_f( edict_t *ent, bool arg0, bool checkflood )
 	}
 
 	// don't let text be too long for malicious reasons
-	if( strlen( text ) > 150 )
-		text[150] = 0;
+	text[arg0len + (MAX_CHAT_BYTES - 1)] = 0;
 
 	G_ChatMsg( NULL, ent, false, "%s", text );
 }
@@ -1209,6 +1210,17 @@ static void Cmd_TVConnect_f( edict_t *ent )
 	G_MoveClientToTV( ent );
 }
 
+/*
+* Cmd_Upstate_f
+*
+* Update client on the state of things
+*/
+static void Cmd_Upstate_f( edict_t *ent )
+{
+	G_UpdatePlayerMatchMsg( ent, true );
+	G_SetPlayerHelpMessage( ent, ent->r.client->level.helpmessage, true );
+}
+
 //===========================================================
 //	client commands
 //===========================================================
@@ -1361,6 +1373,9 @@ void G_InitGameCommands( void )
 
 	// TV
 	G_AddCommand( "tvconnect", Cmd_TVConnect_f );
+
+	// misc
+	G_AddCommand( "upstate", Cmd_Upstate_f );
 }
 
 /*

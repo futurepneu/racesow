@@ -165,9 +165,9 @@ void CL_UIModule_Init( void )
 {
 	int apiversion;
 	ui_import_t import;
-	void *( *builtinAPIfunc )(void *) = NULL;
-#ifdef UI_HARD_LINKED
-	builtinAPIfunc = GetUIAPI;
+	dllfunc_t funcs[2];
+#ifndef UI_HARD_LINKED
+	void *( *GetUIAPI )(void *) = NULL;
 #endif
 
 	CL_UIModule_Shutdown();
@@ -239,7 +239,7 @@ void CL_UIModule_Init( void )
 	import.Key_SetBinding = Key_SetBinding;
 	import.Key_IsDown = Key_IsDown;
 
-	import.IN_ShowIME = IN_ShowIME;
+	import.IN_ShowSoftKeyboard = IN_ShowSoftKeyboard;
 
 	import.R_ClearScene = re.ClearScene;
 	import.R_AddEntityToScene = re.AddEntityToScene;
@@ -280,7 +280,12 @@ void CL_UIModule_Init( void )
 	import.SCR_DrawString = SCR_DrawString;
 	import.SCR_DrawStringWidth = SCR_DrawStringWidth;
 	import.SCR_DrawClampString = SCR_DrawClampString;
-	import.SCR_strHeight = SCR_strHeight;
+	import.SCR_FontSize = SCR_FontSize;
+	import.SCR_FontHeight = SCR_FontHeight;
+	import.SCR_FontUnderline = SCR_FontUnderline;
+	import.SCR_FontAdvance = SCR_FontAdvance;
+	import.SCR_FontXHeight = SCR_FontXHeight;
+	import.SCR_SetDrawCharIntercept = SCR_SetDrawCharIntercept;
 	import.SCR_strWidth = SCR_strWidth;
 	import.SCR_StrlenForWidth = SCR_StrlenForWidth;
 
@@ -323,29 +328,39 @@ void CL_UIModule_Init( void )
 	import.L10n_LoadLangPOFile = &CL_UIModule_L10n_LoadLangPOFile;
 	import.L10n_TranslateString = &CL_UIModule_L10n_TranslateString;
 	import.L10n_ClearDomain = &CL_UIModule_L10n_ClearDomain;
+	import.L10n_GetUserLanguage = &L10n_GetUserLanguage;
 
-	if( builtinAPIfunc ) {
-		uie = (ui_export_t *)builtinAPIfunc( &import );
-	}
-	else {
-		uie = (ui_export_t *)Com_LoadGameLibrary( "ui", "GetUIAPI", &module_handle, &import, cls.sv_pure, NULL );
-	}
-	if( !uie )
-		Com_Error( ERR_DROP, "Failed to load UI dll" );
-
-	apiversion = uie->API();
-	if( apiversion != UI_API_VERSION )
+#ifndef UI_HARD_LINKED
+	funcs[0].name = "GetUIAPI";
+	funcs[0].funcPointer = ( void ** ) &GetUIAPI;
+	funcs[1].name = NULL;
+	module_handle = Com_LoadLibrary( LIB_DIRECTORY "/" LIB_PREFIX "ui_" ARCH LIB_SUFFIX, funcs );
+	if( !module_handle )
 	{
-		Com_UnloadGameLibrary( &module_handle );
 		Mem_FreePool( &ui_mempool );
+		Com_Error( ERR_FATAL, "Failed to load UI dll" );
 		uie = NULL;
+		return;
+	}
+#endif
+
+	uie = GetUIAPI( &import );
+	apiversion = uie->API();
+	if( apiversion == UI_API_VERSION )
+	{
+		CL_UIModule_AsyncStream_Init();
+
+		uie->Init( viddef.width, viddef.height, VID_GetPixelRatio(),
+			APP_PROTOCOL_VERSION, APP_DEMO_EXTENSION_STR, APP_UI_BASEPATH );
+	}
+	else
+	{
+		// wrong version
+		uie = NULL;
+		Com_UnloadLibrary( &module_handle );
+		Mem_FreePool( &ui_mempool );
 		Com_Error( ERR_FATAL, "UI version is %i, not %i", apiversion, UI_API_VERSION );
 	}
-
-	CL_UIModule_AsyncStream_Init();
-
-	uie->Init( viddef.width, viddef.height, VID_GetPixelRatio(),
-		APP_PROTOCOL_VERSION, APP_DEMO_EXTENSION_STR, APP_UI_BASEPATH );
 
 	Com_Printf( "------------------------------------\n" );
 }
@@ -362,7 +377,7 @@ void CL_UIModule_Shutdown( void )
 
 	uie->Shutdown();
 	Mem_FreePool( &ui_mempool );
-	Com_UnloadGameLibrary( &module_handle );
+	Com_UnloadLibrary( &module_handle );
 	uie = NULL;
 
 	CL_UIModule_L10n_ClearDomain();
@@ -380,7 +395,7 @@ void CL_UIModule_TouchAllAssets( void )
 /*
 * CL_UIModule_Refresh
 */
-void CL_UIModule_Refresh( qboolean backGround, qboolean showCursor )
+void CL_UIModule_Refresh( bool backGround, bool showCursor )
 {
 	if( uie )
 		uie->Refresh( cls.realtime, Com_ClientState(), Com_ServerState(), 
@@ -391,7 +406,7 @@ void CL_UIModule_Refresh( qboolean backGround, qboolean showCursor )
 /*
 * CL_UIModule_UpdateConnectScreen
 */
-void CL_UIModule_UpdateConnectScreen( qboolean backGround )
+void CL_UIModule_UpdateConnectScreen( bool backGround )
 {
 	if( uie )
 	{
@@ -460,7 +475,7 @@ void CL_UIModule_UpdateConnectScreen( qboolean backGround )
 			downloadType, cls.download.name, cls.download.percent * 100.0f, downloadSpeed,
 			cls.connect_count, backGround );
 
-		CL_UIModule_Refresh( backGround, qfalse );	
+		CL_UIModule_Refresh( backGround, false );	
 	}
 }
 
@@ -485,7 +500,7 @@ void CL_UIModule_Keyup( int key )
 /*
 * CL_UIModule_CharEvent
 */
-void CL_UIModule_CharEvent( qwchar key )
+void CL_UIModule_CharEvent( wchar_t key )
 {
 	if( uie )
 		uie->CharEvent( key );

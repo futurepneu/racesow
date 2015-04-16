@@ -26,7 +26,7 @@ static sndQueue_t *s_cmdQueue;
 static struct qthread_s *s_backThread;
 
 static int		s_registration_sequence;
-static qboolean	s_registering;
+static bool	s_registering;
 
 struct mempool_s *soundpool;
 
@@ -92,7 +92,7 @@ static void SF_Music_f( void )
 		return;
 	}
 
-	SF_StartBackgroundTrack( trap_Cmd_Argv( 1 ), trap_Cmd_Argv( 2 ) );
+	SF_StartBackgroundTrack( trap_Cmd_Argv( 1 ), trap_Cmd_Argv( 2 ), 0 );
 }
 
 /*
@@ -114,7 +114,7 @@ static void SF_SoundInfo_f( void )
 */
 static void SF_StopAllSounds_f( void )
 {
-	SF_StopAllSounds( qtrue, qtrue );
+	SF_StopAllSounds( true, true );
 }
 
 // =======================================================================
@@ -178,7 +178,7 @@ void SF_BeginRegistration( void )
 	if( !s_registration_sequence ) {
 		s_registration_sequence = 1;
 	}
-	s_registering = qtrue;
+	s_registering = true;
 
 	// wait for the queue to be processed
 	S_FinishSoundQueue( s_cmdQueue );
@@ -243,7 +243,7 @@ void SF_EndRegistration( void )
 	// wait for the queue to be processed
 	S_FinishSoundQueue( s_cmdQueue );
 
-	s_registering = qfalse;
+	s_registering = false;
 
 	// free any sounds not from this registration sequence
 	for( i = 0, sfx = known_sfx; i < num_sfx; i++, sfx++ ) {
@@ -261,7 +261,7 @@ void SF_EndRegistration( void )
 /*
 * SF_Init
 */
-qboolean SF_Init( void *hwnd, int maxEntities, qboolean verbose )
+bool SF_Init( void *hwnd, int maxEntities, bool verbose )
 {
 	soundpool = S_MemAllocPool( "QF Sound Module" );
 
@@ -293,11 +293,11 @@ qboolean SF_Init( void *hwnd, int maxEntities, qboolean verbose )
 	num_sfx = 0;
 
 	s_registration_sequence = 1;
-	s_registering = qfalse;
+	s_registering = false;
 
 	s_cmdQueue = S_CreateSoundQueue();
 	if( !s_cmdQueue ) {
-		return qfalse;
+		return false;
 	}
 
 	s_backThread = trap_Thread_Create( S_BackgroundUpdateProc, s_cmdQueue );
@@ -307,19 +307,19 @@ qboolean SF_Init( void *hwnd, int maxEntities, qboolean verbose )
 	S_FinishSoundQueue( s_cmdQueue );
 
 	if( !dma.buffer )
-		return qfalse;
+		return false;
 
 	SF_SetAttenuationModel( S_DEFAULT_ATTENUATION_MODEL, 
 		S_DEFAULT_ATTENUATION_MAXDISTANCE, S_DEFAULT_ATTENUATION_REFDISTANCE );
 
-	return qtrue;
+	return true;
 }
 
 
 /*
 * SF_Shutdown
 */
-void SF_Shutdown( qboolean verbose )
+void SF_Shutdown( bool verbose )
 {
 	if( !soundpool ) {
 		return;
@@ -354,7 +354,7 @@ void SF_Shutdown( qboolean verbose )
 
 	S_MemFreePool( &soundpool );
 
-	s_registering = qfalse;
+	s_registering = false;
 
 	num_sfx = 0;
 }
@@ -362,19 +362,17 @@ void SF_Shutdown( qboolean verbose )
 /*
 * SF_Activate
 */
-void SF_Activate( qboolean active )
+void SF_Activate( bool active )
 {
-	SF_LockBackgroundTrack( !active );
-
 	S_IssueActivateCmd( s_cmdQueue, active );
 }
 
 /*
 * SF_StartBackgroundTrack
 */
-void SF_StartBackgroundTrack( const char *intro, const char *loop )
+void SF_StartBackgroundTrack( const char *intro, const char *loop, int mode )
 {
-	S_IssueStartBackgroundTrackCmd( s_cmdQueue, intro, loop );
+	S_IssueStartBackgroundTrackCmd( s_cmdQueue, intro, loop, mode );
 }
 
 /*
@@ -388,7 +386,7 @@ void SF_StopBackgroundTrack( void )
 /*
 * SF_LockBackgroundTrack
 */
-void SF_LockBackgroundTrack( qboolean lock )
+void SF_LockBackgroundTrack( bool lock )
 {
 	S_IssueLockBackgroundTrackCmd( s_cmdQueue, lock );
 }
@@ -396,7 +394,7 @@ void SF_LockBackgroundTrack( qboolean lock )
 /*
 * SF_StopAllSounds
 */
-void SF_StopAllSounds( qboolean clear, qboolean stopMusic )
+void SF_StopAllSounds( bool clear, bool stopMusic )
 {
 	S_IssueStopAllSoundsCmd( s_cmdQueue, clear, stopMusic );
 }
@@ -430,7 +428,7 @@ void SF_PauseBackgroundTrack( void )
 */
 void SF_BeginAviDemo( void )
 {
-	S_IssueAviDemoCmd( s_cmdQueue, qtrue );
+	S_IssueAviDemoCmd( s_cmdQueue, true );
 }
 
 /*
@@ -438,7 +436,7 @@ void SF_BeginAviDemo( void )
 */
 void SF_StopAviDemo( void )
 {
-	S_IssueAviDemoCmd( s_cmdQueue, qfalse );
+	S_IssueAviDemoCmd( s_cmdQueue, false );
 }
 
 /*
@@ -517,7 +515,7 @@ void SF_AddLoopSound( sfx_t *sfx, int entnum, float fvol, float attenuation )
 /*
 * SF_Update
 */
-void SF_Update( const vec3_t origin, const vec3_t velocity, const mat3_t axis, qboolean avidump )
+void SF_Update( const vec3_t origin, const vec3_t velocity, const mat3_t axis, bool avidump )
 {
 	S_IssueSetListenerCmd( s_cmdQueue, origin, velocity, axis, avidump );
 }
@@ -526,10 +524,10 @@ void SF_Update( const vec3_t origin, const vec3_t velocity, const mat3_t axis, q
 * SF_RawSamples
 */
 void SF_RawSamples( unsigned int samples, unsigned int rate, unsigned short width, 
-	unsigned short channels, const qbyte *data, qboolean music )
+	unsigned short channels, const uint8_t *data, bool music )
 {
 	size_t data_size = samples * width * channels;
-	qbyte *data_copy = S_Malloc( data_size );
+	uint8_t *data_copy = S_Malloc( data_size );
 
 	memcpy( data_copy, data, data_size );
 
@@ -541,10 +539,10 @@ void SF_RawSamples( unsigned int samples, unsigned int rate, unsigned short widt
 */
 void SF_PositionedRawSamples( int entnum, float fvol, float attenuation, 
 	unsigned int samples, unsigned int rate, 
-	unsigned short width, unsigned short channels, const qbyte *data )
+	unsigned short width, unsigned short channels, const uint8_t *data )
 {
 	size_t data_size = samples * width * channels;
-	qbyte *data_copy = S_Malloc( data_size );
+	uint8_t *data_copy = S_Malloc( data_size );
 
 	memcpy( data_copy, data, data_size );
 
@@ -605,7 +603,7 @@ void Com_Printf( const char *format, ... )
 }
 
 #if defined ( HAVE_DLLMAIN )
-int _stdcall DLLMain( void *hinstDll, unsigned long dwReason, void *reserved )
+int WINAPI DLLMain( void *hinstDll, unsigned long dwReason, void *reserved )
 {
 	return 1;
 }

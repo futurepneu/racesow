@@ -204,7 +204,7 @@ static void path_corner_touch( edict_t *self, edict_t *other, cplane_t *plane, i
 		v[2] -= other->r.mins[2];
 		VectorCopy( v, other->s.origin );
 		next = G_PickTarget( next->target );
-		other->s.teleported = qtrue;
+		other->s.teleported = true;
 	}
 
 	other->goalentity = other->movetarget = next;
@@ -986,7 +986,7 @@ void SP_misc_particles( edict_t *ent )
 
 	if( ent->spawnflags & 8 ) // LIGHT
 	{
-		ent->s.light = COLOR_RGB( (qbyte)(ent->color[0] * 255), (qbyte)(ent->color[1] * 255), (qbyte)(ent->color[2] * 255) );
+		ent->s.light = COLOR_RGB( (uint8_t)(ent->color[0] * 255), (uint8_t)(ent->color[1] * 255), (uint8_t)(ent->color[2] * 255) );
 		if( !ent->s.light )
 			ent->s.light = COLOR_RGB( 255, 255, 255 );
 	}

@@ -113,6 +113,32 @@ static void CG_SC_CenterPrint( void )
 }
 
 /*
+* CG_SC_CenterPrintFormat
+*/
+static void CG_SC_CenterPrintFormat( void )
+{
+	if( trap_Cmd_Argc() == 8 ) {
+		CG_CenterPrint( va( CG_TranslateString( trap_Cmd_Argv( 1 ) ), trap_Cmd_Argv( 2 ), trap_Cmd_Argv( 3 ), 
+			trap_Cmd_Argv( 4 ), trap_Cmd_Argv( 5 ), trap_Cmd_Argv( 6 ), trap_Cmd_Argv( 7 ) ) );
+	} else if( trap_Cmd_Argc() == 7 ) {
+		CG_CenterPrint( va( CG_TranslateString( trap_Cmd_Argv( 1 ) ), trap_Cmd_Argv( 2 ), trap_Cmd_Argv( 3 ), 
+			trap_Cmd_Argv( 4 ), trap_Cmd_Argv( 5 ), trap_Cmd_Argv( 6 ) ) );
+	} else if( trap_Cmd_Argc() == 6 ) {
+		CG_CenterPrint( va( CG_TranslateString( trap_Cmd_Argv( 1 ) ), trap_Cmd_Argv( 2 ), trap_Cmd_Argv( 3 ), 
+			trap_Cmd_Argv( 4 ), trap_Cmd_Argv( 5 ) ) );
+	} else if( trap_Cmd_Argc() == 5 ) {
+		CG_CenterPrint( va( CG_TranslateString( trap_Cmd_Argv( 1 ) ), trap_Cmd_Argv( 2 ), trap_Cmd_Argv( 3 ), 
+			trap_Cmd_Argv( 4 ) ) );
+	} else if( trap_Cmd_Argc() == 4 ) {
+		CG_CenterPrint( va( CG_TranslateString( trap_Cmd_Argv( 1 ) ), trap_Cmd_Argv( 2 ), trap_Cmd_Argv( 3 ) ) );
+	} else if( trap_Cmd_Argc() == 3 ) {
+		CG_CenterPrint( va( CG_TranslateString( trap_Cmd_Argv( 1 ) ), trap_Cmd_Argv( 2 ) ) );
+	} else if( trap_Cmd_Argc() == 2 ) {
+		CG_CenterPrint( CG_TranslateString( trap_Cmd_Argv( 1 ) ) ); // theoretically, shouldn't happen
+	} 
+}
+
+/*
 * CG_ConfigString
 */
 void CG_ConfigString( int i, const char *s )
@@ -682,17 +708,33 @@ static void CG_SC_MatchMessage( void )
 
 	mm = (matchmessage_t)atoi( trap_Cmd_Argv( 1 ) );
 	matchmessage = GS_MatchMessageString( mm );
-	if( !matchmessage[0] )
-		matchmessage = NULL;
+	if( !matchmessage || !matchmessage[0] )
+		return;
 
-	if( matchmessage ) {
-		const char *translated = CG_TranslateString( matchmessage );
-		if( translated ) {
-			matchmessage = translated;
-		}
+	cg.matchmessage = CG_TranslateString( matchmessage );
+}
+
+/*
+* CG_SC_HelpMessage
+*/
+static void CG_SC_HelpMessage( void )
+{
+	unsigned index;
+	const char *helpmessage;
+
+	cg.helpmessage = NULL;
+
+	index = atoi( trap_Cmd_Argv( 1 ) );
+	if( !index || index > MAX_HELPMESSAGES ) {
+		return;
 	}
 
-	cg.matchmessage = matchmessage;
+	helpmessage = cgs.configStrings[CS_HELPMESSAGES + index - 1];
+	if( !helpmessage[0] )
+		return;
+
+	cg.helpmessage = CG_TranslateString( helpmessage );
+	cg.helpmessage_time = cg.time;
 }
 
 /*
@@ -826,7 +868,7 @@ static void CG_SC_MenuCustom( void )
 	for( i = 2, c = 1; i < trap_Cmd_Argc() - 1; i += 2, c++ )
 	{
 		Q_strncatz( request, va( "btn%i \"%s\" ", c, trap_Cmd_Argv( i ) ), sizeof( request ) );
-		Q_strncatz( request, va( "cmd%i \"%s\" ", c, trap_Cmd_Argv( i + 1 ) ), sizeof( request ) );
+		Q_strncatz( request, va( "cmd%i \"cmd %s\" ", c, trap_Cmd_Argv( i + 1 ) ), sizeof( request ) );
 	}
 
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "%s\n", request ) );
@@ -840,7 +882,7 @@ void CG_AddAward( const char *str )
 	if( !str || !str[0] )
 		return;
 
-	Q_strncpyz( cg.award_lines[cg.award_head % MAX_AWARD_LINES], str, MAX_CONFIGSTRING_CHARS );
+	Q_strncpyz( cg.award_lines[cg.award_head % MAX_AWARD_LINES], CG_TranslateString( str ), MAX_CONFIGSTRING_CHARS );
 	cg.award_times[cg.award_head % MAX_AWARD_LINES] = cg.time;
 	cg.award_head++;
 }
@@ -923,10 +965,12 @@ static const svcmd_t cg_svcmds[] =
 	{ "pch", CG_SC_Privsay }, // racesow
 	{ "tvch", CG_SC_TVChatPrint },
 	{ "cp", CG_SC_CenterPrint },
+	{ "cpf", CG_SC_CenterPrintFormat },
 	{ "obry", CG_SC_Obituary },
 	{ "scb", CG_SC_Scoreboard },
 	{ "plstats", CG_SC_PlayerStats },
 	{ "mm", CG_SC_MatchMessage },
+	{ "mapmsg", CG_SC_HelpMessage },
 	{ "ti", CG_CS_UpdateTeamInfo },
 	{ "demoget", CG_SC_DemoGet },
 	{ "cha", CG_SC_ChannelAdd },
@@ -1086,6 +1130,82 @@ static void CG_Cmd_LastWeapon_f( void )
 			trap_Cmd_ExecuteText( EXEC_NOW, va( "cmd use %i", item->tag ) );
 			cg.lastWeapon = cg.predictedPlayerState.stats[STAT_PENDING_WEAPON];
 		}
+	}
+}
+
+/*
+* CG_Cmd_WeaponCross_f
+*/
+static void CG_Cmd_WeaponCross_f( void )
+{
+	int i;
+	int quarter = -1, first;
+	int w[2], count = 0, selected = -1, select;
+	gsitem_t *item;
+
+	if( !cg.frame.valid || cgs.demoPlaying )
+		return;
+
+	if( trap_Cmd_Argc() )
+		quarter = atoi( trap_Cmd_Argv( 1 ) );
+
+	if( ( quarter < 0 ) || ( quarter > 4 ) )
+	{
+		CG_Printf( "Usage: 'weaponcross 0-4 (0 - just show, 1 - GB/MG, 2 - RG/GL, 3 - RL/PG, 4 - LG/EB)\n" );
+		return;
+	}
+
+	CG_ShowWeaponCross();
+
+	if( !quarter )
+		return;
+
+	quarter--;
+	first = quarter << 1;
+
+	for( i = 0; i < 2; i++ )
+	{
+		if( !cg.predictedPlayerState.inventory[WEAP_GUNBLADE + first + i] )
+		{
+			continue;
+		}
+		if( !cg.predictedPlayerState.inventory[AMMO_GUNBLADE + first + i] &&
+			!cg.predictedPlayerState.inventory[AMMO_WEAK_GUNBLADE + first + i] )
+		{
+			continue;
+		}
+
+		if( cg.predictedPlayerState.stats[STAT_PENDING_WEAPON] == ( WEAP_GUNBLADE + first + i ) )
+			selected = i;
+
+		w[count] = first + i;
+		count++;
+	}
+
+	if( !count )
+		return;
+
+	if( count == 2 )
+	{
+		if( selected >= 0 )
+			select = selected ^ 1;
+		else
+			select = ( cg.lastCrossWeapons >> quarter ) & 1;
+	}
+	else
+	{
+		if( selected >= 0 )
+			return;
+		select = 0;
+	}
+
+	item = GS_Cmd_UseItem( &cg.frame.playerState, va( "%i", WEAP_GUNBLADE + w[select] ), IT_WEAPON );
+	if( item )
+	{
+		if( item->type & IT_WEAPON )
+			CG_Predict_ChangeWeapon( item->tag );
+		trap_Cmd_ExecuteText( EXEC_NOW, va( "cmd use %i", item->tag ) );
+		cg.lastCrossWeapons = ( cg.lastCrossWeapons & ~( 1 << quarter ) ) | ( ( w[select] & 1 ) << quarter );
 	}
 }
 
@@ -1257,6 +1377,7 @@ static const cgcmd_t cgcmds[] =
 	{ "weapnext", CG_Cmd_NextWeapon_f, true },
 	{ "weapprev", CG_Cmd_PrevWeapon_f, true },
 	{ "weaplast", CG_Cmd_LastWeapon_f, true },
+	{ "weapcross", CG_Cmd_WeaponCross_f, true },
 	{ "viewpos", CG_Viewpos_f, true },
 	{ "block", CG_Cmd_RSChatBlock_f, false }, // racesow
 	{ "players", NULL, false },

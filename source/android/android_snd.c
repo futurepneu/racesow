@@ -20,7 +20,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "../snd_qf/snd_local.h"
 #include <SLES/OpenSLES.h>
-#include <SLES/OpenSLES_Android.h>
 
 static cvar_t *s_bits = NULL;
 static cvar_t *s_channels = NULL;
@@ -28,7 +27,7 @@ static cvar_t *s_channels = NULL;
 static SLObjectItf snddma_android_engine = NULL;
 static SLObjectItf snddma_android_outputMix = NULL;
 static SLObjectItf snddma_android_player = NULL;
-static SLAndroidSimpleBufferQueueItf snddma_android_bufferQueue;
+static SLBufferQueueItf snddma_android_bufferQueue;
 static SLPlayItf snddma_android_play;
 
 static struct qmutex_s *snddma_android_mutex = NULL;
@@ -36,7 +35,7 @@ static struct qmutex_s *snddma_android_mutex = NULL;
 static int snddma_android_pos;
 static int snddma_android_size;
 
-void S_Activate( qboolean active )
+void S_Activate( bool active )
 {
 	if( active )
 	{
@@ -51,13 +50,13 @@ void S_Activate( qboolean active )
 	}
 }
 
-static void SNDDMA_Android_Callback( SLAndroidSimpleBufferQueueItf bq, void *context )
+static void SNDDMA_Android_Callback( SLBufferQueueItf bq, void *context )
 {
-	qbyte *buffer2;
+	uint8_t *buffer2;
 
 	trap_Mutex_Lock( snddma_android_mutex );
 
-	buffer2 = ( qbyte * )dma.buffer + snddma_android_size;
+	buffer2 = ( uint8_t * )dma.buffer + snddma_android_size;
 	(*bq)->Enqueue( bq, buffer2, snddma_android_size );
 	memcpy( buffer2, dma.buffer, snddma_android_size );
 	memset( dma.buffer, ( dma.samplebits == 8 ) ? 128 : 0, snddma_android_size );
@@ -74,7 +73,7 @@ static const char *SNDDMA_Android_Init( void )
 
 	int freq;
 
-	SLDataLocator_AndroidSimpleBufferQueue sourceLocator;
+	SLDataLocator_BufferQueue sourceLocator;
 	SLDataFormat_PCM sourceFormat;
 	SLDataSource source;
 
@@ -105,7 +104,7 @@ static const char *SNDDMA_Android_Init( void )
 	else
 		freq = 11025;
 
-	sourceLocator.locatorType = SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE;
+	sourceLocator.locatorType = SL_DATALOCATOR_BUFFERQUEUE;
 	sourceLocator.numBuffers = 2;
 	sourceFormat.formatType = SL_DATAFORMAT_PCM;
 	sourceFormat.numChannels = bound( 1, s_channels->integer, 2 );
@@ -122,15 +121,15 @@ static const char *SNDDMA_Android_Init( void )
 	sink.pLocator = &sinkLocator;
 	sink.pFormat = NULL;
 
-	interfaceID = SL_IID_ANDROIDSIMPLEBUFFERQUEUE;
+	interfaceID = SL_IID_BUFFERQUEUE;
 	interfaceRequired = SL_BOOLEAN_TRUE;
 
 	result = (*engine)->CreateAudioPlayer( engine, &snddma_android_player, &source, &sink, 1, &interfaceID, &interfaceRequired );
 	if( result != SL_RESULT_SUCCESS ) return "engine->CreateAudioPlayer";
 	result = (*snddma_android_player)->Realize( snddma_android_player, SL_BOOLEAN_FALSE );
 	if( result != SL_RESULT_SUCCESS ) return "player->Realize";
-	result = (*snddma_android_player)->GetInterface( snddma_android_player, SL_IID_ANDROIDSIMPLEBUFFERQUEUE, &snddma_android_bufferQueue );
-	if( result != SL_RESULT_SUCCESS ) return "player->GetInterface(ANDROIDSIMPLEBUFFERQUEUE)";
+	result = (*snddma_android_player)->GetInterface( snddma_android_player, SL_IID_BUFFERQUEUE, &snddma_android_bufferQueue );
+	if( result != SL_RESULT_SUCCESS ) return "player->GetInterface(BUFFERQUEUE)";
 	result = (*snddma_android_player)->GetInterface( snddma_android_player, SL_IID_PLAY, &snddma_android_play );
 	if( result != SL_RESULT_SUCCESS ) return "player->GetInterface(PLAY)";
 	result = (*snddma_android_bufferQueue)->RegisterCallback( snddma_android_bufferQueue, SNDDMA_Android_Callback, NULL );
@@ -157,12 +156,12 @@ static const char *SNDDMA_Android_Init( void )
 
 	snddma_android_pos = 0;
 
-	S_Activate( qtrue );
+	S_Activate( true );
 
 	return NULL;
 }
 
-qboolean SNDDMA_Init( void *hwnd, qboolean verbose )
+bool SNDDMA_Init( void *hwnd, bool verbose )
 {
 	const char *initError;
 
@@ -180,13 +179,13 @@ qboolean SNDDMA_Init( void *hwnd, qboolean verbose )
 	{
 		Com_Printf( "SNDDMA_Init: %s failed.\n", initError );
 		SNDDMA_Shutdown( verbose );
-		return qfalse;
+		return false;
 	}
 
 	if( verbose )
 		Com_Printf( "OpenSL ES audio initialized.\n" );
 
-	return qtrue;
+	return true;
 }
 
 int SNDDMA_GetDMAPos( void )
@@ -194,7 +193,7 @@ int SNDDMA_GetDMAPos( void )
 	return snddma_android_pos;
 }
 
-void SNDDMA_Shutdown( qboolean verbose )
+void SNDDMA_Shutdown( bool verbose )
 {
 	if( verbose )
 		Com_Printf( "Closing OpenSL ES audio device...\n" );

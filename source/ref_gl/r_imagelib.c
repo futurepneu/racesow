@@ -122,7 +122,7 @@ typedef struct _TargaHeader
 
 #undef WRITEPIXEL
 #define WRITEPIXEL	WRITEPIXEL24
-static void tga_comp_cm24( qbyte *pout, qbyte *pin, qbyte palette[256][4], int size )
+static void tga_comp_cm24( uint8_t *pout, uint8_t *pin, uint8_t palette[256][4], int size )
 {
 	int header, pixelcount;
 	int blue, green, red;
@@ -131,7 +131,7 @@ static void tga_comp_cm24( qbyte *pout, qbyte *pin, qbyte palette[256][4], int s
 	WRITELOOP_COMP_1;
 }
 
-static void tga_cm24( qbyte *pout, qbyte *pin, qbyte palette[256][4], int size )
+static void tga_cm24( uint8_t *pout, uint8_t *pin, uint8_t palette[256][4], int size )
 {
 	int blue, green, red;
 	int i;
@@ -153,7 +153,7 @@ static void tga_cm24( qbyte *pout, qbyte *pin, qbyte palette[256][4], int size )
 
 #undef WRITEPIXEL
 #define WRITEPIXEL	WRITEPIXEL32
-static void tga_comp_cm32( qbyte *pout, qbyte *pin, qbyte palette[256][4], int size )
+static void tga_comp_cm32( uint8_t *pout, uint8_t *pin, uint8_t palette[256][4], int size )
 {
 	int header, pixelcount;
 	int blue, green, red, alpha;
@@ -162,7 +162,7 @@ static void tga_comp_cm32( qbyte *pout, qbyte *pin, qbyte palette[256][4], int s
 	WRITELOOP_COMP_1;
 }
 
-static void tga_cm32( qbyte *pout, qbyte *pin, qbyte palette[256][4], int size )
+static void tga_cm32( uint8_t *pout, uint8_t *pin, uint8_t palette[256][4], int size )
 {
 	int blue, green, red, alpha;
 	int i;
@@ -182,7 +182,7 @@ static void tga_cm32( qbyte *pout, qbyte *pin, qbyte palette[256][4], int size )
 
 #undef WRITEPIXEL
 #define WRITEPIXEL	WRITEPIXEL24
-static void tga_comp_rgb24( qbyte *pout, qbyte *pin, int size )
+static void tga_comp_rgb24( uint8_t *pout, uint8_t *pin, int size )
 {
 	int header, pixelcount;
 	int blue, green, red;
@@ -211,7 +211,7 @@ static void tga_comp_rgb24( qbyte *pout, qbyte *pin, int size )
 	}
 }
 
-static void tga_rgb24( qbyte *pout, qbyte *pin, int size )
+static void tga_rgb24( uint8_t *pout, uint8_t *pin, int size )
 {
 	memcpy( pout, pin, size * 3 );
 }
@@ -229,7 +229,7 @@ static void tga_rgb24( qbyte *pout, qbyte *pin, int size )
 		*((int*)a) = pix;	\
 		a += 4;
 
-static void tga_comp_rgb32( qbyte *pout, qbyte *pin, int size )
+static void tga_comp_rgb32( uint8_t *pout, uint8_t *pin, int size )
 {
 	int header, pixelcount;
 	int blue, green, red, alpha;
@@ -256,7 +256,7 @@ static void tga_comp_rgb32( qbyte *pout, qbyte *pin, int size )
 	}
 }
 
-static void tga_rgb32( qbyte *pout, qbyte *pin, int size )
+static void tga_rgb32( uint8_t *pout, uint8_t *pin, int size )
 {
 	memcpy( pout, pin, size * 4 );
 }
@@ -268,7 +268,7 @@ static void tga_rgb32( qbyte *pout, qbyte *pin, int size )
 
 #undef WRITEPIXEL
 #define WRITEPIXEL	WRITEPIXEL24
-static void tga_comp_grey( qbyte *pout, qbyte *pin, int size )
+static void tga_comp_grey( uint8_t *pout, uint8_t *pin, int size )
 {
 	int header, pixelcount;
 	int blue, green, red;
@@ -277,7 +277,7 @@ static void tga_comp_grey( qbyte *pout, qbyte *pin, int size )
 	WRITELOOP_COMP_1;
 }
 
-static void tga_grey( qbyte *pout, qbyte *pin, int size )
+static void tga_grey( uint8_t *pout, uint8_t *pin, int size )
 {
 	int i, a;
 
@@ -293,11 +293,11 @@ static void tga_grey( qbyte *pout, qbyte *pin, int size )
 /*
 * LoadTGA
 */
-r_imginfo_t LoadTGA( const char *name, qbyte *(*allocbuf)( void *, size_t, const char *, int ), void *uptr )
+r_imginfo_t LoadTGA( const char *name, uint8_t *(*allocbuf)( void *, size_t, const char *, int ), void *uptr )
 {
 	int i, j, columns, rows, samples;
-	qbyte *buf_p, *buffer, *pixbuf, *targa_rgba;
-	qbyte palette[256][4];
+	uint8_t *buf_p, *buffer, *pixbuf, *targa_rgba;
+	uint8_t palette[256][4];
 	TargaHeader targa_header;
 	r_imginfo_t imginfo;
 
@@ -462,8 +462,8 @@ r_imginfo_t LoadTGA( const char *name, qbyte *(*allocbuf)( void *, size_t, const
 	{
 		// Flip the image vertically
 		int rowsize = columns * samples;
-		qbyte *row1, *row2;
-		qbyte *tmpLine = alloca( rowsize );
+		uint8_t *row1, *row2;
+		uint8_t *tmpLine = alloca( rowsize );
 
 		for( i = 0, j = rows - 1; i < j; i++, j-- )
 		{
@@ -495,17 +495,17 @@ r_imginfo_t LoadTGA( const char *name, qbyte *(*allocbuf)( void *, size_t, const
 /*
 * WriteTGA
 */
-qboolean WriteTGA( const char *name, r_imginfo_t *info, int quality )
+bool WriteTGA( const char *name, r_imginfo_t *info, int quality )
 {
 	int file, i, c, temp;
 	int width, height, samples;
-	qbyte header[18], *buffer;
-	qboolean bgr;
+	uint8_t header[18], *buffer;
+	bool bgr;
 
-	if( ri.FS_FOpenFile( name, &file, FS_WRITE ) == -1 )
+	if( ri.FS_FOpenAbsoluteFile( name, &file, FS_WRITE ) == -1 )
 	{
 		Com_Printf( "WriteTGA: Couldn't create %s\n", name );
-		return qfalse;
+		return false;
 	}
 
 	width = info->width;
@@ -538,7 +538,7 @@ qboolean WriteTGA( const char *name, r_imginfo_t *info, int quality )
 	ri.FS_Write( buffer, c, file );
 	ri.FS_FCloseFile( file );
 
-	return qtrue;
+	return true;
 }
 
 /*
@@ -603,10 +603,10 @@ void q_jpeg_mem_src( j_decompress_ptr cinfo, unsigned char *mem, unsigned long l
 /*
 * LoadJPG
 */
-r_imginfo_t LoadJPG( const char *name, qbyte *(*allocbuf)( void *, size_t, const char *, int ), void *uptr )
+r_imginfo_t LoadJPG( const char *name, uint8_t *(*allocbuf)( void *, size_t, const char *, int ), void *uptr )
 {
 	unsigned int i, length, samples, widthXsamples;
-	qbyte *img, *scan, *buffer, *line, *jpg_rgb;
+	uint8_t *img, *scan, *buffer, *line, *jpg_rgb;
 	struct q_jpeg_error_mgr jerr;
 	struct jpeg_decompress_struct cinfo;
 	r_imginfo_t imginfo;
@@ -684,65 +684,73 @@ error:
 
 #define JPEG_OUTPUT_BUFFER_SIZE		4096
 
-static void q_jpg_init_destination(j_compress_ptr cinfo)
+struct q_jpeg_destination_mgr {
+	struct jpeg_destination_mgr pub;
+
+	int outfile;
+	JOCTET *buffer;
+};
+
+static void q_jpg_init_destination( j_compress_ptr cinfo )
 {
+	struct q_jpeg_destination_mgr *dest = ( struct q_jpeg_destination_mgr * )( cinfo->dest );
+
+	dest->pub.next_output_byte = dest->buffer;
+	dest->pub.free_in_buffer = JPEG_OUTPUT_BUFFER_SIZE;
 }
 
-static boolean q_jpg_write_buf_to_disk(j_compress_ptr cinfo)
+static boolean q_jpg_empty_output_buffer( j_compress_ptr cinfo )
 {
-	int written = JPEG_OUTPUT_BUFFER_SIZE - cinfo->dest->free_in_buffer;
-	qbyte *buffer = ( qbyte * )cinfo->dest->next_output_byte - written;
-	int file = *((int *)(buffer + JPEG_OUTPUT_BUFFER_SIZE));
-	if( ri.FS_Write( buffer, JPEG_OUTPUT_BUFFER_SIZE, file ) == 0 ) {
+	struct q_jpeg_destination_mgr *dest = ( struct q_jpeg_destination_mgr * )( cinfo->dest );
+
+	if( ri.FS_Write( dest->buffer, JPEG_OUTPUT_BUFFER_SIZE, dest->outfile ) == 0 ) {
 		return FALSE;
 	}
+
+	dest->pub.next_output_byte = dest->buffer;
+	dest->pub.free_in_buffer = JPEG_OUTPUT_BUFFER_SIZE;
+
 	return TRUE;
 }
 
-static boolean q_jpg_empty_output_buffer(j_compress_ptr cinfo)
+static void q_jpg_term_destination( j_compress_ptr cinfo )
 {
-	boolean res = q_jpg_write_buf_to_disk( cinfo );
-	cinfo->dest->next_output_byte -= JPEG_OUTPUT_BUFFER_SIZE - cinfo->dest->free_in_buffer;
-	cinfo->dest->free_in_buffer = JPEG_OUTPUT_BUFFER_SIZE;
-	return res;
-}
+	struct q_jpeg_destination_mgr *dest = ( struct q_jpeg_destination_mgr * )( cinfo->dest );
+	size_t datacount = JPEG_OUTPUT_BUFFER_SIZE - dest->pub.free_in_buffer;
 
-static void q_jpg_term_destination(j_compress_ptr cinfo)
-{
-	q_jpg_write_buf_to_disk( cinfo );
+	if( datacount > 0 ) {
+		ri.FS_Write( dest->buffer, datacount, dest->outfile );
+	}
 }
 
 /*
 * WriteJPG
 */
-qboolean WriteJPG( const char *name, r_imginfo_t *info, int quality )
+bool WriteJPG( const char *name, r_imginfo_t *info, int quality )
 {
 	struct jpeg_compress_struct cinfo;
 	struct jpeg_error_mgr jerr;
-	struct jpeg_destination_mgr jdest;
-	char buf[JPEG_OUTPUT_BUFFER_SIZE + sizeof( int )];
+	struct q_jpeg_destination_mgr jdest;
+	JOCTET buffer[JPEG_OUTPUT_BUFFER_SIZE];
 	JSAMPROW s[1];
 	int offset, w3;
 	int file;
 
-	if( ri.FS_FOpenFile( name, &file, FS_WRITE ) == -1 ) {
+	if( ri.FS_FOpenAbsoluteFile( name, &file, FS_WRITE ) == -1 ) {
 		Com_Printf( "WriteJPG: Couldn't create %s\n", name );
-		return qfalse;
+		return false;
 	}
 
-	// hack file handle into output buffer
-	*((int *)(buf + JPEG_OUTPUT_BUFFER_SIZE)) = file;
-
-	jdest.init_destination = q_jpg_init_destination;
-	jdest.empty_output_buffer = q_jpg_empty_output_buffer;
-	jdest.term_destination = q_jpg_term_destination;
-	jdest.next_output_byte = (JOCTET *)buf;
-	jdest.free_in_buffer = JPEG_OUTPUT_BUFFER_SIZE;
+	jdest.pub.init_destination = q_jpg_init_destination;
+	jdest.pub.empty_output_buffer = q_jpg_empty_output_buffer;
+	jdest.pub.term_destination = q_jpg_term_destination;
+	jdest.outfile = file;
+	jdest.buffer = buffer;
 
 	// initialize the JPEG compression object
 	jpeg_create_compress( &cinfo );
 	cinfo.err = jpeg_std_error( &jerr );
-	cinfo.dest = &jdest;
+	cinfo.dest = &( jdest.pub );
 
 	// setup JPEG parameters
 	cinfo.image_width = info->width;
@@ -765,7 +773,7 @@ qboolean WriteJPG( const char *name, r_imginfo_t *info, int quality )
 	}
 
 	// start compression
-	jpeg_start_compress( &cinfo, qtrue );
+	jpeg_start_compress( &cinfo, true );
 
 	// feed scanline data
 	w3 = cinfo.image_width * info->samples;
@@ -782,7 +790,7 @@ qboolean WriteJPG( const char *name, r_imginfo_t *info, int quality )
 
 	ri.FS_FCloseFile( file );
 
-	return qtrue;
+	return true;
 }
 
 /*
@@ -794,7 +802,7 @@ PNG LOADING
 */
 
 typedef struct {
-	qbyte *data;
+	uint8_t *data;
 	size_t size;
 	size_t curptr;
 } q_png_iobuf_t;
@@ -831,10 +839,10 @@ static void q_png_user_read_fn( png_structp png_ptr, unsigned char *data, size_t
 /*
 * LoadPNG
 */
-r_imginfo_t LoadPNG( const char *name, qbyte *(*allocbuf)( void *, size_t, const char *, int ), void *uptr )
+r_imginfo_t LoadPNG( const char *name, uint8_t *(*allocbuf)( void *, size_t, const char *, int ), void *uptr )
 {
-	qbyte *img;
-	qbyte *png_data;
+	uint8_t *img;
+	uint8_t *png_data;
 	size_t png_datasize;
 	q_png_iobuf_t io;
 	png_structp png_ptr = NULL;
@@ -991,14 +999,14 @@ static const int q_etc1_modifierTable[] =
 
 static const int q_etc1_lookup[] = { 0, 1, 2, 3, -4, -3, -2, -1 };
 
-static void q_etc1_subblock( qbyte *out, int stride, qboolean bgr, int r, int g, int b,
-	const int *table, unsigned int low, qboolean second, qboolean flipped )
+static void q_etc1_subblock( uint8_t *out, int stride, bool bgr, int r, int g, int b,
+	const int *table, unsigned int low, bool second, bool flipped )
 {
 	int baseX = 0, baseY = 0;
 	int i;
 	int x, y;
 	int k, delta;
-	qbyte *q;
+	uint8_t *q;
 	if( second )
 	{
 		if( flipped )
@@ -1036,12 +1044,12 @@ static void q_etc1_subblock( qbyte *out, int stride, qboolean bgr, int r, int g,
 	}
 }
 
-static void q_etc1_block( const qbyte *in, qbyte *out, int stride, qboolean bgr )
+static void q_etc1_block( const uint8_t *in, uint8_t *out, int stride, bool bgr )
 {
 	unsigned int high = ( in[0] << 24 ) | ( in[1] << 16 ) | ( in[2] << 8 ) | in[3];
 	unsigned int low = ( in[4] << 24 ) | ( in[5] << 16 ) | ( in[6] << 8 ) | in[7];
 	int r1, r2, g1, g2, b1, b2;
-	qboolean flipped = ( qboolean )( high & 1 );
+	bool flipped = ( bool )( high & 1 );
 
 	if( high & 2 )
 	{
@@ -1074,16 +1082,16 @@ static void q_etc1_block( const qbyte *in, qbyte *out, int stride, qboolean bgr 
 
 	q_etc1_subblock( out, stride, bgr, r1, g1, b1,
 		q_etc1_modifierTable + ( ( high >> 3 ) & ( 7 << 2 ) ),
-		low, qfalse, flipped );
+		low, false, flipped );
 	q_etc1_subblock( out, stride, bgr, r2, g2, b2,
 		q_etc1_modifierTable + ( high & ( 7 << 2 ) ),
-		low, qtrue, flipped );
+		low, true, flipped );
 }
 
-void DecompressETC1( const qbyte *in, int width, int height, qbyte *out, qboolean bgr )
+void DecompressETC1( const uint8_t *in, int width, int height, uint8_t *out, bool bgr )
 {
 	int stride = ALIGN( width, 4 ) * 3;
-	qbyte *uncompressed = alloca( 4 * stride );
+	uint8_t *uncompressed = alloca( 4 * stride );
 	int i, j, rows, rowSize = width * 3, rowSizeAligned = ALIGN( rowSize, 4 );
 	for( i = 0; i < height; i += 4 )
 	{

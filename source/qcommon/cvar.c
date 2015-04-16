@@ -22,8 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../qalgo/q_trie.h"
 #include "../client/console.h"
 
-static qboolean	cvar_initialized = qfalse;
-static qboolean	cvar_preinitialized = qfalse;
+static bool	cvar_initialized = false;
+static bool	cvar_preinitialized = false;
 
 static trie_t *cvar_trie = NULL;
 static qmutex_t *cvar_mutex = NULL;
@@ -42,7 +42,7 @@ static int Cvar_IsLatched( void *cvar, void *flags )
 	return Cvar_FlagIsSet( var->flags, *(cvar_flag_t *) flags ) && var->latched_string;
 }
 
-static qboolean Cvar_CheatsAllowed()
+static bool Cvar_CheatsAllowed()
 {
 	return ( Com_ClientState() < CA_CONNECTED ) ||          // not connected
 		Com_DemoPlaying() ||                             // playing demo
@@ -51,13 +51,13 @@ static qboolean Cvar_CheatsAllowed()
 
 static int Cvar_PatternMatches( void *cvar, void *pattern )
 {
-	return !pattern || Com_GlobMatch( (const char *) pattern, ( (cvar_t *) cvar )->name, qfalse );
+	return !pattern || Com_GlobMatch( (const char *) pattern, ( (cvar_t *) cvar )->name, false );
 }
 
 /*
 * Cvar_InfoValidate
 */
-static qboolean Cvar_InfoValidate( const char *s, qboolean name )
+static bool Cvar_InfoValidate( const char *s, bool name )
 {
 	return !( ( strlen( s ) >= (unsigned)( name ? MAX_INFO_KEY : MAX_INFO_VALUE ) ) ||
 		( strchr( s, '\\' ) ) ||
@@ -131,7 +131,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, cvar_flag_t flags
 
 	if( Cvar_FlagIsSet( flags, CVAR_USERINFO ) || Cvar_FlagIsSet( flags, CVAR_SERVERINFO ) )
 	{
-		if( !Cvar_InfoValidate( var_name, qtrue ) )
+		if( !Cvar_InfoValidate( var_name, true ) )
 		{
 			Com_Printf( "invalid info cvar name\n" );
 			return NULL;
@@ -143,22 +143,35 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, cvar_flag_t flags
 	Trie_Find( cvar_trie, var_name, TRIE_EXACT_MATCH, (void **)&var );
 	QMutex_Unlock( cvar_mutex );
 
+	if( !var_value )
+		return NULL;
+
 	if( var )
 	{
-		assert( var_value );
+		bool reset = false;
+
 		if( !var->dvalue || strcmp( var->dvalue, var_value ) )
 		{
 			if( var->dvalue )
 				Mem_ZoneFree( var->dvalue ); // free the old default value string
 			var->dvalue = ZoneCopyString( (char *) var_value );
 		}
+
+		if( Cvar_FlagIsSet( flags, CVAR_USERINFO ) || Cvar_FlagIsSet( flags, CVAR_SERVERINFO ) )
+		{
+			if( var->string && !Cvar_InfoValidate( var->string, false ) )
+			{
+				reset = true;
+			}
+		}
+
 #ifdef PUBLIC_BUILD
-		if( Cvar_FlagIsSet( flags, CVAR_READONLY ) || Cvar_FlagIsSet( flags, CVAR_DEVELOPER ) )
-		{
+		reset = reset || (Cvar_FlagIsSet( flags, CVAR_READONLY ) || Cvar_FlagIsSet( flags, CVAR_DEVELOPER ));
 #else
-		if( Cvar_FlagIsSet( flags, CVAR_READONLY ) )
-		{
+		reset = reset || (Cvar_FlagIsSet( flags, CVAR_READONLY ));
 #endif
+		if( reset )
+		{
 			if( !var->string || strcmp( var->string, var_value ) )
 			{
 				if( var->string )
@@ -171,18 +184,15 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, cvar_flag_t flags
 		}
 
 		if( Cvar_FlagIsSet( flags, CVAR_USERINFO ) && !Cvar_FlagIsSet( var->flags, CVAR_USERINFO ) )
-			userinfo_modified = qtrue; // transmit at next oportunity
+			userinfo_modified = true; // transmit at next oportunity
 
 		Cvar_FlagSet( &var->flags, flags );
 		return var;
 	}
 
-	if( !var_value )
-		return NULL;
-
 	if( Cvar_FlagIsSet( flags, CVAR_USERINFO ) || Cvar_FlagIsSet( flags, CVAR_SERVERINFO ) )
 	{
-		if( !Cvar_InfoValidate( var_value, qfalse ) )
+		if( !Cvar_InfoValidate( var_value, false ) )
 		{
 			Com_Printf( "invalid info cvar value\n" );
 			return NULL;
@@ -190,7 +200,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, cvar_flag_t flags
 	}
 
 	var = Mem_ZoneMalloc( (int)( sizeof( *var ) + strlen( var_name ) + 1 ) );
-	var->name = (char *)( (qbyte *)var + sizeof( *var ) );
+	var->name = (char *)( (uint8_t *)var + sizeof( *var ) );
 	strcpy( var->name, var_name );
 	var->dvalue = ZoneCopyString( (char *) var_value );
 	var->string = ZoneCopyString( (char *) var_value );
@@ -209,7 +219,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, cvar_flag_t flags
 /*
 * Cvar_Set2
 */
-static cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force )
+static cvar_t *Cvar_Set2( const char *var_name, const char *value, bool force )
 {
 	cvar_t *var = Cvar_Find( var_name );
 
@@ -221,7 +231,7 @@ static cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean forc
 
 	if( Cvar_FlagIsSet( var->flags, CVAR_USERINFO ) || Cvar_FlagIsSet( var->flags, CVAR_SERVERINFO ) )
 	{
-		if( !Cvar_InfoValidate( value, qfalse ) )
+		if( !Cvar_InfoValidate( value, false ) )
 		{
 			Com_Printf( "invalid info cvar value\n" );
 			return var;
@@ -286,7 +296,7 @@ static cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean forc
 				{
 					if( !strcmp( var->name, "fs_game" ) )
 					{
-						FS_SetGameDirectory( value, qfalse );
+						FS_SetGameDirectory( value, false );
 						return var;
 					}
 					Mem_ZoneFree( var->string ); // free the old value string
@@ -314,7 +324,7 @@ static cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean forc
 	Cvar_SetModified( var );
 
 	if( Cvar_FlagIsSet( var->flags, CVAR_USERINFO ) )
-		userinfo_modified = qtrue; // transmit at next oportunity
+		userinfo_modified = true; // transmit at next oportunity
 
 	Mem_ZoneFree( var->string ); // free the old value string
 
@@ -331,7 +341,7 @@ static cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean forc
 */
 cvar_t *Cvar_ForceSet( const char *var_name, const char *value )
 {
-	return Cvar_Set2( var_name, value, qtrue );
+	return Cvar_Set2( var_name, value, true );
 }
 
 /*
@@ -340,13 +350,13 @@ cvar_t *Cvar_ForceSet( const char *var_name, const char *value )
 */
 cvar_t *Cvar_Set( const char *var_name, const char *value )
 {
-	return Cvar_Set2( var_name, value, qfalse );
+	return Cvar_Set2( var_name, value, false );
 }
 
 /*
 * Cvar_FullSet
 */
-cvar_t *Cvar_FullSet( const char *var_name, const char *value, cvar_flag_t flags, qboolean overwrite_flags )
+cvar_t *Cvar_FullSet( const char *var_name, const char *value, cvar_flag_t flags, bool overwrite_flags )
 {
 	cvar_t *var;
 
@@ -409,7 +419,7 @@ void Cvar_GetLatchedVars( cvar_flag_t flags )
 		cvar_t *const var = (cvar_t *) dump->key_value_vector[i].value;
 		if( !strcmp( var->name, "fs_game" ) )
 		{
-			FS_SetGameDirectory( var->latched_string, qfalse );
+			FS_SetGameDirectory( var->latched_string, false );
 			return;
 		}
 		Mem_ZoneFree( var->string );
@@ -460,14 +470,14 @@ void Cvar_FixCheatVars( void )
 * command.  Returns true if the command was a variable reference that
 * was handled. (print or change)
 */
-qboolean Cvar_Command( void )
+bool Cvar_Command( void )
 {
 	cvar_t *v;
 
 	// check variables
 	v = Cvar_Find( Cmd_Argv( 0 ) );
 	if( !v )
-		return qfalse;
+		return false;
 
 	// perform a variable print or set
 	if( Cmd_Argc() == 1 )
@@ -478,11 +488,11 @@ qboolean Cvar_Command( void )
 		if( v->latched_string )
 			Com_Printf( "latched: \"%s%s\"\n", v->latched_string,
 			Q_ColorStringTerminator( v->latched_string, ColorIndex(COLOR_WHITE) ) );
-		return qtrue;
+		return true;
 	}
 
 	Cvar_Set( v->name, Cmd_Argv( 1 ) );
-	return qtrue;
+	return true;
 }
 
 
@@ -508,7 +518,7 @@ static void Cvar_SetWithFlag_f( cvar_flag_t flag )
 		Com_Printf( "usage: %s <variable> <value>\n", Cmd_Argv( 0 ) );
 		return;
 	}
-	Cvar_FullSet( Cmd_Argv( 1 ), Cmd_Argv( 2 ), flag, qfalse );
+	Cvar_FullSet( Cmd_Argv( 1 ), Cmd_Argv( 2 ), flag, false );
 }
 
 static void Cvar_Seta_f( void )
@@ -710,7 +720,7 @@ static void Cvar_ArchiveList_f( void )
 }
 #endif
 
-qboolean userinfo_modified;
+bool userinfo_modified;
 
 static char *Cvar_BitInfo( int bit )
 {
@@ -871,7 +881,7 @@ void Cvar_PreInit( void )
 
 	Trie_Create( CVAR_TRIE_CASING, &cvar_trie );
 
-	cvar_preinitialized = qtrue;
+	cvar_preinitialized = true;
 }
 
 /*
@@ -909,7 +919,7 @@ void Cvar_Init( void )
 	Cmd_AddCommand( "cvararchivelist", Cvar_ArchiveList_f );
 #endif
 
-	cvar_initialized = qtrue;
+	cvar_initialized = true;
 }
 
 /*
@@ -968,7 +978,7 @@ void Cvar_Shutdown( void )
 		}
 		Trie_FreeDump( dump );
 
-		cvar_initialized = qfalse;
+		cvar_initialized = false;
 	}
 
 	if( cvar_preinitialized )
@@ -982,6 +992,6 @@ void Cvar_Shutdown( void )
 
 		QMutex_Destroy( &cvar_mutex );
 
-		cvar_preinitialized = qfalse;
+		cvar_preinitialized = false;
 	}
 }

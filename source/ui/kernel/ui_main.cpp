@@ -22,7 +22,6 @@
 #include "datasources/ui_gametypes_datasource.h"
 #include "datasources/ui_maps_datasource.h"
 #include "datasources/ui_mods_datasource.h"
-#include "datasources/ui_crosshair_datasource.h"
 #include "datasources/ui_models_datasource.h"
 #include "datasources/ui_profiles_datasource.h"
 #include "datasources/ui_serverbrowser_datasource.h"
@@ -30,7 +29,6 @@
 #include "datasources/ui_ircchannels_datasource.h"
 #include "datasources/ui_gameajax_datasource.h"
 
-#include "formatters/ui_crosshair_formatter.h"
 #include "formatters/ui_levelshot_formatter.h"
 #include "formatters/ui_datetime_formatter.h"
 #include "formatters/ui_duration_formatter.h"
@@ -48,18 +46,19 @@ const std::string UI_Main::ui_connectscreen( "connectscreen.rml" );
 UI_Main::UI_Main( int vidWidth, int vidHeight, float pixelRatio,
 	int protocol, const char *demoExtension, const char *basePath )
 	// pointers to zero
-	: asmodule(0), rocketModule(0),
+	: asmodule(nullptr), rocketModule(nullptr),
 	levelshot_fmt(0), datetime_fmt(0), duration_fmt(0), filetype_fmt(0), colorcode_fmt(0), 
-	crosshair_fmt(0), empty_fmt(0),
+	empty_fmt(0),
 	serverBrowser(0), gameTypes(0), maps(0), vidProfiles(0), huds(0), videoModes(0), 
 	demos(0), mods(0), 
-	playerModels(0), crosshairs(0), tvchannels(0), ircchannels(0), gameajax(0),
+	playerModels(0), tvchannels(0), ircchannels(0), gameajax(0),
 
 	// other members
 	mousex(0), mousey(0), gameProtocol(protocol),
 	menuVisible(false), forceMenu(false), showNavigationStack(false),
 	serverName(""), rejectMessage(""), demoExtension(demoExtension),
-	connectCount(0), invalidateAjaxCache(false)
+	connectCount(0), invalidateAjaxCache(false),
+	ui_basepath(nullptr), ui_cursor(nullptr), ui_developer(nullptr), ui_preload(nullptr)
 {
 	// instance
 	self = this;
@@ -68,6 +67,7 @@ UI_Main::UI_Main( int vidWidth, int vidHeight, float pixelRatio,
 	ui_basepath = trap::Cvar_Get( "ui_basepath", basePath, CVAR_ARCHIVE );
 	ui_cursor = trap::Cvar_Get( "ui_cursor", "cursors/default.rml", CVAR_DEVELOPER );
 	ui_developer = trap::Cvar_Get( "developer", "0", 0 );
+	ui_preload = trap::Cvar_Get( "ui_preload", "1", CVAR_ARCHIVE );
 
 	// temp fix for missing background on start.. populate refreshState with some nice values
 	refreshState.clientState = CA_UNINITIALIZED;
@@ -206,6 +206,8 @@ void UI_Main::preloadUI( void )
 	// postpone displaying the document until the first valid refresh state
 	navigator->pushDocument( ui_index, false, false );
 	showNavigationStack = navigator->hasDocuments();
+
+	rocketModule->update();
 }
 
 void UI_Main::reloadUI( void )
@@ -258,7 +260,7 @@ void UI_Main::loadCursor( void )
 bool UI_Main::initRocket( void )
 {
 	// this may throw runtime_error.. ok pass it back up
-	rocketModule = __new__( RocketModule )( refreshState.width, refreshState.height, refreshState.pixelRatio );
+	rocketModule = __new__(RocketModule)( refreshState.width, refreshState.height, refreshState.pixelRatio );
 	return true;
 }
 
@@ -338,7 +340,6 @@ void UI_Main::createDataSources( void )
 	videoModes = __new__( VideoDataSource )();
 	demos = __new__( DemosDataSource )( demoExtension );
 	mods = __new__( ModsDataSource )();
-	crosshairs = __new__( CrosshairDataSource )();
 	tvchannels = __new__( TVChannelsDataSource )();
 	ircchannels = __new__( IrcChannelsDataSource )();
 	gameajax = __new__( GameAjaxDataSource )();
@@ -355,7 +356,6 @@ void UI_Main::destroyDataSources( void )
 	__SAFE_DELETE_NULLIFY( videoModes );
 	__SAFE_DELETE_NULLIFY( demos );
 	__SAFE_DELETE_NULLIFY( mods );
-	__SAFE_DELETE_NULLIFY( crosshairs );
 	__SAFE_DELETE_NULLIFY( tvchannels );
 	__SAFE_DELETE_NULLIFY( ircchannels );
 	__SAFE_DELETE_NULLIFY( gameajax );
@@ -365,7 +365,6 @@ void UI_Main::destroyDataSources( void )
 
 void UI_Main::createFormatters( void )
 {
-	crosshair_fmt = __new__( CrosshairFormatter )();
 	levelshot_fmt = __new__(LevelShotFormatter)();
 	datetime_fmt = __new__( DatetimeFormatter )();
 	duration_fmt = __new__( DurationFormatter )();
@@ -376,7 +375,6 @@ void UI_Main::createFormatters( void )
 
 void UI_Main::destroyFormatters( void )
 {
-	__SAFE_DELETE_NULLIFY( crosshair_fmt );
 	__SAFE_DELETE_NULLIFY( levelshot_fmt );
 	__SAFE_DELETE_NULLIFY( datetime_fmt );
 	__SAFE_DELETE_NULLIFY( duration_fmt );
@@ -427,14 +425,23 @@ void UI_Main::drawConnectScreen( const char *serverName, const char *rejectMessa
 	showUI( true );
 }
 
-int UI_Main::getGameProtocol( void ) const 
+int UI_Main::getGameProtocol( void ) 
 {
-	return gameProtocol;
+	return self != nullptr ? self->gameProtocol : 0;
 }
 
 void UI_Main::customRender( void )
 {
 	// NO-OP for now
+}
+
+bool UI_Main::preloadEnabled( void )
+{
+#if defined(NDEBUG) && !defined( __ANDROID__ )
+	return ( self != nullptr && self->ui_preload && self->ui_preload->integer != 0 );
+#else
+	return false;
+#endif
 }
 
 //===========================================
@@ -464,7 +471,7 @@ void UI_Main::mouseMove( int x, int y, bool absolute )
 	rocketModule->mouseMove( mousex, mousey );
 }
 
-void UI_Main::textInput( qwchar c )
+void UI_Main::textInput( wchar_t c )
 {
 	// context->ProcessTextInput( c );
 	rocketModule->textInput( c );

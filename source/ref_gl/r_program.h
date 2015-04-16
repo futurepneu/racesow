@@ -20,22 +20,23 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef R_PROGRAM_H
 #define R_PROGRAM_H
 
-typedef quint64 r_glslfeat_t;
+typedef uint64_t r_glslfeat_t;
 
 #define GLSL_BIT(x)							(1ULL << (x))
-#define GLSL_BITS_VERSION					9
+#define GLSL_BITS_VERSION					11
 
-#define DEFAULT_GLSL_MATERIAL_PROGRAM		"defaultMaterial"
-#define DEFAULT_GLSL_DISTORTION_PROGRAM		"defaultDistortion"
-#define DEFAULT_GLSL_RGB_SHADOW_PROGRAM		"defaultRGBShadow"
-#define DEFAULT_GLSL_SHADOWMAP_PROGRAM		"defaultShadowmap"
-#define DEFAULT_GLSL_OUTLINE_PROGRAM		"defaultOutline"
-#define DEFAULT_GLSL_DYNAMIC_LIGHTS_PROGRAM "defaultDynamicLights"
-#define DEFAULT_GLSL_Q3A_SHADER_PROGRAM		"defaultQ3AShader"
-#define DEFAULT_GLSL_CELSHADE_PROGRAM		"defaultCelshade"
-#define DEFAULT_GLSL_FOG_PROGRAM			"defaultFog"
-#define DEFAULT_GLSL_FXAA_PROGRAM			"defaultFXAA"
-#define DEFAULT_GLSL_YUV_PROGRAM			"defaultYUV"
+#define DEFAULT_GLSL_MATERIAL_PROGRAM			"defaultMaterial"
+#define DEFAULT_GLSL_DISTORTION_PROGRAM			"defaultDistortion"
+#define DEFAULT_GLSL_RGB_SHADOW_PROGRAM			"defaultRGBShadow"
+#define DEFAULT_GLSL_SHADOWMAP_PROGRAM			"defaultShadowmap"
+#define DEFAULT_GLSL_OUTLINE_PROGRAM			"defaultOutline"
+#define DEFAULT_GLSL_DYNAMIC_LIGHTS_PROGRAM		"defaultDynamicLights"
+#define DEFAULT_GLSL_Q3A_SHADER_PROGRAM			"defaultQ3AShader"
+#define DEFAULT_GLSL_CELSHADE_PROGRAM			"defaultCelshade"
+#define DEFAULT_GLSL_FOG_PROGRAM				"defaultFog"
+#define DEFAULT_GLSL_FXAA_PROGRAM				"defaultFXAA"
+#define DEFAULT_GLSL_YUV_PROGRAM				"defaultYUV"
+#define DEFAULT_GLSL_COLORCORRECTION_PROGRAM	"defaultColorCorrection"
 
 // program types
 enum
@@ -52,6 +53,7 @@ enum
 	GLSL_PROGRAM_TYPE_FOG,
 	GLSL_PROGRAM_TYPE_FXAA,
 	GLSL_PROGRAM_TYPE_YUV,
+	GLSL_PROGRAM_TYPE_COLORCORRECTION,
 
 	GLSL_PROGRAM_TYPE_MAXTYPE
 };
@@ -142,6 +144,7 @@ enum
 #define GLSL_SHADER_Q3_LIGHTSTYLE				((GLSL_SHADER_Q3_LIGHTSTYLE0 | GLSL_SHADER_Q3_LIGHTSTYLE1 \
 													| GLSL_SHADER_Q3_LIGHTSTYLE2 | GLSL_SHADER_Q3_LIGHTSTYLE3))
 #define GLSL_SHADER_Q3_LIGHTMAP_ARRAYS			GLSL_BIT(40)
+#define GLSL_SHADER_Q3_ALPHA_MASK				GLSL_BIT(41)
 
 // distortions
 #define GLSL_SHADER_DISTORTION_DUDV				GLSL_BIT(32)
@@ -178,6 +181,9 @@ enum
 #define GLSL_SHADER_CELSHADE_CEL_LIGHT			GLSL_BIT(39)
 #define GLSL_SHADER_CELSHADE_CEL_LIGHT_ADD		GLSL_BIT(40)
 
+// color correction
+#define GLSL_SHADER_COLORCORRECTION_3D_LUT		GLSL_BIT(32)
+
 void RP_Init( void );
 void RP_Shutdown( void );
 
@@ -190,8 +196,8 @@ int	RP_GetProgramObject( int elem );
 
 void RP_UpdateShaderUniforms( int elem, 
 	float shaderTime, 
-	const vec3_t entOrigin, const vec3_t entDist, const qbyte *entityColor, 
-	const qbyte *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
+	const vec3_t entOrigin, const vec3_t entDist, const uint8_t *entityColor, 
+	const uint8_t *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
 	const mat4_t texMatrix );
 
 void RP_UpdateViewUniforms( int elem, 
@@ -208,7 +214,7 @@ void RP_UpdateSoftParticlesUniforms( int elem, float scale );
 void RP_UpdateMaterialUniforms( int elem, 
 	float offsetmappingScale, float glossIntensity, float glossExponent );
 
-void RP_UpdateDistortionUniforms( int elem, qboolean frontPlane );
+void RP_UpdateDistortionUniforms( int elem, bool frontPlane );
 
 void RP_UpdateTextureUniforms( int elem, int TexWidth, int TexHeight );
 

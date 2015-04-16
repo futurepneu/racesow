@@ -50,6 +50,7 @@ ElementDocument::ElementDocument(const String& tag) : Element(tag)
 	modal = false;
 	layout_dirty = true;
 	lock_layout = 0;
+	structure_update_id = 0;
 
 	user_data = NULL;
 
@@ -226,6 +227,9 @@ void ElementDocument::Show(int focus_flags)
 
 	// Set to visible and switch focus if necessary
 	SetProperty(VISIBILITY, "visible");
+
+	DispatchEvent("show", Dictionary(), false);
+
 	if (focus_flags & FOCUS || focus_flags & MODAL)
 	{
 		// If no element could be focused, focus the window
@@ -234,8 +238,6 @@ void ElementDocument::Show(int focus_flags)
 			Focus();
 		}
 	}
-
-	DispatchEvent("show", Dictionary(), false);
 }
 
 void ElementDocument::Hide()
@@ -293,6 +295,32 @@ void ElementDocument::LoadScript(Stream* ROCKET_UNUSED_PARAMETER(stream), const 
 {
 	ROCKET_UNUSED(stream);
 	ROCKET_UNUSED(source_name);
+}
+
+void ElementDocument::InformDirty(Element *child)
+{
+	if (child == this)
+		return;
+	dirty_structures.insert(child);
+	child->AddReference();
+}
+
+void ElementDocument::UpdateStructure()
+{
+	if (dirty_structures.empty())
+		return;
+
+	this->structure_update_id++;
+
+	DirtyLayout();
+
+	for (ElementSet::iterator it = dirty_structures.begin(); it != dirty_structures.end(); ++it) {
+		Element *element = *it;
+		element->UpdateStructure(this->structure_update_id);
+		element->RemoveReference();
+	}
+
+	dirty_structures.clear();
 }
 
 // Updates the layout if necessary.
@@ -366,6 +394,7 @@ bool ElementDocument::IsLayoutDirty()
 // Refreshes the document layout if required.
 void ElementDocument::OnUpdate()
 {
+	UpdateStructure();
 	UpdateLayout();
 }
 
@@ -494,6 +523,7 @@ bool ElementDocument::SearchFocusSubtree(Element* element, bool forward)
 	if (element->GetProperty<int>(TAB_INDEX) == TAB_INDEX_AUTO)
 	{
 		element->Focus();
+		element->ScrollIntoView(false);
 		return true;
 	}
 

@@ -1,14 +1,14 @@
 #include "../qcommon/qcommon.h"
 #include <windows.h>
 
-static qboolean hwtimer;
+static bool hwtimer;
 static dynvar_t *hwtimer_var;
-static quint64 hwtimer_freq;
+static uint64_t hwtimer_freq;
 static int milli_offset = 0;
-static qint64 micro_offset = 0;
+static int64_t micro_offset = 0;
 
 static unsigned int Sys_Milliseconds_TGT( void );
-static quint64 Sys_Microseconds_QPC( void );
+static uint64_t Sys_Microseconds_QPC( void );
 
 // wsw: pb adapted High Res Performance Counter code from ezquake
 
@@ -56,8 +56,8 @@ static void Sys_SynchronizeTimers_f( void *val )
 	static int hwtimer_old = -1;
 
 	const unsigned int millis = Sys_Milliseconds_TGT();
-	const qint64 micros = Sys_Microseconds_QPC();
-	const qint64 drift = micros - millis * 1000;
+	const int64_t micros = Sys_Microseconds_QPC();
+	const int64_t drift = micros - millis * 1000;
 
 	const int hwtimer_new = ( *(char *) val ) - '0';
 
@@ -121,7 +121,7 @@ void Sys_InitTime( void )
 static unsigned int Sys_Milliseconds_TGT( void )
 {
 	static unsigned int base;
-	static qboolean	initialized = qfalse;
+	static bool	initialized = false;
 	unsigned int now;
 
 	if( !initialized )
@@ -129,7 +129,7 @@ static unsigned int Sys_Milliseconds_TGT( void )
 		// let base retain 16 bits of effectively random data which is used
 		//for quickly generating random numbers
 		base = timeGetTime() & 0xffff0000;
-		initialized = qtrue;
+		initialized = true;
 	}
 
 	now = timeGetTime();
@@ -137,17 +137,17 @@ static unsigned int Sys_Milliseconds_TGT( void )
 	return now - base;
 }
 
-static quint64 Sys_Microseconds_QPC( void )
+static uint64_t Sys_Microseconds_QPC( void )
 {
-	static qboolean first = qtrue;
-	static qint64 p_start;
+	static bool first = true;
+	static int64_t p_start;
 
-	qint64 p_now;
+	int64_t p_now;
 	QueryPerformanceCounter( (LARGE_INTEGER *) &p_now );
 
 	if( first )
 	{
-		first = qfalse;
+		first = false;
 		p_start = p_now;
 	}
 
@@ -162,10 +162,10 @@ unsigned int Sys_Milliseconds( void )
 		return Sys_Milliseconds_TGT() + milli_offset;
 }
 
-quint64 Sys_Microseconds( void )
+uint64_t Sys_Microseconds( void )
 {
 	if( hwtimer )
 		return Sys_Microseconds_QPC() + micro_offset;
 	else
-		return (quint64)( Sys_Milliseconds_TGT() + milli_offset ) * 1000;
+		return (uint64_t)( Sys_Milliseconds_TGT() + milli_offset ) * 1000;
 }

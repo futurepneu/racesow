@@ -60,8 +60,8 @@ enum
 // usercmd_t is sent to the server each client frame
 typedef struct usercmd_s
 {
-	qbyte msec;
-	qbyte buttons;
+	uint8_t msec;
+	uint8_t buttons;
 	short angles[3];
 	float forwardfrac, sidefrac, upfrac;
 	short forwardmove, sidemove, upmove;
@@ -163,6 +163,7 @@ typedef struct
 #define MAX_GAMECOMMANDS	256		// command names for command completion
 #define MAX_LOCATIONS		256
 #define MAX_WEAPONDEFS		MAX_ITEMS
+#define MAX_HELPMESSAGES		256
 
 //
 // config strings are a general means of communication from
@@ -218,8 +219,9 @@ typedef struct
 #define CS_LOCATIONS		( CS_GAMECOMMANDS+MAX_GAMECOMMANDS )
 #define CS_WEAPONDEFS		( CS_LOCATIONS+MAX_LOCATIONS )
 #define CS_GENERAL			( CS_WEAPONDEFS+MAX_WEAPONDEFS )
+#define CS_HELPMESSAGES		( CS_GENERAL+MAX_GENERAL ) // for localizable messages, that got a special place on the HUD
 
-#define	MAX_CONFIGSTRINGS	( CS_GENERAL+MAX_GENERAL )
+#define	MAX_CONFIGSTRINGS	( CS_HELPMESSAGES+MAX_HELPMESSAGES )
 
 //==============================================
 
@@ -280,7 +282,7 @@ typedef struct entity_state_s
 	unsigned int svflags;
 
 	int type;							// ET_GENERIC, ET_BEAM, etc
-	qboolean linearProjectile;			// is sent inside "type" as ET_INVERSE flag
+	bool linearProjectile;			// is sent inside "type" as ET_INVERSE flag
 	vec3_t linearProjectileVelocity;	// this is transmitted instead of origin when linearProjectile is true
 
 	vec3_t origin;
@@ -325,7 +327,7 @@ typedef struct entity_state_s
 										// PVS culling)
 
 	int weapon;							// WEAP_ for players
-	qboolean teleported;				// the entity was teleported this snap (sent inside "weapon" as ET_INVERSE flag)
+	bool teleported;				// the entity was teleported this snap (sent inside "weapon" as ET_INVERSE flag)
 
 	unsigned int effects;
 
@@ -443,8 +445,8 @@ typedef struct
 
 typedef struct
 {
-	qboolean all;
-	qbyte targets[MAX_CLIENTS/8];
+	bool all;
+	uint8_t targets[MAX_CLIENTS/8];
 	size_t commandOffset;			// offset of the data in gamecommandsData
 } gcommand_t;
 
@@ -470,11 +472,11 @@ typedef struct
 	float viewheight;
 	float fov;					// horizontal field of view
 
-	qbyte weaponState;
+	uint8_t weaponState;
 
 	int inventory[MAX_ITEMS];
 	short stats[PS_MAX_STATS];	// fast status bar updates
-	qbyte plrkeys;				// infos on the pressed keys of chased player (self if not chasing)
+	uint8_t plrkeys;				// infos on the pressed keys of chased player (self if not chasing)
 } player_state_t;
 
 typedef struct
@@ -484,7 +486,7 @@ typedef struct
 
 	// command (in)
 	usercmd_t cmd;
-	qboolean snapinitial;       // if s has been changed outside pmove
+	bool snapinitial;       // if s has been changed outside pmove
 
 	// results (out)
 	int numtouch;

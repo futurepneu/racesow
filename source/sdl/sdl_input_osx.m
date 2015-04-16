@@ -33,7 +33,7 @@ io_connect_t IN_GetIOHandle( void )
 	return ( myHandle );
 }
 
-void IN_SetMouseScalingEnabled( qboolean isRestore )
+void IN_SetMouseScalingEnabled( bool isRestore )
 {
 	static double myOldAcceleration = 0.0;
 
@@ -62,4 +62,13 @@ void IN_SetMouseScalingEnabled( qboolean isRestore )
 			Cvar_Set( "in_disablemacosxmouseaccel", "0" );
 		}
 	}
+}
+
+/**
+ * IN_GetInputLanguage
+ */
+void IN_GetInputLanguage( char *dest, size_t size )
+{
+	if( size )
+		dest[0] = '\0';
 }

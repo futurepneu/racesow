@@ -374,7 +374,7 @@ static void S_DumpPaintBuffer( int endtime, int file )
 	int len, count;
 	int in_mask;
 	unsigned int *pbuf;
-	qbyte *raw;
+	uint8_t *raw;
 
 	pbuf = (unsigned int *)dma.buffer;
 	count = ( endtime - paintedtime ) * dma.channels;
@@ -572,7 +572,7 @@ void S_InitScaletable( void )
 	int i, j;
 	int scale;
 
-	s_volume->modified = qfalse;
+	s_volume->modified = false;
 	for( i = 0; i < 32; i++ )
 	{
 		scale = i * 8 * 256 * s_volume->value;

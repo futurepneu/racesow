@@ -56,6 +56,16 @@ int CG_VerticalAlignForHeight( const int y, int align, int height )
 	return ny;
 }
 
+int CG_HorizontalMovementForAlign( int align )
+{
+	int m = 1; // move to the right
+
+	if( align % 3 == 0 )  // left
+		m = -1; // move to the left
+
+	return m;
+}
+
 /*
 ===============================================================================
 
@@ -231,6 +241,7 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 	int x_lefttop, y_lefttop, z_lefttop;	// the negative y coordinate (bottom of the map)
 	float map_div_w, map_div_h;
 	bool isSelf;
+	int nameDir = 1, nameAlign = ALIGN_LEFT_TOP;
 
 	if( !cg_showminimap->integer )
 		return;
@@ -254,6 +265,13 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 
 	x = CG_HorizontalAlignForWidth( x, align, iw );
 	y = CG_VerticalAlignForHeight( y, align, ih );
+
+	// if the minimap is in the right part of the screen, draw the names to the left
+	if( ( x + ( iw >> 1 ) ) > ( cgs.vidWidth >> 1 ) )
+	{
+		nameDir = -1;
+		nameAlign = ALIGN_RIGHT_TOP;
+	}
 
 	Vector4Copy( color, tmp_col );
 	Vector4Copy( colorWhite, tmp_white_alpha );
@@ -292,7 +310,7 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 	//alignment test, to display green dot at 0,0
 	//CG_DrawHUDRect( x + x_lefttop/map_div_w -1, y + y_lefttop/map_div_h -1,ALIGN_LEFT_TOP,3,3,1,1, colorGreen, CG_MediaShader( cgs.media.shaderMiniMap ) );
 
-	for( i = 0; i < cg.frame.numEntities; i++ )
+	for( i = cg.frame.numEntities - 1; i >= 0; i-- ) // draw players above everything
 	{
 		entnum = cg.frame.parsedEntities[i&( MAX_PARSE_ENTITIES-1 )].number;
 
@@ -360,8 +378,8 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 
 			// do we want names too?
 			if( draw_playernames == true )
-				trap_SCR_DrawString( x + (int)coords[0] + 8 * cgs.vidHeight / 600, y + (int)coords[1] - 4 * cgs.vidHeight / 600,
-					ALIGN_LEFT_TOP,	COM_RemoveColorTokensExt( cgs.clientInfo[cent->current.number-1].name, qtrue ),
+				trap_SCR_DrawString( x + (int)coords[0] + 8 * nameDir * cgs.vidHeight / 600, y + (int)coords[1] - 4 * cgs.vidHeight / 600,
+					nameAlign, COM_RemoveColorTokensExt( cgs.clientInfo[cent->current.number-1].name, true ),
 					cgs.fontSystemSmall, tmp_yellow_alpha );
 		}
 		else if( cent->current.type == ET_MINIMAP_ICON )
@@ -396,8 +414,8 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 				ALIGN_LEFT_TOP, thisSize, thisSize, 1, 1, tmp_white_alpha, trap_R_RegisterPic( cent->item->icon ) );
 			if( draw_itemnames == true )
 			{
-				trap_SCR_DrawString( x + (int)coords[0] + 2 * thisOffset, y + (int)coords[1] - thisOffset,
-					ALIGN_LEFT_TOP, cent->item->shortname, cgs.fontSystemSmall, tmp_yellow_alpha );
+				trap_SCR_DrawString( x + (int)coords[0] + 2 * nameDir * thisOffset, y + (int)coords[1] - thisOffset,
+					nameAlign, cent->item->shortname, cgs.fontSystemSmall, tmp_yellow_alpha );
 			}
 		}
 	}

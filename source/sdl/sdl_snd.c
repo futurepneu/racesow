@@ -67,7 +67,7 @@ static int snd_inited = 0;
 static cvar_t *s_bits = NULL;
 static cvar_t *s_channels = NULL;
 
-void S_Activate( qboolean active )
+void S_Activate( bool active )
 {
 	if( active )
 		SNDDMA_Submit();
@@ -84,19 +84,16 @@ static void sdl_audio_callback( void *userdata, Uint8 *stream, int len )
 {
 	int pos = dmapos % dmasize;
 
-	if( !snd_inited )/* shouldn't happen, but just in case... */
+	if( !snd_inited ) /* shouldn't happen, but just in case... */
 	{
 		memset( stream, '\0', len );
 		return;
-	}
-	else if( len > 0 )
-	{
-		unsigned tobufend = dmasize - pos;/* bytes to buffer's end. */
+	} else if( len > 0 ) {
+		unsigned tobufend = dmasize - pos; /* bytes to buffer's end. */
 		unsigned len1 = len;
 		int len2 = 0;
 
-		if( len1 > tobufend )
-		{
+		if( len1 > tobufend ) {
 			len1 = tobufend;
 			len2 = len - len1;
 		}
@@ -105,7 +102,7 @@ static void sdl_audio_callback( void *userdata, Uint8 *stream, int len )
 			dmapos += len1;
 		else /* wraparound? */
 		{
-			memcpy( stream+len1, dma.buffer, len2 );
+			memcpy( stream + len1, dma.buffer, len2 );
 			dmapos = len2;
 		}
 	}
@@ -115,9 +112,11 @@ static void print_audiospec( const char *str, const SDL_AudioSpec *spec )
 {
 	Com_Printf( "%s:\n", str );
 
-	// I'm sorry this is nasty.
-#define PRINT_AUDIO_FMT( x ) \
-	if( spec->format == x ) Com_Printf( "Format: %s\n", # x );else
+// I'm sorry this is nasty.
+#define PRINT_AUDIO_FMT( x )              \
+	if( spec->format == x )               \
+		Com_Printf( "Format: %s\n", #x ); \
+	else
 	PRINT_AUDIO_FMT( AUDIO_U8 )
 	PRINT_AUDIO_FMT( AUDIO_S8 )
 	PRINT_AUDIO_FMT( AUDIO_U16LSB )
@@ -127,13 +126,13 @@ static void print_audiospec( const char *str, const SDL_AudioSpec *spec )
 	Com_Printf( "Format: UNKNOWN\n" );
 #undef PRINT_AUDIO_FMT
 
-	Com_Printf( "Freq: %d\n", (int) spec->freq );
-	Com_Printf( "Samples: %d\n", (int) spec->samples );
-	Com_Printf( "Channels: %d\n", (int) spec->channels );
+	Com_Printf( "Freq: %d\n", (int)spec->freq );
+	Com_Printf( "Samples: %d\n", (int)spec->samples );
+	Com_Printf( "Channels: %d\n", (int)spec->channels );
 	Com_Printf( "\n" );
 }
 
-qboolean SNDDMA_Init( void *hwnd, qboolean verbose )
+bool SNDDMA_Init( void *hwnd, bool verbose )
 {
 	char drivername[128];
 	SDL_AudioSpec desired;
@@ -146,26 +145,23 @@ qboolean SNDDMA_Init( void *hwnd, qboolean verbose )
 	if( verbose )
 		Com_Printf( "SDL Audio driver initializing...\n" );
 
-	if( !s_bits )
-	{
-		s_bits = trap_Cvar_Get( "s_bits", "16", CVAR_ARCHIVE|CVAR_LATCH_SOUND );
-		s_channels = trap_Cvar_Get( "s_channels", "2", CVAR_ARCHIVE|CVAR_LATCH_SOUND );
+	if( !s_bits ) {
+		s_bits = trap_Cvar_Get( "s_bits", "16", CVAR_ARCHIVE | CVAR_LATCH_SOUND );
+		s_channels = trap_Cvar_Get( "s_channels", "2", CVAR_ARCHIVE | CVAR_LATCH_SOUND );
 	}
 
-	if( !SDL_WasInit( SDL_INIT_AUDIO ) )
-	{
+	if( !SDL_WasInit( SDL_INIT_AUDIO ) ) {
 		if( verbose )
 			Com_Printf( "Calling SDL_Init(SDL_INIT_AUDIO)...\n" );
-		if( SDL_Init( SDL_INIT_AUDIO ) == -1 )
-		{
+		if( SDL_Init( SDL_INIT_AUDIO ) == -1 ) {
 			Com_Printf( "SDL_Init(SDL_INIT_AUDIO) failed: %s\n", SDL_GetError() );
-			return qfalse;
+			return false;
 		}
 		if( verbose )
 			Com_Printf( "SDL_Init(SDL_INIT_AUDIO) passed.\n" );
 	}
 
-#if SDL_VERSION_ATLEAST(2, 0, 0)
+#if SDL_VERSION_ATLEAST( 2, 0, 0 )
 	if( SDL_GetCurrentAudioDriver() ) {
 		Q_strncpyz( drivername, SDL_GetCurrentAudioDriver(), sizeof( drivername ) );
 	} else {
@@ -206,15 +202,13 @@ qboolean SNDDMA_Init( void *hwnd, qboolean verbose )
 	desired.channels = s_channels->integer;
 	desired.callback = sdl_audio_callback;
 
-	if( SDL_OpenAudio( &desired, &obtained ) == -1 )
-	{
+	if( SDL_OpenAudio( &desired, &obtained ) == -1 ) {
 		Com_Printf( "SDL_OpenAudio() failed: %s\n", SDL_GetError() );
 		SDL_QuitSubSystem( SDL_INIT_AUDIO );
-		return qfalse;
+		return false;
 	}
 
-	if( verbose )
-	{
+	if( verbose ) {
 		print_audiospec( "Format we requested from SDL audio device", &desired );
 		print_audiospec( "Format we actually got", &obtained );
 	}
@@ -247,7 +241,7 @@ qboolean SNDDMA_Init( void *hwnd, qboolean verbose )
 	dma.submission_chunk = 1;
 	dma.speed = obtained.freq;
 	dma.msec_per_sample = 1000.0 / dma.speed;
-	dmasize = ( dma.samples * ( dma.samplebits/8 ) );
+	dmasize = ( dma.samples * ( dma.samplebits / 8 ) );
 	dma.buffer = calloc( 1, dmasize );
 
 	if( verbose )
@@ -257,15 +251,15 @@ qboolean SNDDMA_Init( void *hwnd, qboolean verbose )
 	if( verbose )
 		Com_Printf( "SDL audio initialized.\n" );
 	snd_inited = 1;
-	return qtrue;
+	return true;
 }
 
 int SNDDMA_GetDMAPos( void )
 {
-	return dmapos / ( dma.samplebits/8 );
+	return dmapos / ( dma.samplebits / 8 );
 }
 
-void SNDDMA_Shutdown( qboolean verbose )
+void SNDDMA_Shutdown( bool verbose )
 {
 	if( verbose )
 		Com_Printf( "Closing SDL audio device...\n" );

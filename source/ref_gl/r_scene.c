@@ -228,11 +228,65 @@ static void R_BlitTextureToScrFbo( const refdef_t *fd, image_t *image, int dstFb
 	}
 
 	// blit + flip
-	R_DrawStretchQuick( x, y, 
-		w, h, 
-		(float)(x)/image->upload_width, 1.0 - (float)(y)/image->upload_height, 
-		(float)(x+w)/image->upload_width, 1.0 - (float)(y+h)/image->upload_height,
-		color, program_type, image, blendMask );
+	if( ( program_type == GLSL_PROGRAM_TYPE_NONE ) || ( program_type == GLSL_PROGRAM_TYPE_Q3A_SHADER ) )
+	{
+		R_DrawStretchQuick( x, y, 
+			w, h, 
+			(float)(x)/image->upload_width, 1.0 - (float)(y)/image->upload_height, 
+			(float)(x+w)/image->upload_width, 1.0 - (float)(y+h)/image->upload_height,
+			color, program_type, image, blendMask );
+	}
+	else {
+		// On Adreno, reusing the batch mesh for post processing effects drops FPS to 10-20.
+		static char *s_name = "$builtinpostprocessing";
+		static shaderpass_t p;
+		static shader_t s;
+		static tcmod_t tcmod;
+		mat4_t m;
+
+		assert( rsh.postProcessingVBO );
+		if( rsh.postProcessingVBO ) {
+			R_EndStretchBatch();
+
+			s.vattribs = VATTRIB_POSITION_BIT;
+			s.sort = SHADER_SORT_NEAREST;
+			s.numpasses = 1;
+			s.name = s_name;
+			s.passes = &p;
+
+			p.rgbgen.type = RGB_GEN_IDENTITY;
+			p.alphagen.type = ALPHA_GEN_IDENTITY;
+			p.tcgen = TC_GEN_NONE;
+			p.images[0] = image;
+			p.flags = blendMask;
+			p.program_type = program_type;
+
+			if( !dstFbo ) {
+				tcmod.type = TC_MOD_TRANSFORM;
+				tcmod.args[0] = (float)(w) / image->upload_width;
+				tcmod.args[1] = (float)(h) / image->upload_height;
+				tcmod.args[4] = (float)(x) / image->upload_width;
+				tcmod.args[5] = (float)(y) / image->upload_height;
+
+				p.numtcmods = 1;
+				p.tcmods = &tcmod;
+			}
+			else {
+				p.numtcmods = 0;
+			}
+
+			Matrix4_Identity( m );
+			Matrix4_Scale2D( m, w, h );
+			Matrix4_Translate2D( m, x, y );
+			RB_LoadObjectMatrix( m );
+
+			RB_BindShader( NULL, &s, NULL );	
+			RB_BindVBO( rsh.postProcessingVBO->index, GL_TRIANGLES );
+			RB_DrawElements( 0, 4, 0, 6, 0, 0, 0, 0 );
+
+			RB_LoadObjectMatrix( mat4x4_identity );
+		}
+	}
 
 	// restore 2D viewport and scissor
 	RB_Viewport( 0, 0, rf.frameBufferWidth, rf.frameBufferHeight );
@@ -245,11 +299,13 @@ static void R_BlitTextureToScrFbo( const refdef_t *fd, image_t *image, int dstFb
 void R_RenderScene( const refdef_t *fd )
 {
 	int fbFlags = 0;
+	int ppFBO = 0;
+	int firstPPFBO = 0;
 
 	if( r_norefresh->integer )
 		return;
 
-	R_Set2DMode( qfalse );
+	R_Set2DMode( false );
 
 	RB_SetTime( fd->time );
 
@@ -290,17 +346,42 @@ void R_RenderScene( const refdef_t *fd )
 		if( ( fd->rdflags & RDF_WEAPONALPHA ) && ( rsh.screenWeaponTexture != NULL ) ) {
 			fbFlags |= 2;
 		}
-		if( r_fxaa->integer && ( rsh.screenFxaaCopy != NULL ) ) {
-			if( !rn.fbColorAttachment ) {
-				rn.fbColorAttachment = rsh.screenFxaaCopy;
+		if( rsh.screenPPCopies[0] && rsh.screenPPCopies[1] ) {
+			int oldFlags = fbFlags;
+
+			if( r_fxaa->integer ) {
+				fbFlags |= 4;
 			}
-			fbFlags |= 4;
+
+			if( r_colorcorrection->integer && rsh.worldModel && !( fd->rdflags & RDF_NOWORLDMODEL ) ) {
+				image_t *colorCorrectionLUT = rsh.worldBrushModel->colorCorrectionLUT;
+
+				if( r_colorcorrection_override->string[0] ) {
+					if( r_colorcorrection_override->modified ) {
+						r_colorcorrection_override->modified = false;
+						rsh.colorCorrectionOverrideLUT =
+							R_FindImage( r_colorcorrection_override->string, NULL, IT_COLORCORRECTION );
+					}
+					colorCorrectionLUT = rsh.colorCorrectionOverrideLUT;
+				}
+
+				if( colorCorrectionLUT ) {
+					fbFlags |= 8;
+				}
+			}
+
+			if( fbFlags != oldFlags ) {
+				if( !rn.fbColorAttachment ) {
+					rn.fbColorAttachment = rsh.screenPPCopies[0];
+				}
+				firstPPFBO = rsh.screenPPCopies[0]->fbo;
+			}
 		}
 	}
 
 	// adjust field of view for widescreen
-	if( glConfig.wideScreen && !( fd->rdflags & RDF_NOFOVADJUSTMENT ) )
-		AdjustFov( &rn.refdef.fov_x, &rn.refdef.fov_y, glConfig.width, glConfig.height, qfalse );
+	if( !( fd->rdflags & RDF_NOFOVADJUSTMENT ) )
+		AdjustFov( &rn.refdef.fov_x, &rn.refdef.fov_y, glConfig.width, glConfig.height, false );
 
 	// clip new scissor region to the one currently set
 	Vector4Set( rn.scissor, fd->scissor_x, fd->scissor_y, fd->scissor_width, fd->scissor_height );
@@ -331,14 +412,15 @@ void R_RenderScene( const refdef_t *fd )
 
 	R_BindFrameBufferObject( 0 );
 
-	R_Set2DMode( qtrue );
+	R_Set2DMode( true );
 
 	// blit and blend framebuffers in proper order
 
 	if( fbFlags & 1 ) {
-		// copy to FXAA or default framebuffer
+		fbFlags &= ~1;
+
 		R_BlitTextureToScrFbo( fd, rn.fbColorAttachment, 
-			fbFlags & 4 ? rsh.screenFxaaCopy->fbo : 0, 
+			firstPPFBO, 
 			GLSL_PROGRAM_TYPE_NONE, 
 			colorWhite, 0 );
 	}
@@ -347,19 +429,36 @@ void R_RenderScene( const refdef_t *fd )
 		vec4_t color = { 1, 1, 1, 1 };
 		color[3] = fd->weaponAlpha;
 
-		// blend to FXAA or default framebuffer
+		fbFlags &= ~2;
+
 		R_BlitTextureToScrFbo( fd, rsh.screenWeaponTexture, 
-			fbFlags & 4 ? rsh.screenFxaaCopy->fbo : 0, 
+			firstPPFBO, 
 			GLSL_PROGRAM_TYPE_NONE, 
 			color, GLSTATE_SRCBLEND_SRC_ALPHA|GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA );
 	}
 
-	// blit FXAA to default framebuffer
+	// apply FXAA
 	if( fbFlags & 4 ) {
-		// blend to FXAA or default framebuffer
-		R_BlitTextureToScrFbo( fd, rsh.screenFxaaCopy, 0, 
-			GLSL_PROGRAM_TYPE_FXAA, 
+		fbFlags &= ~4;
+
+		R_BlitTextureToScrFbo( fd, rsh.screenPPCopies[ppFBO],
+			fbFlags ? rsh.screenPPCopies[ppFBO ^ 1]->fbo : 0,
+			GLSL_PROGRAM_TYPE_FXAA,
 			colorWhite, 0 );
+
+		ppFBO ^= 1;
+	}
+
+	// apply color correction
+	if( fbFlags & 8 ) {
+		fbFlags &= ~8;
+
+		R_BlitTextureToScrFbo( fd, rsh.screenPPCopies[ppFBO],
+			fbFlags ? rsh.screenPPCopies[ppFBO ^ 1]->fbo : 0,
+			GLSL_PROGRAM_TYPE_COLORCORRECTION,
+			colorWhite, 0 );
+
+		ppFBO ^= 1;
 	}
 }
 
@@ -371,16 +470,16 @@ BOUNDING BOXES
 =============================================================================
 */
 
-#define MAX_DEBUG_BOUNDS	1024
-
 typedef struct
 {
 	vec3_t mins;
 	vec3_t maxs;
+	byte_vec4_t color;
 } r_debug_bound_t;
 
-static int r_num_debug_bounds;
-static r_debug_bound_t r_debug_bounds[MAX_DEBUG_BOUNDS];
+static unsigned r_num_debug_bounds;
+static size_t r_debug_bounds_current_size;
+static r_debug_bound_t *r_debug_bounds;
 
 /*
 * R_ClearDebugBounds
@@ -393,17 +492,25 @@ static void R_ClearDebugBounds( void )
 /*
 * R_AddDebugBounds
 */
-void R_AddDebugBounds( const vec3_t mins, const vec3_t maxs )
+void R_AddDebugBounds( const vec3_t mins, const vec3_t maxs, const byte_vec4_t color )
 {
-	int i;
+	unsigned i;
 
 	i = r_num_debug_bounds;
-	if( i < MAX_DEBUG_BOUNDS )
+	r_num_debug_bounds++;
+
+	if( r_num_debug_bounds > r_debug_bounds_current_size )
 	{
-		VectorCopy( mins, r_debug_bounds[i].mins );
-		VectorCopy( maxs, r_debug_bounds[i].maxs );
-		r_num_debug_bounds++;
+		r_debug_bounds_current_size = ALIGN( r_num_debug_bounds, 256 );
+		if( r_debug_bounds )
+			r_debug_bounds = R_Realloc( r_debug_bounds, r_debug_bounds_current_size * sizeof( r_debug_bound_t ) );
+		else
+			r_debug_bounds = R_Malloc( r_debug_bounds_current_size * sizeof( r_debug_bound_t ) );
 	}
+
+	VectorCopy( mins, r_debug_bounds[i].mins );
+	VectorCopy( maxs, r_debug_bounds[i].maxs );
+	Vector4Copy( color, r_debug_bounds[i].color );
 }
 
 /*
@@ -411,44 +518,58 @@ void R_AddDebugBounds( const vec3_t mins, const vec3_t maxs )
 */
 static void R_RenderDebugBounds( void )
 {
-	int i, j;
-	vec3_t corner;
+	unsigned i, j;
 	const vec_t *mins, *maxs;
-	mesh_t *rb_mesh;
-	elem_t elems[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+	const uint8_t *color;
+	mesh_t mesh;
+	vec4_t verts[8];
+	byte_vec4_t colors[8];
+	elem_t elems[24] =
+	{
+		0, 1, 1, 3, 3, 2, 2, 0,
+		0, 4, 1, 5, 2, 6, 3, 7,
+		4, 5, 5, 7, 7, 6, 6, 4
+	};
 
 	if( !r_num_debug_bounds )
 		return;
 
-	RB_EnableTriangleOutlines( qtrue );
+	memset( &mesh, 0, sizeof( mesh ) );
+	mesh.numVerts = 8;
+	mesh.xyzArray = verts;
+	mesh.numElems = 24;
+	mesh.elems = elems;
+	mesh.colorsArray[0] = colors;
+
+	RB_SetShaderStateMask( ~0, GLSTATE_NO_DEPTH_TEST );
 
 	RB_BindShader( rsc.worldent, rsh.whiteShader, NULL );
 
-	RB_BindVBO( RB_VBO_STREAM, GL_TRIANGLE_STRIP );
+	RB_BindVBO( RB_VBO_STREAM, GL_LINES );
+
+	RB_BeginBatch();
 
 	for( i = 0; i < r_num_debug_bounds; i++ )
 	{
 		mins = r_debug_bounds[i].mins;
 		maxs = r_debug_bounds[i].maxs;
+		color = r_debug_bounds[i].color;
 
-		rb_mesh = RB_MapBatchMesh( 8, 8 );
 		for( j = 0; j < 8; j++ )
 		{
-			corner[0] = ( ( j & 1 ) ? mins[0] : maxs[0] );
-			corner[1] = ( ( j & 2 ) ? mins[1] : maxs[1] );
-			corner[2] = ( ( j & 4 ) ? mins[2] : maxs[2] );
-			VectorCopy( corner, rb_mesh->xyzArray[j] );
+			verts[j][0] = ( ( j & 1 ) ? mins[0] : maxs[0] );
+			verts[j][1] = ( ( j & 2 ) ? mins[1] : maxs[1] );
+			verts[j][2] = ( ( j & 4 ) ? mins[2] : maxs[2] );
+			verts[j][3] = 1.0f;
+			Vector4Copy( color, colors[j] );
 		}
 
-		rb_mesh->numVerts = 8;
-		rb_mesh->numElems = 8;
-		rb_mesh->elems = elems;
-		RB_UploadMesh( rb_mesh );
-
-		RB_EndBatch();
+		RB_BatchMesh( &mesh );
 	}
 
-	RB_EnableTriangleOutlines( qfalse );
+	RB_EndBatch();
+
+	RB_SetShaderStateMask( ~0, 0 );
 }
 
 //=======================================================================

@@ -71,7 +71,7 @@ void CG_SetSceneTeamColors( void )
 	for( team = TEAM_PLAYERS; team < GS_MAX_TEAMS; team++ )
 	{
 		CG_TeamColor( team, color );
-		trap_R_SetCustomColor( team, (qbyte)( color[0] * 255 ), (qbyte)( color[1] * 255 ), (qbyte)( color[2] * 255 ) ); // update the renderer
+		trap_R_SetCustomColor( team, (uint8_t)( color[0] * 255 ), (uint8_t)( color[1] * 255 ), (uint8_t)( color[2] * 255 ) ); // update the renderer
 	}
 }
 
@@ -84,10 +84,10 @@ static void CG_RegisterForceModel( cvar_t *teamForceModel, cvar_t *teamForceSkin
 	struct skinfile_s *skin = NULL;
 
 	if( teamForceModel )
-		teamForceModel->modified = qfalse;
+		teamForceModel->modified = false;
 
 	if( teamForceSkin )
-		teamForceSkin->modified = qfalse;
+		teamForceSkin->modified = false;
 
 	if( !ppmodelinfo || !pskin )
 		return;
@@ -267,7 +267,7 @@ void CG_RegisterTeamColor( int team )
 			}
 		}
 
-		teamForceColor->modified = qfalse;
+		teamForceColor->modified = false;
 	}
 }
 
@@ -311,7 +311,7 @@ vec_t *CG_TeamColor( int team, vec4_t color )
 /*
 * 
 */
-qbyte *_ColorForEntity( int entNum, byte_vec4_t color, bool player )
+uint8_t *_ColorForEntity( int entNum, byte_vec4_t color, bool player )
 {
 	centity_t *cent;
 	int team;
@@ -389,7 +389,7 @@ qbyte *_ColorForEntity( int entNum, byte_vec4_t color, bool player )
 /*
 * 
 */
-qbyte *CG_TeamColorForEntity( int entNum, byte_vec4_t color )
+uint8_t *CG_TeamColorForEntity( int entNum, byte_vec4_t color )
 {
 	return _ColorForEntity( entNum, color, false );
 }
@@ -397,7 +397,7 @@ qbyte *CG_TeamColorForEntity( int entNum, byte_vec4_t color )
 /*
 * 
 */
-qbyte *CG_PlayerColorForEntity( int entNum, byte_vec4_t color )
+uint8_t *CG_PlayerColorForEntity( int entNum, byte_vec4_t color )
 {
 	return _ColorForEntity( entNum, color, true );
 }

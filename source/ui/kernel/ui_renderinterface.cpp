@@ -70,7 +70,6 @@ void UI_RenderInterface::RenderCompiledGeometry(Rocket::Core::CompiledGeometryHa
 
 	poly_t *poly = ( poly_t * )geometry;
 
-	if( !trap::Cvar_Value("foo"))
 	trap::R_DrawStretchPoly( poly, translation.x, translation.y );
 }
 
@@ -80,7 +79,6 @@ void UI_RenderInterface::RenderGeometry(Rocket::Core::Vertex *vertices, int num_
 
 	poly = RocketGeometry2Poly( true, vertices, num_vertices, indices, num_indices, texture );
 
-	if( !trap::Cvar_Value("foo"))
 	trap::R_DrawStretchPoly( poly, translation.x, translation.y );
 }
 
@@ -110,13 +108,13 @@ void UI_RenderInterface::ReleaseTexture(Rocket::Core::TextureHandle texture_hand
 
 }
 
-bool UI_RenderInterface::GenerateTexture(Rocket::Core::TextureHandle & texture_handle, const Rocket::Core::byte *source, const Rocket::Core::Vector2i & source_dimensions)
+bool UI_RenderInterface::GenerateTexture(Rocket::Core::TextureHandle & texture_handle, const Rocket::Core::byte *source, const Rocket::Core::Vector2i & source_dimensions, int source_samples)
 {
 	shader_t *shader;
 	Rocket::Core::String name( MAX_QPATH, "ui_raw_%d", texCounter++ );
 
 	// Com_Printf("RenderInterface::GenerateTexture: going to register %s %dx%d\n", name.CString(), source_dimensions.x, source_dimensions.y );
-	shader = trap::R_RegisterRawPic( name.CString(), source_dimensions.x, source_dimensions.y, (qbyte*)source );
+	shader = trap::R_RegisterRawPic( name.CString(), source_dimensions.x, source_dimensions.y, (uint8_t*)source, source_samples );
 	if( !shader )
 	{
 		Com_Printf(S_COLOR_RED"Warning: RenderInterface couldnt register raw pic %s!\n", name.CString() );
@@ -133,16 +131,29 @@ bool UI_RenderInterface::GenerateTexture(Rocket::Core::TextureHandle & texture_h
 
 bool UI_RenderInterface::LoadTexture(Rocket::Core::TextureHandle & texture_handle, Rocket::Core::Vector2i & texture_dimensions, const Rocket::Core::String & source)
 {
-	shader_t *shader;
+	shader_t *shader = NULL;
 	Rocket::Core::String source2( source );
 
-	if( source2[0] == '/' )
+	if( source2[0] == '/' ) {
 		source2.Erase( 0, 1 );
+	}
+	else if( source2[0] == '?' ) {
+		String protocol = source2.Substring( 1, source2.Find( "::" ) - 1 );
+		if( protocol == "fonthandle" ) {
+			if( sscanf( source2.CString(), "?fonthandle::%p", &shader ) != 1 ) {
+				Com_Printf( S_COLOR_RED "Warning: RenderInterface couldnt load pic %s!\n", source.CString() );
+				return false;
+			}
+		}
+	}
 
-	shader = trap::R_RegisterPic( source2.CString() );
+	if( !shader ) {
+		shader = trap::R_RegisterPic( source2.CString() );
+	}
+
 	if( !shader )
 	{
-		Com_Printf(S_COLOR_RED"Warning: RenderInterface couldnt load pic %s!\n", source.CString() );
+		Com_Printf( S_COLOR_RED "Warning: RenderInterface couldnt load pic %s!\n", source.CString() );
 		return false;
 	}
 
@@ -170,6 +181,11 @@ int UI_RenderInterface::GetWidth( void )
 float UI_RenderInterface::GetPixelsPerInch( void )
 {
 	return this->pixelsPerInch;
+}
+
+float UI_RenderInterface::GetBasePixelsPerInch( void )
+{
+	return 160.0f;
 }
 
 poly_t *UI_RenderInterface::RocketGeometry2Poly( bool temp, Rocket::Core::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rocket::Core::TextureHandle texture )

@@ -297,11 +297,11 @@ extern spawn_temp_t st;
 extern int meansOfDeath;
 
 
-#define	FOFS( x ) (size_t)&( ( (edict_t *)0 )->x )
-#define	STOFS( x ) (size_t)&( ( (spawn_temp_t *)0 )->x )
-#define	LLOFS( x ) (size_t)&( ( (level_locals_t *)0 )->x )
-#define	CLOFS( x ) (size_t)&( ( (gclient_t *)0 )->x )
-#define	AWOFS( x ) (size_t)&( ( (award_info_t *)0 )->x )
+#define	FOFS( x ) offsetof(edict_t,x)
+#define	STOFS( x ) offsetof(spawn_temp_t,x)
+#define	LLOFS( x ) offsetof(level_locals_t,x)
+#define	CLOFS( x ) offsetof(gclient_t,x)
+#define	AWOFS( x ) offsetof(award_info_t,x)
 
 extern cvar_t *password;
 extern cvar_t *g_operator_password;
@@ -642,9 +642,13 @@ void G_PrintMsg( edict_t *ent, const char *format, ... );
 void G_PrintChasersf( edict_t *self, const char *format, ... );
 void G_ChatMsg( edict_t *ent, edict_t *who, bool teamonly, const char *format, ... );
 void G_CenterPrintMsg( edict_t *ent, const char *format, ... );
-void G_UpdatePlayerMatchMsg( edict_t *ent );
+void G_CenterPrintFormatMsg( edict_t *ent, const char *format, ... );
+void G_UpdatePlayerMatchMsg( edict_t *ent, bool force = false );
 void G_UpdatePlayersMatchMsgs( void );
 void G_Obituary( edict_t *victim, edict_t *attacker, int mod );
+
+unsigned G_RegisterHelpMessage( const char *str );
+void G_SetPlayerHelpMessage( edict_t *ent, unsigned index, bool force = false );
 
 void G_Sound( edict_t *owner, int channel, int soundindex, float attenuation );
 void G_PositionedSound( vec3_t origin, int channel, int soundindex, float attenuation );
@@ -657,14 +661,11 @@ void G_PureSound( const char *sound );
 void G_PureModel( const char *model );
 
 extern game_locals_t game;
-#define ENTNUM( x ) ( ( x ) != NULL ? ( x ) - game.edicts : -1 )
 
-#define PLAYERNUM( x ) ( ( x ) - game.edicts - 1 )
-#define PLAYERENT( x ) ( game.edicts + ( x ) + 1 )
 #define G_ISGHOSTING( x ) ( ( ( x )->s.modelindex == 0 ) && ( ( x )->r.solid == SOLID_NOT ) )
 // racesow: fix maps with many models: allows for 50 non-inlane models to load
-// #define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) ) ? qtrue : qfalse )
-#define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) && ( (int)x < MAX_MODELS - 50 ) ) ? qtrue : qfalse )
+// #define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) ) ? true : false )
+#define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) && ( (int)x < MAX_MODELS - 50 ) ) ? true : false )
 // !racesow
 
 void G_TeleportEffect( edict_t *ent, bool in );
@@ -851,11 +852,11 @@ void G_ClientRespawn( edict_t *self, bool ghost );
 void G_ClientClearStats( edict_t *ent );
 void G_GhostClient( edict_t *self );
 void G_MoveClientToTV( edict_t *ent );
-qboolean ClientMultiviewChanged( edict_t *ent, qboolean multiview );
+bool ClientMultiviewChanged( edict_t *ent, bool multiview );
 void ClientThink( edict_t *ent, usercmd_t *cmd, int timeDelta );
 void G_ClientThink( edict_t *ent );
 void G_CheckClientRespawnClick( edict_t *ent );
-qboolean ClientConnect( edict_t *ent, char *userinfo, qboolean fakeClient, qboolean tvClient );
+bool ClientConnect( edict_t *ent, char *userinfo, bool fakeClient, bool tvClient );
 void ClientDisconnect( edict_t *ent, const char *reason );
 void ClientBegin( edict_t *ent );
 void ClientCommand( edict_t *ent );
@@ -956,7 +957,7 @@ void G_RestartLevel( void );
 game_state_t *G_GetGameState( void );
 void	G_Timeout_Reset( void );
 
-qboolean G_AllowDownload( edict_t *ent, const char *requestname, const char *uploadname );
+bool G_AllowDownload( edict_t *ent, const char *requestname, const char *uploadname );
 
 //
 // g_frame.c
@@ -1072,7 +1073,7 @@ typedef struct
 	int mh_control_award;
 	int ra_control_award;
 
-	qbyte combo[MAX_CLIENTS]; // combo management for award
+	uint8_t combo[MAX_CLIENTS]; // combo management for award
 	edict_t *lasthit;
 	unsigned int lasthit_time;
 
@@ -1088,7 +1089,7 @@ typedef struct
 typedef struct
 {
 	int buttons;
-	qbyte plrkeys; // used for displaying key icons
+	uint8_t plrkeys; // used for displaying key icons
 	int damageTaken;
 	vec3_t damageTakenDir;
 
@@ -1128,6 +1129,7 @@ typedef struct
 
 	unsigned int respawnCount;
 	matchmessage_t matchmessage;
+	unsigned int helpmessage;
 
 	unsigned int last_vsay;         // time when last vsay was said
 	unsigned int last_activity;
@@ -1350,6 +1352,9 @@ struct edict_s
 	int dmg;
 
 	const char *message;
+	const char *helpmessage;
+	unsigned mapmessage_index;
+
 	int mass;
 	unsigned int air_finished;
 	float gravity;              // per entity gravity multiplier (1.0 is normal) // use for lowgrav artifact, flares
@@ -1425,6 +1430,14 @@ struct edict_s
 	void *asScriptModule;
 	void *asSpawnFunc, *asThinkFunc, *asUseFunc, *asTouchFunc, *asPainFunc, *asDieFunc, *asStopFunc;
 };
+
+static inline int ENTNUM( edict_t *x ) { return x - game.edicts; }
+static inline int ENTNUM( gclient_t *x ) { return x - game.clients + 1; }
+
+static inline int PLAYERNUM( edict_t *x ) { return x - game.edicts - 1; }
+static inline int PLAYERNUM( gclient_t *x ) { return x - game.clients; }
+
+static inline edict_t *PLAYERENT( int x ) { return game.edicts + x + 1; }
 
 // matchmaker
 

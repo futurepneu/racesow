@@ -113,7 +113,7 @@ void ServerInfo::fromInfo( const char *info )
 				hostname = value;
 
 				// hostname with color sequences stripped
-				cleanname = COM_RemoveColorTokensExt( value.c_str(), qfalse );
+				cleanname = COM_RemoveColorTokensExt( value.c_str(), false );
 
 				// lowercase stripped version of non-colored name, used for sorting
 				locleanname = cleanname;
@@ -546,13 +546,13 @@ void ServerBrowserDataSource::tableNameForServerInfo( const ServerInfo &info, St
 	}
 }
 
-void ServerBrowserDataSource::addServerToTable( ServerInfo &info, String tableName )
+void ServerBrowserDataSource::addServerToTable( ServerInfo &info, const String &tableName )
 {
 	ReferenceList &referenceList = referenceListMap[tableName];
 
 	// Show/sort with referenceList
 	ReferenceList::iterator it = find_if( referenceList,
-							ServerInfo::EqualUnary<quint64, &ServerInfo::iaddress>( info.iaddress ) );
+							ServerInfo::EqualUnary<uint64_t, &ServerInfo::iaddress>( info.iaddress ) );
 
 	if( it == referenceList.end() ) {
 		// server isnt in the list, use insertion sort to put it in
@@ -572,13 +572,13 @@ void ServerBrowserDataSource::addServerToTable( ServerInfo &info, String tableNa
 	}
 }
 
-void ServerBrowserDataSource::removeServerFromTable( ServerInfo &info, String tableName )
+void ServerBrowserDataSource::removeServerFromTable( ServerInfo &info, const String &tableName )
 {
 	ReferenceList &referenceList = referenceListMap[tableName];
 
 	// notify rocket + remove from referenceList
 	ReferenceList::iterator it = find_if( referenceList,
-							ServerInfo::EqualUnary<quint64, &ServerInfo::iaddress>( info.iaddress ) );
+							ServerInfo::EqualUnary<uint64_t, &ServerInfo::iaddress>( info.iaddress ) );
 
 	if( it != referenceList.end() ) {
 		int index = std::distance( referenceList.begin(), it );
@@ -839,13 +839,13 @@ void ServerBrowserDataSource::compileSuggestionsList( void )
 }
 
 // called to re-sort the data
-void ServerBrowserDataSource::sortByColumn( const char *_column )
+void ServerBrowserDataSource::sortByField( const char *field )
 {
 	// do a full re-sorting of the data by given column name (lookup from COLUMN_NAMES)
 	// (for visibleServers only)
 
 	// set the sorting function
-	std::string column( _column );
+	std::string column( field );
 	if( column == "address" )
 		sortCompare = ServerInfo::LessPtrBinary<std::string, &ServerInfo::address>;
 	else if( column == "hostname" )
@@ -874,11 +874,11 @@ void ServerBrowserDataSource::sortByColumn( const char *_column )
 		sortCompare = ServerInfo::LessPtrBinary<bool, &ServerInfo::mm>;
 	else if( column == "ping" )
 		sortCompare = ServerInfo::LessPtrBinary<unsigned int, &ServerInfo::ping>;
-	else if( column == "" )
+	else if( column.empty() )
 		sortCompare = &ServerInfo::DefaultCompareBinary;
 	else
 	{
-		Com_Printf("Serverbrowser sort: unknown column %s\n", _column );
+		Com_Printf("Serverbrowser sort: unknown field %s\n", field );
 		return;
 	}
 
@@ -913,11 +913,11 @@ void ServerBrowserDataSource::filtersUpdated(void)
 
 }
 
-void ServerBrowserDataSource::notifyOfFavoriteChange( quint64 iaddr, bool add )
+void ServerBrowserDataSource::notifyOfFavoriteChange( uint64_t iaddr, bool add )
 {
 	// lets see if the server is already in our serverlist
 	ServerInfoList::iterator it_s = find_if( serverList,
-		ServerInfo::EqualUnary<quint64, &ServerInfo::iaddress>( iaddr ) );
+		ServerInfo::EqualUnary<uint64_t, &ServerInfo::iaddress>( iaddr ) );
 
 	if( it_s == serverList.end() ) {
 		return;
@@ -935,7 +935,7 @@ void ServerBrowserDataSource::notifyOfFavoriteChange( quint64 iaddr, bool add )
 	ReferenceList &referenceList = referenceListMap[tableName];
 
 	ReferenceList::iterator it = find_if( referenceList,
-							ServerInfo::EqualUnary<quint64, &ServerInfo::iaddress>( iaddr ) );
+							ServerInfo::EqualUnary<uint64_t, &ServerInfo::iaddress>( iaddr ) );
 	if( it != referenceList.end() ) {
 		NotifyRowChange( tableName, std::distance( referenceList.begin(), it ), 1 );
 	}
@@ -951,7 +951,7 @@ void ServerBrowserDataSource::notifyOfFavoriteChange( quint64 iaddr, bool add )
 
 bool ServerBrowserDataSource::addFavorite( const char *fav )
 {
-	quint64 iaddr = addr_to_int( fav );
+	uint64_t iaddr = addr_to_int( fav );
 
 	// is that address already favorited?
 	FavoritesList::const_iterator it_f = favorites.find( iaddr );
@@ -969,7 +969,7 @@ bool ServerBrowserDataSource::addFavorite( const char *fav )
 
 bool ServerBrowserDataSource::removeFavorite( const char *fav )
 {
-	quint64 iaddr = addr_to_int( fav );
+	uint64_t iaddr = addr_to_int( fav );
 
 	FavoritesList::const_iterator it_f = favorites.find( iaddr );
 	if( it_f == favorites.end() ) {

@@ -418,9 +418,20 @@ void G_AwardPlayerKilled( edict_t *self, edict_t *inflictor, edict_t *attacker, 
 
 		G_PlayerAward( attacker, s );
 	}
-	else if( attacker->r.client->resp.awardInfo.frag_count == 1 )
+
+	if( teamlist[attacker->s.team].stats.frags == 1 )
 	{
-		G_PlayerAward( attacker, S_COLOR_YELLOW "First Frag!" );
+		int i;
+
+		for( i = TEAM_PLAYERS; i < GS_MAX_TEAMS; i++ ) {
+			if( i == attacker->s.team )
+				continue;
+			if( teamlist[i].stats.frags )
+				break;
+		}
+
+		if( i != GS_MAX_TEAMS )
+			G_PlayerAward( attacker, S_COLOR_YELLOW "First Frag!" );
 	}
 
 	// ch : weapon specific frags
@@ -495,14 +506,20 @@ void G_AwardRaceRecord( edict_t *self )
 void G_PlayerAwardOfs( edict_t *ent, const char *awardMsg, int ofs, int limit, bool meta )
 {
 	if( ofs >= 0 ) {
+		gclient_t *client = ent->r.client;
+
 		if( ofs == AWOFS( goodgame_award ) ) {
 			// only count the "Good game award" during postmatch
 			if( gs.gameState.stats[GAMESTAT_MATCHSTATE] != MATCH_STATE_POSTMATCH ) {
 				return;
 			}
+			// don't get muted even once
+			if( client->level.stats.muted_count > 0 ) {
+				return;
+			}
 		}
 
-		int *award = (int *)((qbyte *)&ent->r.client->resp.awardInfo + ofs);
+		int *award = (int *)((uint8_t *)&client->resp.awardInfo + ofs);
 		if( *award >= limit ) {
 			return;
 		}
@@ -513,7 +530,7 @@ void G_PlayerAwardOfs( edict_t *ent, const char *awardMsg, int ofs, int limit, b
 		}
 
 		if( ofs == AWOFS( goodgame_award ) ) {
-			ent->r.client->level.stats.fairplay_count++;
+			client->level.stats.fairplay_count++;
 			G_PlayerAward( ent, S_COLOR_CYAN FAIR_PLAY_AWARD );
 			return;
 		}

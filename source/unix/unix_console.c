@@ -1,11 +1,12 @@
 #include <sys/types.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "../qcommon/qcommon.h"
 
-qboolean stdin_active = qtrue;
+bool stdin_active = true;
 extern cvar_t *nostdout;
-extern qboolean nostdout_backup_val;
+extern bool nostdout_backup_val;
 
 char *Sys_ConsoleInput( void )
 {
@@ -31,7 +32,7 @@ char *Sys_ConsoleInput( void )
 	if( len == 0 )
 	{           // eof!
 		Com_Printf( "EOF from stdin, console input disabled...\n" );
-		stdin_active = qfalse;
+		stdin_active = false;
 		return NULL;
 	}
 

@@ -69,6 +69,8 @@ QF_DLL_EXPORT ref_export_t *GetRefAPI( ref_import_t *import )
 	globals.RemapShader = R_RemapShader;
 	globals.GetShaderDimensions = R_GetShaderDimensions;
 
+	globals.ReplaceRawSubPic = R_ReplaceRawSubPic;
+
 	globals.ClearScene = R_ClearScene;
 	globals.AddEntityToScene = R_AddEntityToScene;
 	globals.AddLightToScene = R_AddLightToScene;
@@ -158,7 +160,7 @@ void Com_DPrintf( const char *format, ... )
 #endif
 
 #if defined(HAVE_DLLMAIN) && !defined(REF_HARD_LINKED)
-int _stdcall DLLMain( void *hinstDll, unsigned long dwReason, void *reserved )
+int WINAPI DLLMain( void *hinstDll, unsigned long dwReason, void *reserved )
 {
 	return 1;
 }

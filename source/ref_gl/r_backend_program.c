@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define FTABLE_SIZE_POW	12
 #define FTABLE_SIZE	( 1<<FTABLE_SIZE_POW )
 #define FTABLE_CLAMP( x ) ( ( (int)( ( x )*FTABLE_SIZE ) & ( FTABLE_SIZE-1 ) ) )
-#define FTABLE_EVALUATE( table, x ) ( ( table )[FTABLE_CLAMP( x )] )
+#define FTABLE_EVALUATE( table, x ) ( ( table )[FTABLE_CLAMP( fmod( x, 1.0 ) )] )
 
 #define DRAWFLAT() ( ( rb.currentModelType == mod_brush ) && ( rb.renderFlags & RF_DRAWFLAT ) && !( rb.currentShader->flags & SHADER_NODRAWFLAT ) )
 
@@ -401,7 +401,7 @@ void RB_GetShaderpassColor( const shaderpass_t *pass, byte_vec4_t rgba_ )
 	case RGB_GEN_WAVE:
 	case RGB_GEN_CUSTOMWAVE:
 		
-		if( !rgbgenfunc || rgbgenfunc->type == SHADER_FUNC_NONE )
+		if( rgbgenfunc->type == SHADER_FUNC_NONE )
 		{
 			temp = 1;
 		}
@@ -798,7 +798,7 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 	float offsetmappingScale, glossIntensity, glossExponent;
 	const superLightStyle_t *lightStyle = NULL;
 	const mfog_t *fog = rb.fog;
-	qboolean applyDecal;
+	bool applyDecal;
 	mat4_t texMatrix;
 
 	// handy pointers
@@ -912,7 +912,7 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 		}
 		else {
 			// if no alpha, use additive blending
-			if( decalmap->samples == 3 )
+			if( ( decalmap->samples == 3 ) || ( ( decalmap->flags & IT_LUMINANCE ) && ( decalmap->samples == 1 ) ) )
 				programFeatures |= GLSL_SHADER_MATERIAL_DECAL_ADD;
 		}
 
@@ -924,7 +924,7 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 		programFeatures |= GLSL_SHADER_MATERIAL_ENTITY_DECAL;
 
 		// if no alpha, use additive blending
-		if( entdecalmap->samples == 3 )
+		if( ( entdecalmap->samples == 3 ) || ( ( entdecalmap->flags & IT_LUMINANCE ) && ( entdecalmap->samples == 1 ) ) )
 			programFeatures |= GLSL_SHADER_MATERIAL_ENTITY_DECAL_ADD;
 
 		RB_BindTexture( 4, entdecalmap ); // decal
@@ -1025,7 +1025,7 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 		}
 	}
 
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_MATERIAL, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_MATERIAL, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
 	if( RB_BindProgram( program ) )
 	{
@@ -1068,7 +1068,7 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, r_glslfeat_t
 	int width = 1, height = 1;
 	int program;
 	image_t *portaltexture[2];
-	qboolean frontPlane;
+	bool frontPlane;
 	mat4_t texMatrix;
 	const image_t *dudvmap, *normalmap;
 
@@ -1096,7 +1096,7 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, r_glslfeat_t
 	if( portaltexture[1] != rsh.blackTexture )
 		programFeatures |= GLSL_SHADER_DISTORTION_REFRACTION;
 
-	frontPlane = (PlaneDiff( rb.cameraOrigin, &rb.currentPortalSurface->untransformed_plane ) > 0 ? qtrue : qfalse);
+	frontPlane = (PlaneDiff( rb.cameraOrigin, &rb.currentPortalSurface->untransformed_plane ) > 0 ? true : false);
 
 	if( frontPlane )
 	{
@@ -1128,7 +1128,7 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, r_glslfeat_t
 	RB_BindTexture( 3, portaltexture[1] );           // refraction
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_DISTORTION, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_DISTORTION, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
 	if( RB_BindProgram( program ) )
 	{
@@ -1178,7 +1178,7 @@ static void RB_RenderMeshGLSL_ShadowmapArray( const shaderpass_t *pass, r_glslfe
 	}
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_SHADOWMAP, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_SHADOWMAP, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, 
 		rb.currentShader->numdeforms, programFeatures );
 	if( !RB_BindProgram( program ) )
@@ -1227,7 +1227,7 @@ static void RB_RenderMeshGLSL_RGBShadow( const shaderpass_t *pass, r_glslfeat_t 
 	RB_SetShaderpassState( pass->flags );
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_RGB_SHADOW, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_RGB_SHADOW, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
 	if( RB_BindProgram( program ) )
 	{
@@ -1345,7 +1345,7 @@ static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, r_glslfeat_t pr
 	programFeatures |= RB_RGBAlphaGenToProgramFeatures( &pass->rgbgen, &pass->alphagen );
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_OUTLINE, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_OUTLINE, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
 	if( !RB_BindProgram( program ) )
 		return;
@@ -1423,10 +1423,10 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 	int rgbgen = pass->rgbgen.type;
 	const image_t *image;
 	const mfog_t *fog = rb.fog;
-	qboolean isWorldSurface = rb.currentModelType == mod_brush ? qtrue : qfalse;
+	bool isWorldSurface = rb.currentModelType == mod_brush ? true : false;
 	const superLightStyle_t *lightStyle = NULL;
 	const entity_t *e = rb.currentEntity;
-	qboolean isLightmapped = qfalse, isWorldVertexLight = qfalse;
+	bool isLightmapped = false, isWorldVertexLight = false;
 	vec3_t lightDir;
 	vec4_t lightAmbient, lightDiffuse;
 	mat4_t texMatrix, genVectors;
@@ -1445,17 +1445,17 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 		(rb.currentShader->flags & SHADER_LIGHTMAP) && 
 		(pass->flags & GLSTATE_BLEND_ADD) != GLSTATE_BLEND_ADD ) {
 		lightStyle = rb.superLightStyle;
-		isLightmapped = qtrue;
+		isLightmapped = true;
 	}
 
 	// vertex-lit world surface
 	if( isWorldSurface
 		&& ( rgbgen == RGB_GEN_VERTEX || rgbgen == RGB_GEN_EXACT_VERTEX )
 		&& ( rb.superLightStyle != NULL ) ) {
-		isWorldVertexLight = qtrue;
+		isWorldVertexLight = true;
 	}
 	else {
-		isWorldVertexLight = qfalse;
+		isWorldVertexLight = false;
 	}
 
 	// possibly apply the fog inline
@@ -1513,6 +1513,10 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 		}
 	}
 
+	if( image->flags & IT_ALPHA ) {
+		programFeatures |= GLSL_SHADER_Q3_ALPHA_MASK;
+	}
+
 	RB_BindTexture( 0, image );
 
 	// convert rgbgen and alphagen to GLSL feature defines
@@ -1556,7 +1560,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 	}
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_Q3A_SHADER, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_Q3A_SHADER, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
 	if( RB_BindProgram( program ) )
 	{
@@ -1651,7 +1655,8 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, r_glslfeat_t p
 			btex = tex->loaded ? tex : replacement; \
 			if( btex ) { \
 				programFeatures |= feature; \
-				if( canAdd && btex->samples == 3 ) programFeatures |= ((feature) << 1); \
+				if( canAdd && ( ( btex->samples == 3 ) || ( ( btex->flags & IT_LUMINANCE ) && ( btex->samples == 1 ) ) ) ) \
+					programFeatures |= ((feature) << 1); \
 			} \
 		} \
 		if( btex ) { \
@@ -1659,17 +1664,17 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, r_glslfeat_t p
 		} \
 	}
 
-	CELSHADE_BIND( 1, shade, 0, qfalse, rsh.whiteCubemapTexture );
-	CELSHADE_BIND( 2, diffuse, GLSL_SHADER_CELSHADE_DIFFUSE, qfalse, NULL );
-	CELSHADE_BIND( 3, decal, GLSL_SHADER_CELSHADE_DECAL, qtrue, NULL );
-	CELSHADE_BIND( 4, entdecal, GLSL_SHADER_CELSHADE_ENTITY_DECAL, qtrue, rsh.whiteTexture );
-	CELSHADE_BIND( 5, stripes, GLSL_SHADER_CELSHADE_STRIPES, qtrue, NULL );
-	CELSHADE_BIND( 6, light, GLSL_SHADER_CELSHADE_CEL_LIGHT, qtrue, NULL );
+	CELSHADE_BIND( 1, shade, 0, false, rsh.whiteCubemapTexture );
+	CELSHADE_BIND( 2, diffuse, GLSL_SHADER_CELSHADE_DIFFUSE, false, NULL );
+	CELSHADE_BIND( 3, decal, GLSL_SHADER_CELSHADE_DECAL, true, NULL );
+	CELSHADE_BIND( 4, entdecal, GLSL_SHADER_CELSHADE_ENTITY_DECAL, true, rsh.whiteTexture );
+	CELSHADE_BIND( 5, stripes, GLSL_SHADER_CELSHADE_STRIPES, true, NULL );
+	CELSHADE_BIND( 6, light, GLSL_SHADER_CELSHADE_CEL_LIGHT, true, NULL );
 
 #undef CELSHADE_BIND
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_CELSHADE, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_CELSHADE, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
 	if( RB_BindProgram( program ) )
 	{
@@ -1705,7 +1710,7 @@ static void RB_RenderMeshGLSL_Fog( const shaderpass_t *pass, r_glslfeat_t progra
 	RB_SetShaderpassState( pass->flags );
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_FOG, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_FOG, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
 	if( RB_BindProgram( program ) )
 	{
@@ -1729,15 +1734,17 @@ static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, r_glslfeat_t progr
 {
 	int program;
 	const image_t *image = pass->images[0];
-	mat4_t texMatrix = { 0 };
+	mat4_t texMatrix;
 
 	// set shaderpass state (blending, depthwrite, etc)
 	RB_SetShaderpassState( pass->flags );
 
+	Matrix4_Identity( texMatrix );
+
 	RB_BindTexture( 0, image );
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_FXAA, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_FXAA, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, 
 		rb.currentShader->numdeforms, programFeatures );
 	if( RB_BindProgram( program ) )
@@ -1766,7 +1773,43 @@ static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, r_glslfeat_t progra
 	RB_BindTexture( 2, pass->images[2] );
 
 	// update uniforms
-	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_YUV, NULL,
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_YUV, NULL,
+		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
+	if( RB_BindProgram( program ) )
+	{
+		RB_UpdateCommonUniforms( program, pass, texMatrix );
+
+		RB_DrawElementsReal( &rb.drawElements );
+	}
+}
+
+/*
+* RB_RenderMeshGLSL_ColorCorrection
+*/
+static void RB_RenderMeshGLSL_ColorCorrection( const shaderpass_t *pass, r_glslfeat_t programFeatures )
+{
+	int program;
+	const image_t *image;
+	mat4_t texMatrix;
+
+	// set shaderpass state (blending, depthwrite, etc)
+	RB_SetShaderpassState( pass->flags );
+
+	if( r_colorcorrection_override->string[0] )
+		image = rsh.colorCorrectionOverrideLUT;
+	else
+		image = rsh.worldBrushModel->colorCorrectionLUT;
+
+	Matrix4_Identity( texMatrix );
+
+	RB_BindTexture( 0, pass->images[0] );
+	RB_BindTexture( 1, image );
+
+	if( image->flags & IT_3D )
+		programFeatures |= GLSL_SHADER_COLORCORRECTION_3D_LUT;
+
+	// update uniforms
+	program = RB_RegisterProgram( GLSL_PROGRAM_TYPE_COLORCORRECTION, NULL,
 		rb.currentShader->deformsKey, rb.currentShader->deforms, rb.currentShader->numdeforms, programFeatures );
 	if( RB_BindProgram( program ) )
 	{
@@ -1786,9 +1829,11 @@ void RB_RenderMeshGLSLProgrammed( const shaderpass_t *pass, int programType )
 	if( rb.greyscale || pass->flags & SHADERPASS_GREYSCALE ) {
 		features |= GLSL_SHADER_COMMON_GREYSCALE;
 	}
-	if( r_fragment_highp->integer ) {
+#ifdef GL_ES_VERSION_2_0
+	if( glConfig.ext.fragment_precision_high ) {
 		features |= GLSL_SHADER_COMMON_FRAGMENT_HIGHP;
 	}
+#endif
 
 	features |= RB_BonesTransformsToProgramFeatures();
 	features |= RB_AutospriteProgramFeatures();
@@ -1832,6 +1877,9 @@ void RB_RenderMeshGLSLProgrammed( const shaderpass_t *pass, int programType )
 		break;
 	case GLSL_PROGRAM_TYPE_YUV:
 		RB_RenderMeshGLSL_YUV( pass, features );
+		break;
+	case GLSL_PROGRAM_TYPE_COLORCORRECTION:
+		RB_RenderMeshGLSL_ColorCorrection( pass, features );
 		break;
 	default:
 		ri.Com_DPrintf( S_COLOR_YELLOW "WARNING: Unknown GLSL program type %i\n", programType );
@@ -1884,8 +1932,8 @@ void RB_BindShader( const entity_t *e, const shader_t *shader, const mfog_t *fog
 		}
 	}
 
-	rb.doneDepthPass = qfalse;
-	rb.dirtyUniformState = qtrue;
+	rb.doneDepthPass = false;
+	rb.dirtyUniformState = true;
 
 	rb.currentEntity = e ? e : &rb.nullEnt;
 	rb.currentModelType = ( rb.currentEntity->rtype == RT_MODEL && rb.currentEntity->model ) ? rb.currentEntity->model->type : mod_bad;
@@ -1903,8 +1951,8 @@ void RB_BindShader( const entity_t *e, const shader_t *shader, const mfog_t *fog
 
 	if( !e ) {
 		rb.currentShaderTime = rb.nullEnt.shaderTime * 0.001;
-		rb.alphaHack = qfalse;
-		rb.greyscale = qfalse;
+		rb.alphaHack = false;
+		rb.greyscale = false;
 	} else {
 		Vector4Copy( rb.currentEntity->shaderRGBA, rb.entityColor );
 		Vector4Copy( rb.currentEntity->outlineColor, rb.entityOutlineColor );
@@ -1912,9 +1960,9 @@ void RB_BindShader( const entity_t *e, const shader_t *shader, const mfog_t *fog
 			rb.currentShaderTime = 0;
 		else
 			rb.currentShaderTime = (rb.time - rb.currentEntity->shaderTime) * 0.001;
-		rb.alphaHack = e->renderfx & RF_ALPHAHACK ? qtrue : qfalse;
+		rb.alphaHack = e->renderfx & RF_ALPHAHACK ? true : false;
 		rb.hackedAlpha = e->shaderRGBA[3] / 255.0;
-		rb.greyscale = e->renderfx & RF_GREYSCALE ? qtrue : qfalse;
+		rb.greyscale = e->renderfx & RF_GREYSCALE ? true : false;
 	}
 
 	RB_UpdateVertexAttribs();
@@ -1927,7 +1975,7 @@ void RB_SetLightstyle( const superLightStyle_t *lightStyle )
 {
 	assert( rb.currentShader != NULL );
 	rb.superLightStyle = lightStyle;
-	rb.dirtyUniformState = qtrue;
+	rb.dirtyUniformState = true;
 
 	RB_UpdateVertexAttribs();
 }
@@ -1939,7 +1987,7 @@ void RB_SetDlightBits( unsigned int dlightBits )
 {
 	assert( rb.currentShader != NULL );
 	rb.currentDlightBits = dlightBits;
-	rb.dirtyUniformState = qtrue;
+	rb.dirtyUniformState = true;
 }
 
 /*
@@ -1949,7 +1997,7 @@ void RB_SetShadowBits( unsigned int shadowBits )
 {
 	assert( rb.currentShader != NULL );
 	rb.currentShadowBits = shadowBits;
-	rb.dirtyUniformState = qtrue;
+	rb.dirtyUniformState = true;
 }
 
 /*
@@ -1970,7 +2018,7 @@ void RB_SetBonesData( int numBones, dualquat_t *dualQuats, int maxWeights )
 	memcpy( rb.bonesData.dualQuats, dualQuats, numBones * sizeof( *dualQuats ) );
 	rb.bonesData.maxWeights = maxWeights;
 
-	rb.dirtyUniformState = qtrue;
+	rb.dirtyUniformState = true;
 
 	RB_UpdateVertexAttribs();
 }
@@ -1982,7 +2030,7 @@ void RB_SetPortalSurface( const portalSurface_t *portalSurface )
 {
 	assert( rb.currentShader != NULL );
 	rb.currentPortalSurface = portalSurface;
-	rb.dirtyUniformState = qtrue;
+	rb.dirtyUniformState = true;
 }
 
 /*
@@ -1991,7 +2039,7 @@ void RB_SetPortalSurface( const portalSurface_t *portalSurface )
 void RB_SetSkyboxShader( const shader_t *shader )
 {
 	rb.skyboxShader = shader;
-	rb.dirtyUniformState = qtrue;
+	rb.dirtyUniformState = true;
 }
 
 /*
@@ -2004,7 +2052,7 @@ void RB_SetSkyboxSide( int side )
 	} else {
 		rb.skyboxSide = side;
 	}
-	rb.dirtyUniformState = qtrue;
+	rb.dirtyUniformState = true;
 }
 
 /*
@@ -2033,10 +2081,33 @@ void RB_SetZClip( float zNear, float zFar )
 /*
 * RB_SetLightParams
 */
-void RB_SetLightParams( float minLight, qboolean noWorldLight )
+void RB_SetLightParams( float minLight, bool noWorldLight )
 {
 	rb.minLight = minLight;
 	rb.noWorldLight = noWorldLight;
+}
+
+/*
+* RB_RegisterProgram
+*/
+int RB_RegisterProgram( int type, const char *name, const char *deformsKey, 
+	const deformv_t *deforms, int numDeforms, r_glslfeat_t features )
+{
+	int program;
+	bool noDeforms = !deformsKey || !*deformsKey;
+
+	if( rb.currentRegProgramType == type && noDeforms && rb.currentRegProgramFeatures == features ) {
+		return rb.currentRegProgram;
+	}
+
+	program = RP_RegisterProgram( type, name, deformsKey, deforms, numDeforms, features );
+	if( noDeforms ) {
+		rb.currentRegProgram = program;
+		rb.currentRegProgramType = type;
+		rb.currentRegProgramFeatures = features;
+	}
+
+	return program;
 }
 
 /*
@@ -2062,7 +2133,8 @@ int RB_BindProgram( int program )
 		qglUseProgram( object );
 	}
 	rb.currentProgramObject = object;
-	rb.dirtyUniformState = qtrue;
+	rb.dirtyUniformState = true;
+	rb.stats.c_totalPrograms++;
 	return object;
 }
 
@@ -2085,11 +2157,11 @@ static void RB_RenderPass( const shaderpass_t *pass )
 
 	if( rb.dirtyUniformState ) {
 		rb.donePassesTotal = 0;
-		rb.dirtyUniformState = qfalse;
+		rb.dirtyUniformState = false;
 	}
 
 	if( rb.gl.state & GLSTATE_DEPTHWRITE ) {
-		rb.doneDepthPass = qtrue;
+		rb.doneDepthPass = true;
 	}
 
 	rb.donePassesTotal++;
@@ -2155,14 +2227,14 @@ static void RB_SetShaderpassState( int state )
 * is not set and there have been no uniform updates, we can simply
 * call glDrawElements with fresh vertex data
 */
-static qboolean RB_CleanSinglePass( void )
+static bool RB_CleanSinglePass( void )
 {
 	// reuse current GLSL state (same program bound, same uniform values)
 	if( !rb.dirtyUniformState && rb.donePassesTotal == 1 ) {
 		RB_DrawElementsReal( &rb.drawElements );
-		return qtrue;
+		return true;
 	}
-	return qfalse;
+	return false;
 }
 
 /*
@@ -2240,7 +2312,7 @@ void RB_DrawOutlinedElements( void )
 void RB_DrawShadedElements( void )
 {
 	unsigned i;
-	qboolean addGLSLOutline = qfalse;
+	bool addGLSLOutline = false;
 	shaderpass_t *pass;
 
 	if( RB_CleanSinglePass() ) {
@@ -2251,7 +2323,7 @@ void RB_DrawShadedElements( void )
 		&& ( rb.currentShader->sort == SHADER_SORT_OPAQUE ) && ( rb.currentShader->flags & SHADER_CULL_FRONT )
 		&& !( rb.renderFlags & RF_SHADOWMAPVIEW ) )
 	{
-		addGLSLOutline = qtrue;
+		addGLSLOutline = true;
 	}
 
 	RB_SetShaderState();

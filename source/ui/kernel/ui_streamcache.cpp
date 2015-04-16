@@ -154,7 +154,7 @@ void StreamCache::StreamDone( int status, const char *contentType, void *private
 		bool moved = false;
 		if( status == HTTP_CODE_OK ) {
 			// verify that the move succeeds
-			moved = ( trap::FS_MoveFile( tmpFile.c_str(), realFile.c_str() ) == qtrue );
+			moved = ( trap::FS_MoveFile( tmpFile.c_str(), realFile.c_str() ) == true );
 		}
 		else {
 			Com_Printf( S_COLOR_YELLOW "StreamCache::StreamDone: error %i fetching '%s'\n", status, stream->url.c_str() );
@@ -281,7 +281,7 @@ std::string StreamCache::CacheFileForUrl( const std::string url, bool noCache )
 	std::string fileName;
 
 	// compute hash key for the URL and convert to hex
-	hashkey = md5_digest32( ( const qbyte * )url.c_str(), url.size() );
+	hashkey = md5_digest32( ( const uint8_t * )url.c_str(), url.size() );
 	std::stringstream outstream;
 	outstream << std::hex << hashkey;	// to hex
 
@@ -321,7 +321,7 @@ std::string StreamCache::RealFileForCacheFile( const std::string cacheFile, cons
 
 	// force extensions for some known mime types because renderer has no idea about mime types
 	// FIXME: this breaks caching due to cache file name mismatch at the start of PerformRequest
-	if( contentType != "" ) {
+	if( !contentType.empty() ) {
 		std::string forceExtension( "" );
 
 		if( contentType == "image/x-tga" ) {
@@ -335,7 +335,7 @@ std::string StreamCache::RealFileForCacheFile( const std::string cacheFile, cons
 		}
 
 		// remove existing extension (if any), append forced extension
-		if( forceExtension != "" ) {
+		if( !forceExtension.empty() ) {
 			std::string::size_type dot = realFile.rfind( '.' );
 			std::string::size_type slash = realFile.rfind( '/' );
 			if( dot != realFile.npos && ( slash == realFile.npos || dot > slash ) ) {

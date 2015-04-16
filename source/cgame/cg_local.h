@@ -42,7 +42,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define FLAG_TRAIL_DROP_DELAY 300
 #define HEADICON_TIMEOUT 8000
 
-#define GAMECHAT_STRING_SIZE	150
+#define GAMECHAT_STRING_SIZE	1024
 #define GAMECHAT_STACK_SIZE		20
 
 #define CG_MAX_TOUCHES 10
@@ -304,7 +304,6 @@ typedef struct
 	//no wsw
 
 	cgs_media_handle_t *shaderSbNums;
-	cgs_media_handle_t *shaderCrosshair[NUM_CROSSHAIRS];
 
 	// VSAY icons
 	cgs_media_handle_t *shaderVSayIcon[VSAY_TOTAL];
@@ -454,6 +453,7 @@ typedef struct
 	bool demoTutorial;
 	bool pure;
 	bool tv, tvRequested;
+	bool gameMenuRequested;
 	int gameProtocol;
 	unsigned int snapFrameTime;
 	unsigned int extrapolationTime;
@@ -545,6 +545,7 @@ typedef struct
 	player_state_t predictFromPlayerState;
 
 	int lastWeapon;
+	unsigned int lastCrossWeapons; // bitfield containing the last weapons selected from the cross
 
 	mat3_t autorotateAxis;
 
@@ -588,6 +589,8 @@ typedef struct
 	char loadingstring[MAX_QPATH];
 	int precacheCount, precacheTotal;
 	const char *matchmessage;
+	const char *helpmessage;
+	unsigned helpmessage_time;
 	char *teaminfo;
 	size_t teaminfo_size;
 	char *motd;
@@ -613,7 +616,7 @@ extern cg_static_t cgs;
 extern cg_state_t cg;
 
 #define ISVIEWERENTITY( entNum )  ( ( cg.predictedPlayerState.POVnum > 0 ) && ( (int)cg.predictedPlayerState.POVnum == entNum ) && ( cg.view.type == VIEWDEF_PLAYERVIEW ) )
-#define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) ) ? qtrue : qfalse )
+#define ISBRUSHMODEL( x ) ( ( ( x > 0 ) && ( (int)x < trap_CM_NumInlineModels() ) ) ? true : false )
 
 #define ISREALSPECTATOR()		(cg.frame.playerState.stats[STAT_REALTEAM] == TEAM_SPECTATOR)
 #define SPECSTATECHANGED()		((cg.frame.playerState.stats[STAT_REALTEAM] == TEAM_SPECTATOR) != (cg.oldFrame.playerState.stats[STAT_REALTEAM] == TEAM_SPECTATOR))
@@ -635,7 +638,7 @@ void CG_LerpEntities( void );
 void CG_LerpGenericEnt( centity_t *cent );
 
 void CG_SetOutlineColor( byte_vec4_t outlineColor, byte_vec4_t color );
-void CG_AddColoredOutLineEffect( entity_t *ent, int effects, qbyte r, qbyte g, qbyte b, qbyte a );
+void CG_AddColoredOutLineEffect( entity_t *ent, int effects, uint8_t r, uint8_t g, uint8_t b, uint8_t a );
 void CG_AddCentityOutLineEffect( centity_t *cent );
 void CG_AddItemGhostEffect( centity_t *cent );
 
@@ -649,6 +652,7 @@ centity_t *CG_GetItemTimerEnt( int num );
 //
 int CG_HorizontalAlignForWidth( const int x, int align, int width );
 int CG_VerticalAlignForHeight( const int y, int align, int height );
+int CG_HorizontalMovementForAlign( int align );
 
 void CG_DrawHUDField( int x, int y, int align, float *color, int size, int width, int value );
 void CG_DrawHUDModel( int x, int y, int align, int w, int h, struct model_s *model, struct shader_s *shader, float yawspeed );
@@ -706,7 +710,11 @@ extern vrect_t scr_vrect;
 
 extern cvar_t *cg_scoreboardFontFamily;
 extern cvar_t *cg_scoreboardMonoFontFamily;
+extern cvar_t *cg_scoreboardTitleFontFamily;
 extern cvar_t *cg_scoreboardFontSize;
+extern cvar_t *cg_scoreboardTitleFontSize;
+extern cvar_t *cg_scoreboardStats;
+extern cvar_t *cg_scoreboardWidthScale;
 extern cvar_t *cg_showFPS;
 extern cvar_t *cg_showAwards;
 extern cvar_t *cg_showZoomEffect;
@@ -719,7 +727,7 @@ void CG_CalcVrect( void );
 void CG_TileClear( void );
 void CG_DrawLoading( void );
 void CG_CenterPrint( const char *str );
-void CG_CenterPrintToUpper( const char *str );
+void CG_CenterPrintToUpper( const char *format, ... );
 
 void CG_EscapeKey( void );
 void CG_LoadStatusBar( void );
@@ -727,7 +735,7 @@ void CG_LoadStatusBar( void );
 void CG_LoadingString( const char *str );
 void CG_LoadingItemName( const char *str );
 
-void CG_DrawCrosshair( int x, int y, int align, bool touch );
+void CG_DrawCrosshair( int x, int y, int align );
 void CG_DrawKeyState( int x, int y, int w, int h, int align, const char *key );
 
 void CG_ScreenCrosshairDamageUpdate( void );
@@ -753,8 +761,19 @@ enum
 #define TOUCHAREA_SUB_SHIFT 16
 #define TOUCHAREA_MASK ( ( 1 << TOUCHAREA_SUB_SHIFT ) - 1 )
 
-int CG_TouchArea( int area, int x, int y, int w, int h, void ( *upfunc )( int id ) );
-void CG_TouchEvent( int id, touchevent_t type, int x, int y );
+typedef struct {
+	bool down; // is the finger currently down?
+	int x, y; // current x and y of the touch
+	unsigned int time; // system time when pressed
+	int area; // hud area unique id (TOUCHAREA_NONE = not caught by hud)
+	bool area_valid; // was the area of this touch checked this frame, if not, the area doesn't exist anymore
+	void ( *upfunc )( int id, unsigned int time ); // function to call when the finger is released, time is 0 if cancelled
+} cg_touch_t;
+
+extern cg_touch_t cg_touches[];
+
+int CG_TouchArea( int area, int x, int y, int w, int h, void ( *upfunc )( int id, unsigned int time ) );
+void CG_TouchEvent( int id, touchevent_t type, int x, int y, unsigned int time );
 void CG_TouchFrame( void );
 void CG_TouchMove( usercmd_t *cmd, vec3_t viewangles, int frametime );
 void CG_CancelTouches( void );
@@ -767,6 +786,7 @@ enum
 	TOUCHPAD_COUNT
 };
 
+bool CG_GetTouchpadOffset( int padID, float &x, float &y, bool fromStart );
 void CG_SetTouchpad( int padID, int touchID );
 
 //
@@ -778,12 +798,17 @@ extern cvar_t *cg_placebo;
 extern cvar_t *cg_strafeHUD;
 extern cvar_t *cg_touch_flip;
 extern cvar_t *cg_touch_scale;
+extern cvar_t *cg_touch_zoomThres;
+extern cvar_t *cg_touch_zoomTime;
 
 void CG_SC_ResetObituaries( void );
 void CG_SC_Obituary( void );
 void Cmd_CG_PrintHudHelp_f( void );
 void CG_ExecuteLayoutProgram( struct cg_layoutnode_s *rootnode, bool touch );
 void CG_GetHUDTouchButtons( int &buttons, int &upmove );
+void CG_UpdateHUDPostDraw( void );
+void CG_UpdateHUDPostTouch( void );
+void CG_ShowWeaponCross( void );
 
 // racesow
 void CG_CheckpointsClear( void );
@@ -894,8 +919,8 @@ extern cvar_t *cg_flashWindowCount;
 int CG_API( void );
 void CG_Init(	const char *serverName, unsigned int playerNum,
 				int vidWidth, int vidHeight, float pixelRatio,
-				qboolean demoplaying, const char *demoName, qboolean pure, unsigned int snapFrameTime,
-				int protocol, int sharedSeed );
+				bool demoplaying, const char *demoName, bool pure, unsigned int snapFrameTime,
+				int protocol, int sharedSeed, bool gameStart );
 void CG_Shutdown( void );
 void CG_ValidateItemDef( int tag, char *name );
 void CG_Printf( const char *format, ... );
@@ -938,8 +963,8 @@ void CG_SetSceneTeamColors( void );
 pmodelinfo_t *CG_PModelForCentity( centity_t *cent );
 struct skinfile_s *CG_SkinForCentity( centity_t *cent );
 vec_t *CG_TeamColor( int team, vec4_t color );
-qbyte *CG_TeamColorForEntity( int entNum, byte_vec4_t color );
-qbyte *CG_PlayerColorForEntity( int entNum, byte_vec4_t color );
+uint8_t *CG_TeamColorForEntity( int entNum, byte_vec4_t color );
+uint8_t *CG_PlayerColorForEntity( int entNum, byte_vec4_t color );
 
 //
 // cg_view.c

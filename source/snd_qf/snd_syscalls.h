@@ -145,7 +145,7 @@ static inline void trap_FS_FCloseFile( int file )
 	SOUND_IMPORT.FS_FCloseFile( file );
 }
 
-static inline qboolean trap_FS_RemoveFile( const char *filename )
+static inline bool trap_FS_RemoveFile( const char *filename )
 {
 	return SOUND_IMPORT.FS_RemoveFile( filename );
 }
@@ -155,7 +155,7 @@ static inline int trap_FS_GetFileList( const char *dir, const char *extension, c
 	return SOUND_IMPORT.FS_GetFileList( dir, extension, buf, bufsize, start, end );
 }
 
-static inline qboolean trap_FS_IsUrl( const char *url )
+static inline bool trap_FS_IsUrl( const char *url )
 {
 	return SOUND_IMPORT.FS_IsUrl( url );
 }
@@ -166,7 +166,7 @@ static inline unsigned int trap_Milliseconds( void )
 	return SOUND_IMPORT.Milliseconds();
 }
 
-static inline void trap_PageInMemory( qbyte *buffer, int size )
+static inline void trap_PageInMemory( uint8_t *buffer, int size )
 {
 	SOUND_IMPORT.PageInMemory( buffer, size );
 }
@@ -274,4 +274,10 @@ static inline void trap_BufQueue_EnqueueCmd( qbufQueue_t *queue, const void *cmd
 static inline int trap_BufQueue_ReadCmds( qbufQueue_t *queue, unsigned (**cmdHandlers)( const void * ) )
 {
 	return SOUND_IMPORT.BufQueue_ReadCmds( queue, cmdHandlers );
+}
+
+static inline void trap_BufQueue_Wait( qbufQueue_t *queue, int (*read)( qbufQueue_t *, unsigned( ** )(const void *), bool ), 
+	unsigned (**cmdHandlers)( const void * ), unsigned timeout_msec )
+{
+	SOUND_IMPORT.BufQueue_Wait( queue, read, cmdHandlers, timeout_msec );
 }

@@ -29,57 +29,57 @@ static vec3_t modelOrg;							// relative to view point
 /*
 * R_SurfPotentiallyVisible
 */
-qboolean R_SurfPotentiallyVisible( const msurface_t *surf )
+bool R_SurfPotentiallyVisible( const msurface_t *surf )
 {
 	const shader_t *shader = surf->shader;
 	if( surf->flags & SURF_NODRAW )
-		return qfalse;
+		return false;
 	if( !surf->mesh )
-		return qfalse;
+		return false;
 	if( !shader || (!shader->numpasses && !(shader->flags & SHADER_SKY) && !surf->fog) )
-		return qfalse;
-	return qtrue;
+		return false;
+	return true;
 }
 
 /*
 * R_SurfPotentiallyShadowed
 */
-qboolean R_SurfPotentiallyShadowed( const msurface_t *surf )
+bool R_SurfPotentiallyShadowed( const msurface_t *surf )
 {
 	if( surf->flags & ( SURF_SKY|SURF_NODLIGHT|SURF_NODRAW ) )
-		return qfalse;
+		return false;
 	if( ( surf->shader->sort >= SHADER_SORT_OPAQUE ) && ( surf->shader->sort <= SHADER_SORT_ALPHATEST ) ) {
-		return qtrue;
+		return true;
 	}
-	return qfalse;
+	return false;
 }
 
 /*
 * R_SurfPotentiallyLit
 */
-qboolean R_SurfPotentiallyLit( const msurface_t *surf )
+bool R_SurfPotentiallyLit( const msurface_t *surf )
 {
 	const shader_t *shader;
 
 	if( surf->flags & ( SURF_SKY|SURF_NODLIGHT|SURF_NODRAW ) )
-		return qfalse;
+		return false;
 	shader = surf->shader;
 	if( ( shader->flags & SHADER_SKY ) || !shader->numpasses )
-		return qfalse;
+		return false;
 	return ( surf->mesh != NULL /* && (surf->facetype != FACETYPE_TRISURF)*/ );
 }
 
 /*
 * R_CullSurface
 */
-qboolean R_CullSurface( const entity_t *e, const msurface_t *surf, unsigned int clipflags )
+bool R_CullSurface( const entity_t *e, const msurface_t *surf, unsigned int clipflags )
 {
 	const shader_t *shader = surf->shader;
 
 	if( r_nocull->integer )
-		return qfalse;
+		return false;
 	if( ( shader->flags & SHADER_ALLDETAIL ) && !r_detailtextures->integer )
-		return qtrue;
+		return true;
 
 	return ( clipflags && R_CullBox( surf->mins, surf->maxs, clipflags ) );
 }
@@ -175,7 +175,7 @@ static unsigned int R_SurfaceShadowBits( const msurface_t *surf, unsigned int ch
 /*
 * R_DrawBSPSurf
 */
-qboolean R_DrawBSPSurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfaceBSP_t *drawSurf )
+bool R_DrawBSPSurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfaceBSP_t *drawSurf )
 {
 	const vboSlice_t *slice;
 	const vboSlice_t *shadowSlice;
@@ -217,7 +217,7 @@ qboolean R_DrawBSPSurf( const entity_t *e, const shader_t *shader, const mfog_t 
 			shadowSlice->firstVert, shadowSlice->numVerts, shadowSlice->firstElem, shadowSlice->numElems );
 	}
 
-	return qfalse;
+	return false;
 }
 
 /*
@@ -226,7 +226,6 @@ qboolean R_DrawBSPSurf( const entity_t *e, const shader_t *shader, const mfog_t 
 static void R_AddSurfaceToDrawList( const entity_t *e, const msurface_t *surf, const mfog_t *fog,
 	unsigned int clipFlags, unsigned int dlightBits, unsigned shadowBits, float dist )
 {
-	int order = 0;
 	shader_t *shader;
 	drawSurfaceBSP_t *drawSurf;
 
@@ -265,7 +264,7 @@ static void R_AddSurfaceToDrawList( const entity_t *e, const msurface_t *surf, c
 		}
 		drawSurf->visFrame = rf.frameCount;
 
-		if( !R_AddDSurfToDrawList( e, fog, shader, dist, order, portalSurface, drawSurf ) ) {
+		if( !R_AddDSurfToDrawList( e, fog, shader, dist, 0, portalSurface, drawSurf ) ) {
 			return;
 		}
 	}
@@ -316,7 +315,7 @@ BRUSH MODELS
 /*
 * R_BrushModelBBox
 */
-float R_BrushModelBBox( const entity_t *e, vec3_t mins, vec3_t maxs, qboolean *rotated )
+float R_BrushModelBBox( const entity_t *e, vec3_t mins, vec3_t maxs, bool *rotated )
 {
 	int i;
 	const model_t	*model = e->model;
@@ -324,7 +323,7 @@ float R_BrushModelBBox( const entity_t *e, vec3_t mins, vec3_t maxs, qboolean *r
 	if( !Matrix3_Compare( e->axis, axis_identity ) )
 	{
 		if( rotated )
-			*rotated = qtrue;
+			*rotated = true;
 		for( i = 0; i < 3; i++ )
 		{
 			mins[i] = e->origin[i] - model->radius * e->scale;
@@ -335,7 +334,7 @@ float R_BrushModelBBox( const entity_t *e, vec3_t mins, vec3_t maxs, qboolean *r
 	else
 	{
 		if( rotated )
-			*rotated = qfalse;
+			*rotated = false;
 		VectorMA( e->origin, e->scale, model->mins, mins );
 		VectorMA( e->origin, e->scale, model->maxs, maxs );
 		return RadiusFromBounds( mins, maxs );
@@ -353,12 +352,12 @@ float R_BrushModelBBox( const entity_t *e, vec3_t mins, vec3_t maxs, qboolean *r
 /*
 * R_AddBrushModelToDrawList
 */
-qboolean R_AddBrushModelToDrawList( const entity_t *e )
+bool R_AddBrushModelToDrawList( const entity_t *e )
 {
 	unsigned int i;
 	vec3_t origin;
 	vec3_t bmins, bmaxs;
-	qboolean rotated;
+	bool rotated;
 	model_t	*model = e->model;
 	mbrushmodel_t *bmodel = ( mbrushmodel_t * )model->extradata;
 	msurface_t *surf;
@@ -368,19 +367,19 @@ qboolean R_AddBrushModelToDrawList( const entity_t *e )
 	unsigned int dlightBits, shadowBits;
 
 	if( bmodel->nummodelsurfaces == 0 ) {
-		return qfalse;
+		return false;
 	}
 
 	radius = R_BrushModelBBox( e, bmins, bmaxs, &rotated );
 
 	if( R_CullModelEntity( e, bmins, bmaxs, radius, rotated ) ) {
-		return qfalse;
+		return false;
 	}
 
 	// never render weapon models or non-occluders into shadowmaps
 	if( rn.renderFlags & RF_SHADOWMAPVIEW ) {
 		if( rsc.entShadowGroups[R_ENT2NUM(e)] != rn.shadowGroup->id ) {
-			return qtrue;
+			return true;
 		}
 	}
 
@@ -434,7 +433,7 @@ qboolean R_AddBrushModelToDrawList( const entity_t *e )
 		}
 	}
 
-	return qtrue;
+	return true;
 }
 
 /*
@@ -595,6 +594,12 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int clipFlags,
 
 	R_MarkLeafSurfaces( pleaf->firstVisSurface, clipFlags, dlightBits, shadowBits );
 	rf.stats.c_world_leafs++;
+
+	if( r_leafvis->integer )
+	{
+		const byte_vec4_t color = { 255, 0, 0, 255 };
+		R_AddDebugBounds( pleaf->mins, pleaf->maxs, color );
+	}
 }
 
 //==================================================================================
@@ -607,6 +612,7 @@ void R_DrawWorld( void )
 	int clipFlags, msec = 0;
 	unsigned int dlightBits;
 	unsigned int shadowBits;
+	bool worldOutlines;
 
 	if( !r_drawworld->integer )
 		return;
@@ -617,7 +623,9 @@ void R_DrawWorld( void )
 
 	VectorCopy( rn.refdef.vieworg, modelOrg );
 
-	if( (rn.refdef.rdflags & RDF_WORLDOUTLINES) && (rf.viewcluster != -1) && r_outlines_scale->value > 0 )
+	worldOutlines = mapConfig.forceWorldOutlines || ( rn.refdef.rdflags & RDF_WORLDOUTLINES );
+
+	if( worldOutlines && (rf.viewcluster != -1) && r_outlines_scale->value > 0 )
 		rsc.worldent->outlineHeight = max( 0.0f, r_outlines_world->value );
 	else
 		rsc.worldent->outlineHeight = 0;
@@ -659,14 +667,14 @@ void R_DrawWorld( void )
 */
 void R_MarkLeaves( void )
 {
-	qbyte *pvs;
+	uint8_t *pvs;
 	unsigned int i;
 	int rdflags;
 	mleaf_t	*leaf, **pleaf;
 	mnode_t *node;
-	qbyte *areabits;
+	uint8_t *areabits;
 	int cluster;
-	qbyte fatpvs[MAX_MAP_LEAFS/8];
+	uint8_t fatpvs[MAX_MAP_LEAFS/8];
 
 	rdflags = rn.refdef.rdflags;
 	if( rdflags & RDF_NOWORLDMODEL )

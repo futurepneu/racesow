@@ -102,7 +102,7 @@ typedef struct glsl_program_s
 					LightstyleColor[MAX_LIGHTMAPS],
 
 					DynamicLightsPosition[MAX_DLIGHTS],
-					DynamicLightsDiffuseAndInvRadius[MAX_DLIGHTS],
+					DynamicLightsDiffuseAndInvRadius[MAX_DLIGHTS >> 2],
 					NumDynamicLights,
 
 					AttrBonesIndices,
@@ -137,7 +137,7 @@ typedef struct glsl_program_s
 
 trie_t *glsl_cache_trie = NULL;
 
-static qboolean r_glslprograms_initialized;
+static bool r_glslprograms_initialized;
 
 static unsigned int r_numglslprograms;
 static glsl_program_t r_glslprograms[MAX_GLSL_PROGRAMS];
@@ -182,6 +182,7 @@ void RP_Init( void )
 	RP_RegisterProgram( GLSL_PROGRAM_TYPE_FOG, DEFAULT_GLSL_FOG_PROGRAM, NULL, NULL, 0, 0 );
 	RP_RegisterProgram( GLSL_PROGRAM_TYPE_FXAA, DEFAULT_GLSL_FXAA_PROGRAM, NULL, NULL, 0, 0 );
 	RP_RegisterProgram( GLSL_PROGRAM_TYPE_YUV, DEFAULT_GLSL_YUV_PROGRAM, NULL, NULL, 0, 0 );
+	RP_RegisterProgram( GLSL_PROGRAM_TYPE_COLORCORRECTION, DEFAULT_GLSL_COLORCORRECTION_PROGRAM, NULL, NULL, 0, 0 );
 
 	// check whether compilation of the shader with GPU skinning succeeds, if not, disable GPU bone transforms
 	if ( glConfig.maxGLSLBones ) {
@@ -193,7 +194,7 @@ void RP_Init( void )
 
 	RP_PrecachePrograms();
 
-	r_glslprograms_initialized = qtrue;
+	r_glslprograms_initialized = true;
 }
 
 /*
@@ -214,11 +215,19 @@ static void RP_PrecachePrograms( void )
 	char *buffer = NULL, *data, **ptr;
 	const char *token;
 	int handleBin;
+	size_t binaryCacheSize = 0;
 
-	R_LoadFile( GLSL_CACHE_FILE_NAME, ( void ** )&buffer );
+	R_LoadCacheFile( GLSL_CACHE_FILE_NAME, ( void ** )&buffer );
 	if( !buffer ) {
+		r_glslbincache_storemode = FS_WRITE;
 		return;
 	}
+
+#define CLOSE_AND_DROP_BINARY_CACHE() do { \
+		ri.FS_FCloseFile( handleBin ); \
+		handleBin = 0; \
+		r_glslbincache_storemode = FS_WRITE; \
+	} while(0)
 
 	handleBin = 0;
 	if( glConfig.ext.get_program_binary ) {
@@ -229,13 +238,15 @@ static void RP_PrecachePrograms( void )
 			version = 0;
 			hash = 0;
 
+			ri.FS_Seek( handleBin, 0, FS_SEEK_END );
+			binaryCacheSize = ri.FS_Tell( handleBin );
+			ri.FS_Seek( handleBin, 0, FS_SEEK_SET );
+
 			ri.FS_Read( &version, sizeof( version ), handleBin );
 			ri.FS_Read( &hash, sizeof( hash ), handleBin );
 			
-			if( version != GLSL_BITS_VERSION || hash != glConfig.versionHash ) {
-				ri.FS_FCloseFile( handleBin );
-				handleBin = 0;
-				r_glslbincache_storemode = FS_WRITE;
+			if( binaryCacheSize < 8 || version != GLSL_BITS_VERSION || hash != glConfig.versionHash ) {
+				CLOSE_AND_DROP_BINARY_CACHE();
 			}
 		}
 	}
@@ -275,21 +286,21 @@ static void RP_PrecachePrograms( void )
 			type = atoi( token );
 
 			// read lower bits
-			token = COM_ParseExt( ptr, qfalse );
+			token = COM_ParseExt( ptr, false );
 			if( !token[0] ) {
 				break;
 			}
 			lb = atoi( token );
 
 			// read higher bits
-			token = COM_ParseExt( ptr, qfalse );
+			token = COM_ParseExt( ptr, false );
 			if( !token[0] ) {
 				break;
 			}
 			hb = atoi( token );
 
 			// read program full name
-			token = COM_ParseExt( ptr, qfalse );
+			token = COM_ParseExt( ptr, false );
 			if( !token[0] ) {
 				break;
 			}
@@ -298,18 +309,26 @@ static void RP_PrecachePrograms( void )
 			features = (hb << 32) | lb; 
 
 			// read optional binary cache
-			token = COM_ParseExt( ptr, qfalse );
+			token = COM_ParseExt( ptr, false );
 			if( handleBin && token[0] ) {
 				binaryPos = atoi( token );
 				if( binaryPos ) {
-					ri.FS_Seek( handleBin, binaryPos, FS_SEEK_SET );
-					ri.FS_Read( &binaryFormat, sizeof( binaryFormat ), handleBin );
-					ri.FS_Read( &binaryLength, sizeof( binaryLength ), handleBin );
+					bool err = false;
+					
+					err = !err && ri.FS_Seek( handleBin, binaryPos, FS_SEEK_SET ) < 0;
+					err = !err && ri.FS_Read( &binaryFormat, sizeof( binaryFormat ), handleBin ) != sizeof( binaryFormat );
+					err = !err && ri.FS_Read( &binaryLength, sizeof( binaryLength ), handleBin ) != sizeof( binaryLength );
+					if( err || binaryLength >= binaryCacheSize ) {
+						binaryLength = 0;
+						CLOSE_AND_DROP_BINARY_CACHE();
+					}
+
 					if( binaryLength ) {
 						binary = R_Malloc( binaryLength );
-						if( ri.FS_Read( binary, binaryLength, handleBin ) != (int)binaryLength ) {
+						if( binary != NULL && ri.FS_Read( binary, binaryLength, handleBin ) != (int)binaryLength ) {
 							R_Free( binary );
 							binary = NULL;
+							CLOSE_AND_DROP_BINARY_CACHE();
 						}
 					}
 				}
@@ -323,9 +342,14 @@ static void RP_PrecachePrograms( void )
 				elem = RP_RegisterProgramBinary( type, name, NULL, NULL, 0, features, 
 					binaryFormat, binaryLength, binary );
 
+				if( RP_GetProgramObject( elem ) == 0 ) {
+					// check whether the program actually exists
+					elem = 0;
+				}
+
 				if( !elem ) {
 					// rewrite this binary cache on exit
-					r_glslbincache_storemode = FS_WRITE;
+					CLOSE_AND_DROP_BINARY_CACHE();
 				}
 				else {
 					glsl_program_t *program = r_glslprograms + elem - 1;
@@ -333,7 +357,12 @@ static void RP_PrecachePrograms( void )
 				}
 
 				R_Free( binary );
-				continue;
+				binary = NULL;
+
+				if( elem ) {
+					continue;
+				}
+				// fallthrough to regular registration
 			}
 			
 			ri.Com_DPrintf( "Loading program %s...\n", name );
@@ -341,6 +370,8 @@ static void RP_PrecachePrograms( void )
 			RP_RegisterProgram( type, name, NULL, NULL, 0, features );
 		}
 	}
+
+#undef CLOSE_AND_DROP_BINARY_CACHE
 
 	R_FreeFile( buffer );
 
@@ -432,7 +463,7 @@ static void RP_StorePrecacheList( void )
 	ri.FS_FCloseFile( handle );
 	ri.FS_FCloseFile( handleBin );
 
-	if( handleBin && ri.FS_FOpenFile( GLSL_BINARY_CACHE_FILE_NAME, &handleBin, FS_UPDATE ) != -1 ) {
+	if( handleBin && ri.FS_FOpenFile( GLSL_BINARY_CACHE_FILE_NAME, &handleBin, FS_UPDATE|FS_CACHE ) != -1 ) {
 		dummy = GLSL_BITS_VERSION;
 		ri.FS_Write( &dummy, sizeof( dummy ), handleBin );
 		ri.FS_FCloseFile( handleBin );
@@ -766,6 +797,8 @@ static const glsl_feature_t glsl_features_q3a[] =
 
 	{ GLSL_SHADER_Q3_LIGHTMAP_ARRAYS, "#define LIGHTMAP_ARRAYS\n", "_lmarray" },
 
+	{ GLSL_SHADER_Q3_ALPHA_MASK, "#define APPLY_ALPHA_MASK\n", "_alpha_mask" },
+
 	{ 0, NULL, NULL }
 };
 
@@ -836,6 +869,13 @@ static const glsl_feature_t glsl_features_fog[] =
 	{ 0, NULL, NULL }
 };
 
+static const glsl_feature_t glsl_features_colorcorrection[] =
+{
+	{ GLSL_SHADER_COLORCORRECTION_3D_LUT, "#define APPLY_3D_LUT\n", "_3dtex" },
+
+	{ 0, NULL, NULL }
+};
+
 static const glsl_feature_t * const glsl_programtypes_features[] =
 {
 	// GLSL_PROGRAM_TYPE_NONE
@@ -862,6 +902,8 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 	glsl_features_empty,
 	// GLSL_PROGRAM_TYPE_YUV
 	glsl_features_empty,
+	// GLSL_PROGRAM_TYPE_COLORCORRECTION
+	glsl_features_colorcorrection
 };
 
 // ======================================================================================
@@ -877,12 +919,9 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 #define QF_GLSL_VERSION300ES "#version 300 es\n"
 
 #define QF_GLSL_ENABLE_ARB_DRAW_INSTANCED "#extension GL_ARB_draw_instanced : enable\n"
-#ifdef GL_ES_VERSION_2_0
-#define QF_GLSL_ENABLE_ARB_SHADOW "#extension GL_EXT_shadow_samplers : enable\n"
-#else
-#define QF_GLSL_ENABLE_ARB_SHADOW "#extension GL_ARB_shadow : enable\n"
-#endif
+#define QF_GLSL_ENABLE_EXT_SHADOW_SAMPLERS "#extension GL_EXT_shadow_samplers : enable\n"
 #define QF_GLSL_ENABLE_EXT_TEXTURE_ARRAY "#extension GL_EXT_texture_array : enable\n"
+#define QF_GLSL_ENABLE_OES_TEXTURE_3D "#extension GL_OES_texture_3D : enable\n"
 
 #define QF_BUILTIN_GLSL_MACROS "" \
 "#if !defined(myhalf)\n" \
@@ -914,6 +953,7 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 "#define qf_textureLod texture2DLod\n" \
 "#define qf_textureCube textureCube\n" \
 "#define qf_textureArray texture2DArray\n" \
+"#define qf_texture3D texture3D\n" \
 "#define qf_textureOffset(a,b,c,d) texture2DOffset(a,b,ivec2(c,d))\n" \
 "#define qf_shadow shadow2D\n" \
 "\n"
@@ -934,6 +974,7 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 "#define qf_textureCube texture\n" \
 "#define qf_textureLod textureLod\n" \
 "#define qf_textureArray texture\n" \
+"#define qf_texture3D texture\n" \
 "#define qf_textureOffset(a,b,c,d) textureOffset(a,b,ivec2(c,d))\n" \
 "#define qf_shadow texture\n" \
 "\n"
@@ -956,6 +997,7 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 "#define qf_textureLod texture2DLod\n" \
 "#define qf_textureCube textureCube\n" \
 "#define qf_textureArray texture2DArray\n" \
+"#define qf_texture3D texture3D\n" \
 "#define qf_shadow shadow2DEXT\n" \
 "\n"
 
@@ -970,7 +1012,7 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 "# else\n" \
 "   precision mediump float;\n" \
 "# endif\n" \
-"  layout(location = 0) out lowp vec4 qf_FragColor;\n" \
+"  layout(location = 0) out vec4 qf_FragColor;\n" \
 "# define qf_varying in\n" \
 "#endif\n" \
 " qf_varying myhalf4 qf_FrontColor;\n" \
@@ -978,6 +1020,7 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 "#define qf_textureLod textureLod\n" \
 "#define qf_textureCube texture\n" \
 "#define qf_textureArray texture\n" \
+"#define qf_texture3D texture\n" \
 "#define qf_shadow texture\n" \
 "\n"
 
@@ -1183,7 +1226,7 @@ static const char *R_GLSLBuildDeformv( const deformv_t *deformv, int numDeforms 
 typedef struct
 {
 	const char *topFile;
-	qboolean error;
+	bool error;
 
 	const char **strings;
 	size_t maxStrings;
@@ -1197,7 +1240,7 @@ typedef struct
 /*
 * RF_LoadShaderFromFile_r
 */
-static qboolean RF_LoadShaderFromFile_r( glslParser_t *parser, const char *fileName,
+static bool RF_LoadShaderFromFile_r( glslParser_t *parser, const char *fileName,
 	int stackDepth )
 {
 	char *fileContents;
@@ -1230,12 +1273,12 @@ static qboolean RF_LoadShaderFromFile_r( glslParser_t *parser, const char *fileN
 
 	if( !fileContents ) {
 		Com_Printf( S_COLOR_YELLOW "Cannot load file '%s'\n", fileName );
-		return qtrue;
+		return true;
 	}
 
 	if( parser->numBuffers == parser->maxBuffers ) {
 		Com_Printf( S_COLOR_YELLOW "numBuffers overflow in '%s' around '%s'\n", parser->topFile, fileName );
-		return qtrue;
+		return true;
 	}
 	parser->buffers[parser->numBuffers++] = fileContents;
 
@@ -1244,7 +1287,7 @@ static qboolean RF_LoadShaderFromFile_r( glslParser_t *parser, const char *fileN
 
 	while( 1 ) {
 		prevPtr = ptr;
-		token = COM_ParseExt( &ptr, qtrue );
+		token = COM_ParseExt( &ptr, true );
 		if( !token[0] ) {
 			break;
 		}
@@ -1269,7 +1312,7 @@ static qboolean RF_LoadShaderFromFile_r( glslParser_t *parser, const char *fileN
 
 			if( parser->numStrings == parser->maxStrings ) {
 				Com_Printf( S_COLOR_YELLOW "numStrings overflow in '%s' around '%s'\n", fileName, line );
-				return qtrue;
+				return true;
 			}
 			parser->strings[parser->numStrings++] = startBuf;
 			startBuf = NULL;
@@ -1279,12 +1322,12 @@ static qboolean RF_LoadShaderFromFile_r( glslParser_t *parser, const char *fileN
 		token = COM_Parse( &ptr );
 		if( !token[0] ) {
 			Com_Printf( S_COLOR_YELLOW "Syntax error in '%s' around '%s'\n", fileName, line );
-			return qtrue;
+			return true;
 		}
 
 		if( stackDepth == PARSER_MAX_STACKDEPTH ) {
 			Com_Printf( S_COLOR_YELLOW "Include stack overflow in '%s' around '%s'\n", fileName, line );
-			return qtrue;
+			return true;
 		}
 
 		if( !parser->error ) {
@@ -1315,7 +1358,7 @@ static qboolean RF_LoadShaderFromFile_r( glslParser_t *parser, const char *fileN
 			R_Free( tempFilename );
 
 			if( parser->error ) {
-				return qtrue;
+				return true;
 			}
 		}
 	}
@@ -1323,7 +1366,7 @@ static qboolean RF_LoadShaderFromFile_r( glslParser_t *parser, const char *fileN
 	if( startBuf ) {
 		if( parser->numStrings == parser->maxStrings ) {
 			Com_Printf( S_COLOR_YELLOW "numStrings overflow in '%s'\n", fileName, startBuf );
-			return qtrue;
+			return true;
 		}
 		parser->strings[parser->numStrings++] = startBuf;
 	}
@@ -1391,7 +1434,10 @@ static int RP_RegisterProgramBinary( int type, const char *name, const char *def
 	int hash;
 	int linked, error = 0;
 	int shaderTypeIdx, wavefuncsIdx, deformvIdx;
-	int instancedIdx, shadowIdx, textureArrayIdx;
+	int instancedIdx, textureArrayIdx;
+#ifdef GL_ES_VERSION_2_0
+	int shadowIdx, texture3DIdx;
+#endif
 	int body_start, num_init_strings;
 	glsl_program_t *program;
 	char fullName[1024];
@@ -1468,9 +1514,10 @@ static int RP_RegisterProgramBinary( int type, const char *name, const char *def
 		linked = 0;
 		qglProgramBinary( program->object, binaryFormat, binary, binaryLength );
 		qglGetProgramiv( program->object, GL_OBJECT_LINK_STATUS_ARB, &linked );
-		if( linked ) {
-			goto done;
+		if( !linked ) {
+			error = 1;
 		}
+		goto done;
 	}
 
 	Q_strncpyz( fullName, name, sizeof( fullName ) );
@@ -1509,8 +1556,12 @@ static int RP_RegisterProgramBinary( int type, const char *name, const char *def
 #endif
 		shaderStrings[i++] = "\n";
 
+#ifdef GL_ES_VERSION_2_0
 	shadowIdx = i;
 	shaderStrings[i++] = "\n";
+	texture3DIdx = i;
+	shaderStrings[i++] = "\n";
+#endif
 	textureArrayIdx = i;
 	shaderStrings[i++] = "\n";
 
@@ -1576,7 +1627,7 @@ static int RP_RegisterProgramBinary( int type, const char *name, const char *def
 		shaderStrings[deformvIdx] = "\n";
 	}
 	Q_snprintfz( fileName, sizeof( fileName ), "glsl/%s.vert.glsl", name );
-	parser.error = qfalse;
+	parser.error = false;
 	parser.numBuffers = 0;
 	parser.numStrings = 0;
 	RF_LoadShaderFromFile_r( &parser, parser.topFile, 1 );
@@ -1596,8 +1647,12 @@ static int RP_RegisterProgramBinary( int type, const char *name, const char *def
 	if( glConfig.shadingLanguageVersion < 300 )
 #endif
 	{
+#ifdef GL_ES_VERSION_2_0
 		if( glConfig.ext.shadow )
-			shaderStrings[shadowIdx] = QF_GLSL_ENABLE_ARB_SHADOW;
+			shaderStrings[shadowIdx] = QF_GLSL_ENABLE_EXT_SHADOW_SAMPLERS;
+		if( glConfig.ext.texture3D )
+			shaderStrings[texture3DIdx] = QF_GLSL_ENABLE_OES_TEXTURE_3D;
+#endif
 		if( glConfig.ext.texture_array )
 			shaderStrings[textureArrayIdx] = QF_GLSL_ENABLE_EXT_TEXTURE_ARRAY;
 	}
@@ -1605,7 +1660,7 @@ static int RP_RegisterProgramBinary( int type, const char *name, const char *def
 	shaderStrings[wavefuncsIdx] = "\n";
 	shaderStrings[deformvIdx] = "\n";
 	Q_snprintfz( fileName, sizeof( fileName ), "glsl/%s.frag.glsl", name );
-	parser.error = qfalse;
+	parser.error = false;
 	parser.numBuffers = 0;
 	parser.numStrings = 0;
 	RF_LoadShaderFromFile_r( &parser, parser.topFile, 1 );
@@ -1756,8 +1811,8 @@ void RP_ProgramList_f( void )
 */
 void RP_UpdateShaderUniforms( int elem, 
 	float shaderTime, 
-	const vec3_t entOrigin, const vec3_t entDist, const qbyte *entityColor, 
-	const qbyte *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
+	const vec3_t entOrigin, const vec3_t entDist, const uint8_t *entityColor, 
+	const uint8_t *constColor, const float *rgbGenFuncArgs, const float *alphaGenFuncArgs,
 	const mat4_t texMatrix )
 {
 	GLfloat m[9];
@@ -1906,7 +1961,7 @@ void RP_UpdateMaterialUniforms( int elem,
 /*
 * RP_UpdateDistortionUniforms
 */
-void RP_UpdateDistortionUniforms( int elem, qboolean frontPlane )
+void RP_UpdateDistortionUniforms( int elem, bool frontPlane )
 {
 	glsl_program_t *program = r_glslprograms + elem - 1;
 
@@ -1965,12 +2020,13 @@ void RP_UpdateFogUniforms( int elem, byte_vec4_t color, float clearDist, float o
 unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *superLightStyle, 
 	const vec3_t entOrigin, const mat3_t entAxis, unsigned int dlightbits )
 {
-	int i, n;
+	int i, n, c;
 	dlight_t *dl;
 	float colorScale = mapConfig.mapLightColorScale;
 	vec3_t dlorigin, tvec, dlcolor;
 	glsl_program_t *program = r_glslprograms + elem - 1;
-	qboolean identityAxis = Matrix3_Compare( entAxis, axis_identity );
+	bool identityAxis = Matrix3_Compare( entAxis, axis_identity );
+	vec4_t shaderColor[4];
 
 	if( superLightStyle ) {
 		int i;
@@ -1993,6 +2049,8 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 	}
 
 	if( dlightbits ) {
+		memset( shaderColor, 0, sizeof( vec4_t ) * 3 );
+		Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
 		n = 0;
 		for( i = 0; i < MAX_DLIGHTS; i++ ) {
 			dl = rsc.dlights + i;
@@ -2011,8 +2069,19 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 			VectorScale( dl->color, colorScale, dlcolor );
 
 			qglUniform3fvARB( program->loc.DynamicLightsPosition[n], 1, dlorigin );
-			qglUniform4fARB( program->loc.DynamicLightsDiffuseAndInvRadius[n],
-				dlcolor[0], dlcolor[1], dlcolor[2], 1.0f / dl->intensity );
+
+			c = n & 3;
+			shaderColor[0][c] = dlcolor[0];
+			shaderColor[1][c] = dlcolor[1];
+			shaderColor[2][c] = dlcolor[2];
+			shaderColor[3][c] = 1.0f / dl->intensity;
+
+			// DynamicLightsDiffuseAndInvRadius is transposed for SIMD, but it's still 4x4
+			if( c == 3 ) {
+				qglUniform4fvARB( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
+				memset( shaderColor, 0, sizeof( vec4_t ) * 3 );
+				Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
+			}
 
 			n++;
 			dlightbits &= ~(1<<i);
@@ -2021,15 +2090,22 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 			}
 		}
 
+		if( n & 3 ) {
+			qglUniform4fvARB( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
+			memset( shaderColor, 0, sizeof( vec4_t ) * 3 ); // to set to zero for the remaining lights
+			Vector4Set( shaderColor[3], 1.0f, 1.0f, 1.0f, 1.0f );
+			n = ALIGN( n, 4 );
+		}
+
 		if( program->loc.NumDynamicLights >= 0 ) {
 			qglUniform1iARB( program->loc.NumDynamicLights, n );
 		}
 
-		for( ; n < MAX_DLIGHTS; n++ ) {
+		for( ; n < MAX_DLIGHTS; n += 4 ) {
 			if( program->loc.DynamicLightsPosition[n] < 0 ) {
 				break;
 			}
-			qglUniform4fARB( program->loc.DynamicLightsDiffuseAndInvRadius[n], 0.0f, 0.0f, 0.0f, 1.0f );
+			qglUniform4fvARB( program->loc.DynamicLightsDiffuseAndInvRadius[n >> 2], 4, shaderColor[0] );
 		}
 	}
 	
@@ -2188,7 +2264,8 @@ static void RP_GetUniformLocations( glsl_program_t *program )
 			locDepthTexture,
 			locYUVTextureY,
 			locYUVTextureU,
-			locYUVTextureV
+			locYUVTextureV,
+			locColorLUT
 			;
 
 	memset( &program->loc, -1, sizeof( program->loc ) );
@@ -2238,6 +2315,8 @@ static void RP_GetUniformLocations( glsl_program_t *program )
 	locYUVTextureU = qglGetUniformLocationARB( program->object, "u_YUVTextureU" );
 	locYUVTextureV = qglGetUniformLocationARB( program->object, "u_YUVTextureV" );
 
+	locColorLUT = qglGetUniformLocationARB( program->object, "u_ColorLUT" );
+
 	program->loc.DeluxemapOffset = qglGetUniformLocationARB( program->object, "u_DeluxemapOffset" );
 
 	for( i = 0; i < MAX_LIGHTMAPS; i++ ) {
@@ -2284,18 +2363,12 @@ static void RP_GetUniformLocations( glsl_program_t *program )
 
 	// dynamic lights
 	for( i = 0; i < MAX_DLIGHTS; i++ ) {
-		int locP, locD;
-
-		locP = qglGetUniformLocationARB( program->object, va( "u_DlightPosition[%i]", i ) );
-		locD = qglGetUniformLocationARB( program->object, va( "u_DlightDiffuseAndInvRadius[%i]", i ) );
-
-		if( locP < 0 || locD < 0 ) {
-			program->loc.DynamicLightsPosition[i] = program->loc.DynamicLightsDiffuseAndInvRadius[i] = -1;
-			break;
+		program->loc.DynamicLightsPosition[i] = qglGetUniformLocationARB( program->object, va( "u_DlightPosition[%i]", i ) );
+		if( !( i & 3 ) ) {
+			// 4x4 transposed, so we can index it with `i`
+			program->loc.DynamicLightsDiffuseAndInvRadius[i >> 2] =
+				qglGetUniformLocationARB( program->object, va( "u_DlightDiffuseAndInvRadius[%i]", i ) );
 		}
-
-		program->loc.DynamicLightsPosition[i] = locP;
-		program->loc.DynamicLightsDiffuseAndInvRadius[i] = locD;
 	}
 	program->loc.NumDynamicLights = qglGetUniformLocationARB( program->object, "u_NumDynamicLights" );
 
@@ -2381,6 +2454,9 @@ static void RP_GetUniformLocations( glsl_program_t *program )
 		qglUniform1iARB( locYUVTextureU, 1 );
 	if( locYUVTextureV >= 0 )
 		qglUniform1iARB( locYUVTextureV, 2 );
+
+	if( locColorLUT >= 0 )
+		qglUniform1iARB( locColorLUT, 1 );
 }
 
 /*
@@ -2441,5 +2517,5 @@ void RP_Shutdown( void )
 	glsl_cache_trie = NULL;
 
 	r_numglslprograms = 0;
-	r_glslprograms_initialized = qfalse;
+	r_glslprograms_initialized = false;
 }

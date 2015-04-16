@@ -28,18 +28,18 @@ void Mod_LoadAliasMD3Model( model_t *mod, model_t *parent, void *buffer, bspForm
 void Mod_LoadSkeletalModel( model_t *mod, model_t *parent, void *buffer, bspFormatDesc_t *unused );
 void Mod_LoadQ3BrushModel( model_t *mod, model_t *parent, void *buffer, bspFormatDesc_t *format );
 
-model_t *Mod_LoadModel( model_t *mod, qboolean crash );
+model_t *Mod_LoadModel( model_t *mod, bool crash );
 
 static void R_InitMapConfig( const char *model );
 static void R_FinishMapConfig( const model_t *mod );
 
-static qbyte mod_novis[MAX_MAP_LEAFS/8];
+static uint8_t mod_novis[MAX_MAP_LEAFS/8];
 
 #define	MAX_MOD_KNOWN	512*MOD_MAX_LODS
 static model_t mod_known[MAX_MOD_KNOWN];
 static int mod_numknown;
 static int modfilelen;
-static qboolean mod_isworldmodel;
+static bool mod_isworldmodel;
 static const dvis_t *mod_worldvis;
 static model_t *r_prevworldmodel;
 static mapconfig_t *mod_mapConfigs;
@@ -92,17 +92,17 @@ mleaf_t *Mod_PointInLeaf( vec3_t p, model_t *model )
 /*
 * Mod_ClusterVS
 */
-static inline qbyte *Mod_ClusterVS( int cluster, dvis_t *vis )
+static inline uint8_t *Mod_ClusterVS( int cluster, dvis_t *vis )
 {
 	if( cluster < 0 || !vis )
 		return mod_novis;
-	return ( (qbyte *)vis->data + cluster*vis->rowsize );
+	return ( (uint8_t *)vis->data + cluster*vis->rowsize );
 }
 
 /*
 * Mod_ClusterPVS
 */
-qbyte *Mod_ClusterPVS( int cluster, model_t *model )
+uint8_t *Mod_ClusterPVS( int cluster, model_t *model )
 {
 	return Mod_ClusterVS( cluster, (( mbrushmodel_t * )model->extradata)->pvs );
 }
@@ -248,7 +248,7 @@ static void Mod_FinishFaces( model_t *mod )
 		mesh = surf->mesh;
 		shader = surf->shader;
 
-		if( !mesh )
+		if( !mesh || !shader )
 			continue;
 
 		// calculate bounding box of a surface
@@ -328,11 +328,11 @@ static void Mod_SetupSubmodels( model_t *mod )
 static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, size_t *vbo_total_size )
 {
 	unsigned int i, j, k;
-	qbyte *visdata = NULL;
-	qbyte *areadata = NULL;
+	uint8_t *visdata = NULL;
+	uint8_t *areadata = NULL;
 	unsigned int rowbytes, rowlongs;
 	int areabytes;
-	qbyte *arearow;
+	uint8_t *arearow;
 	int *longrow, *longrow2;
 	mmodel_t *bm;
 	mbrushmodel_t *loadbmodel;
@@ -373,8 +373,8 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 
 		// build visibility data for each face, based on what leafs
 		// this face belongs to (visible from)
-		visdata = ( qbyte * )Mod_Malloc( mod, rowlongs * 4 * loadbmodel->numsurfaces );
-		areadata = ( qbyte * )Mod_Malloc( mod, areabytes * loadbmodel->numsurfaces );
+		visdata = ( uint8_t * )Mod_Malloc( mod, rowlongs * 4 * loadbmodel->numsurfaces );
+		areadata = ( uint8_t * )Mod_Malloc( mod, areabytes * loadbmodel->numsurfaces );
 
 		for( pleaf = loadbmodel->visleafs, leaf = *pleaf; leaf; leaf = *pleaf++ )
 		{
@@ -487,7 +487,7 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 					continue;
 				if( surf2->fog != surf->fog )
 					continue;
-				if( vcount + surf2->mesh->numVerts > USHRT_MAX )
+				if( vcount + surf2->mesh->numVerts >= USHRT_MAX )
 					continue;
 
 				// unvised maps and submodels submodel can simply skip PVS checks
@@ -731,6 +731,10 @@ static void Mod_TouchBrushModel( model_t *model )
 	}
 
 	R_TouchLightmapImages( model );
+
+	if( loadbmodel->colorCorrectionLUT ) {
+		R_TouchImage( loadbmodel->colorCorrectionLUT );
+	}
 }
 
 //===============================================================================
@@ -766,7 +770,7 @@ void R_InitModels( void )
 {
 	mod_mempool = R_AllocPool( r_mempool, "Models" );
 	memset( mod_novis, 0xff, sizeof( mod_novis ) );
-	mod_isworldmodel = qfalse;
+	mod_isworldmodel = false;
 	mod_worldvis = NULL;
 	r_prevworldmodel = NULL;
 	mod_mapConfigs = R_MallocExt( mod_mempool, sizeof( *mod_mapConfigs ) * MAX_MOD_KNOWN, 0, 1 );
@@ -910,7 +914,7 @@ model_t *Mod_ForHandle( unsigned int elem )
 * 
 * Loads in a model for the given name
 */
-model_t *Mod_ForName( const char *name, qboolean crash )
+model_t *Mod_ForName( const char *name, bool crash )
 {
 	int i;
 	model_t	*mod, *lod;
@@ -968,7 +972,7 @@ model_t *Mod_ForName( const char *name, qboolean crash )
 		return NULL;
 
 	// call the apropriate loader
-	descr = Q_FindFormatDescriptor( mod_supportedformats, ( const qbyte * )buf, (const bspFormatDesc_t **)&bspFormat );
+	descr = Q_FindFormatDescriptor( mod_supportedformats, ( const uint8_t * )buf, (const bspFormatDesc_t **)&bspFormat );
 	if( !descr )
 	{
 		ri.Com_DPrintf( S_COLOR_YELLOW "Mod_NumForName: unknown fileid for %s", mod->name );
@@ -1075,16 +1079,17 @@ static void R_InitMapConfig( const char *model )
 	memset( &mapConfig, 0, sizeof( mapConfig ) );
 
 	mapConfig.pow2MapOvrbr = 0;
-	mapConfig.lightmapsPacking = qfalse;
-	mapConfig.lightmapArrays = qfalse;
+	mapConfig.lightmapsPacking = false;
+	mapConfig.lightmapArrays = false;
 	mapConfig.maxLightmapSize = 0;
-	mapConfig.deluxeMaps = qfalse;
-	mapConfig.deluxeMappingEnabled = qfalse;
+	mapConfig.deluxeMaps = false;
+	mapConfig.deluxeMappingEnabled = false;
 	mapConfig.overbrightBits = max( 0, r_mapoverbrightbits->integer );
-	mapConfig.checkWaterCrossing = qfalse;
-	mapConfig.depthWritingSky = qtrue;
-	mapConfig.forceClear = qfalse;
+	mapConfig.checkWaterCrossing = false;
+	mapConfig.depthWritingSky = true;
+	mapConfig.forceClear = false;
 	mapConfig.lightingIntensity = 0;
+	mapConfig.colorCorrection[0] = '\0';
 
 	VectorClear( mapConfig.ambient );
 	VectorClear( mapConfig.outlineColor );
@@ -1093,7 +1098,7 @@ static void R_InitMapConfig( const char *model )
 	{
 		char lightmapsPath[MAX_QPATH], *p;
 
-		mapConfig.lightmapsPacking = qtrue;
+		mapConfig.lightmapsPacking = true;
 
 		Q_strncpyz( lightmapsPath, model, sizeof( lightmapsPath ) );
 		p = strrchr( lightmapsPath, '.' );
@@ -1104,7 +1109,7 @@ static void R_InitMapConfig( const char *model )
 			if( ri.FS_FOpenFile( lightmapsPath, NULL, FS_READ ) != -1 )
 			{
 				ri.Com_DPrintf( S_COLOR_YELLOW "External lightmap stage: lightmaps packing is disabled\n" );
-				mapConfig.lightmapsPacking = qfalse;
+				mapConfig.lightmapsPacking = false;
 			}
 		}
 	}
@@ -1139,6 +1144,13 @@ static void R_FinishMapConfig( const model_t *mod )
 				mapConfig.ambient[i] = bound( 0, mapConfig.ambient[i] * scale, 1 );
 		}
 	}
+
+	if( mapConfig.colorCorrection[0] )
+	{
+		( ( mbrushmodel_t * )( mod->extradata ) )->colorCorrectionLUT =
+			R_FindImage( mapConfig.colorCorrection, NULL, IT_COLORCORRECTION );
+	}
+
 	mod_mapConfigs[mod - mod_known] = mapConfig;
 }
 
@@ -1156,12 +1168,12 @@ void R_RegisterWorldModel( const char *model, const dvis_t *pvsData )
 	rsh.worldBrushModel = NULL;
 	rsh.worldModelSequence++;
 
-	mod_isworldmodel = qtrue;
+	mod_isworldmodel = true;
 	mod_worldvis = pvsData;
 
-	rsh.worldModel = Mod_ForName( model, qtrue );
+	rsh.worldModel = Mod_ForName( model, true );
 
-	mod_isworldmodel = qfalse;
+	mod_isworldmodel = false;
 
 	if( !rsh.worldModel ) {
 		return;
@@ -1182,7 +1194,7 @@ struct model_s *R_RegisterModel( const char *name )
 {
 	model_t *mod;
 
-	mod = Mod_ForName( name, qfalse );
+	mod = Mod_ForName( name, false );
 	if( mod ) {
 		R_TouchModel( mod );
 	}

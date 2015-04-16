@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // snd_public.h -- sound dll information visible to engine
 
-#define	SOUND_API_VERSION   38
+#define	SOUND_API_VERSION   39
 
 #define	ATTN_NONE 0
 
@@ -74,17 +74,17 @@ typedef struct
 	int ( *FS_Eof )( int file );
 	int ( *FS_Flush )( int file );
 	void ( *FS_FCloseFile )( int file );
-	qboolean ( *FS_RemoveFile )( const char *filename );
+	bool ( *FS_RemoveFile )( const char *filename );
 	int ( *FS_GetFileList )( const char *dir, const char *extension, char *buf, size_t bufsize, int start, int end );
-	qboolean ( *FS_IsUrl )( const char *url );
+	bool ( *FS_IsUrl )( const char *url );
 
 	unsigned int ( *Milliseconds )( void );
-	void ( *PageInMemory )( qbyte *buffer, int size );
+	void ( *PageInMemory )( uint8_t *buffer, int size );
 	void ( *Sleep )( unsigned int milliseconds );
 
 	// managed memory allocation
 	struct mempool_s *( *Mem_AllocPool )( const char *name, const char *filename, int fileline );
-	void *( *Mem_Alloc )( struct mempool_s *pool, int size, const char *filename, int fileline );
+	void *( *Mem_Alloc )( struct mempool_s *pool, size_t size, const char *filename, int fileline );
 	void ( *Mem_Free )( void *data, const char *filename, int fileline );
 	void ( *Mem_FreePool )( struct mempool_s **pool, const char *filename, int fileline );
 	void ( *Mem_EmptyPool )( struct mempool_s *pool, const char *filename, int fileline );
@@ -108,6 +108,8 @@ typedef struct
 	void ( *BufQueue_Finish )( qbufQueue_t *queue );
 	void ( *BufQueue_EnqueueCmd )( qbufQueue_t *queue, const void *cmd, unsigned cmd_size );
 	int ( *BufQueue_ReadCmds )( qbufQueue_t *queue, unsigned (**cmdHandlers)( const void * ) );
+	void ( *BufQueue_Wait )( qbufQueue_t *queue, int (*read)( qbufQueue_t *, unsigned( ** )(const void *), bool ), 
+		unsigned (**cmdHandlers)( const void * ), unsigned timeout_msec );
 } sound_import_t;
 
 //
@@ -119,17 +121,17 @@ typedef struct
 	int ( *API )( void );
 
 	// the init function will be called at each restart
-	qboolean ( *Init )( void *hwnd, int maxEntities, qboolean verbose );
-	void ( *Shutdown )( qboolean verbose );
+	bool ( *Init )( void *hwnd, int maxEntities, bool verbose );
+	void ( *Shutdown )( bool verbose );
 
 	void ( *BeginRegistration )( void );
 	void ( *EndRegistration )( void );
 
-	void ( *StopAllSounds )( qboolean clear, qboolean stopMusic );
+	void ( *StopAllSounds )( bool clear, bool stopMusic );
 
 	void ( *Clear )( void );
-	void ( *Update )( const vec3_t origin, const vec3_t velocity, const mat3_t axis, qboolean avidump );
-	void ( *Activate )( qboolean active );
+	void ( *Update )( const vec3_t origin, const vec3_t velocity, const mat3_t axis, bool avidump );
+	void ( *Activate )( bool active );
 
 	void ( *SetAttenuationModel )( int model, float maxdistance, float refdistance );
 	void ( *SetEntitySpatialization )( int entnum, const vec3_t origin, const vec3_t velocity );
@@ -143,16 +145,17 @@ typedef struct
 	void ( *AddLoopSound )( struct sfx_s *sfx, int entnum, float fvol, float attenuation );
 
 	// cinema
-	void ( *RawSamples )( unsigned int samples, unsigned int rate, unsigned short width, unsigned short channels, const qbyte *data, qboolean music );
+	void ( *RawSamples )( unsigned int samples, unsigned int rate, unsigned short width, unsigned short channels, const uint8_t *data, bool music );
 	void ( *PositionedRawSamples )( int entnum, float fvol, float attenuation, 
 		unsigned int samples, unsigned int rate, 
-		unsigned short width, unsigned short channels, const qbyte *data );
+		unsigned short width, unsigned short channels, const uint8_t *data );
 	unsigned int ( *GetRawSamplesLength )( void );
 	unsigned int ( *GetPositionedRawSamplesLength )( int entnum );
 
 	// music
-	void ( *StartBackgroundTrack )( const char *intro, const char *loop );
+	void ( *StartBackgroundTrack )( const char *intro, const char *loop, int mode );
 	void ( *StopBackgroundTrack )( void );
+	void ( *LockBackgroundTrack )( bool lock );
 
 	// avi dump
 	void ( *BeginAviDemo )( void );

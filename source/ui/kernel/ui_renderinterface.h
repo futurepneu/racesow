@@ -43,12 +43,14 @@ public:
 	/// Called by Rocket when a texture is required by the library.
 	virtual bool LoadTexture(Rocket::Core::TextureHandle& texture_handle, Rocket::Core::Vector2i& texture_dimensions, const Rocket::Core::String& source);
 	/// Called by Rocket when a texture is required to be built from an internally-generated sequence of pixels.
-	virtual bool GenerateTexture(Rocket::Core::TextureHandle& texture_handle, const Rocket::Core::byte* source, const Rocket::Core::Vector2i& source_dimensions);
+	virtual bool GenerateTexture(Rocket::Core::TextureHandle& texture_handle, const Rocket::Core::byte* source, const Rocket::Core::Vector2i& source_dimensions, int source_samples);
 	/// Called by Rocket when a loaded texture is no longer required.
 	virtual void ReleaseTexture(Rocket::Core::TextureHandle texture_handle);
 
 	/// Returns the number of pixels per inch.
 	virtual float GetPixelsPerInch(void);
+	/// Returns the number of pixels per inch when 1dp equals to 1px.
+	virtual float GetBasePixelsPerInch(void);
 
 	//// Methods
 	int GetWidth( void );

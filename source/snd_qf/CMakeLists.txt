@@ -10,33 +10,38 @@ endif()
 
 file(GLOB SND_QF_HEADERS
     "*.h"
+	"../gameshared/q_*.h"
+	"../client/snd_public.h"
 )
 
 file(GLOB SND_QF_SOURCES
     "*.c"
     "../snd_common/*.c"
     "../gameshared/q_*.c"
-    "../qalgo/*.c"
 )
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    file(GLOB SND_QF_PLATFORM_SOURCES
-        "../win32/win_snd.c"
-    )
-
-    set(SND_QF_PLATFORM_LIBRARIES "winmm.lib")
-else()
+if (USE_SDL2)
     file(GLOB SND_QF_PLATFORM_SOURCES
         "../sdl/sdl_snd.c"
     )
 
-    if (USE_SDL2)
-        set(SND_QF_PLATFORM_LIBRARIES ${SDL2_LIBRARY})
-    else()  
+    set(SND_QF_PLATFORM_LIBRARIES ${SDL2_LIBRARY})
+else()
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+        file(GLOB SND_QF_PLATFORM_SOURCES
+            "../win32/win_snd.c"
+        )
+
+        set(SND_QF_PLATFORM_LIBRARIES "winmm.lib")
+    else()
+        file(GLOB SND_QF_PLATFORM_SOURCES
+            "../sdl/sdl_snd.c"
+        )
+
         set(SND_QF_PLATFORM_LIBRARIES ${SDL_LIBRARY})
     endif()
 endif()
 
 add_library(snd_qf SHARED ${SND_QF_HEADERS} ${SND_QF_SOURCES} ${SND_QF_PLATFORM_SOURCES})
-target_link_libraries(snd_qf ${OGG_LIBRARY} ${VORBIS_LIBRARIES} ${SND_QF_PLATFORM_LIBRARIES})
+target_link_libraries(snd_qf PRIVATE ${OGG_LIBRARY} ${VORBIS_LIBRARIES} ${SND_QF_PLATFORM_LIBRARIES})
 qf_set_output_dir(snd_qf libs)

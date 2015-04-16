@@ -4,6 +4,11 @@ include_directories(${ZLIB_INCLUDE_DIR} ${CURL_INCLUDE_DIR})
 
 file(GLOB TV_SERVER_HEADERS
     "*.h"
+	"../gameshared/q_*.h"
+	"../gameshared/anorms.h"
+	"../gameshared/config.h"
+	"../qcommon/*.h"
+	"../qalgo/*.h"
 )
 
 file(GLOB TV_SERVER_SOURCES
@@ -72,7 +77,7 @@ else()
 endif()
 
 add_executable(${QFUSION_TVSERVER_NAME} ${TV_SERVER_BINARY_TYPE} ${TV_SERVER_HEADERS} ${TV_SERVER_SOURCES} ${TV_SERVER_PLATFORM_SOURCES})
-target_link_libraries(${QFUSION_TVSERVER_NAME} ${CURL_LIBRARY} ${ZLIB_LIBRARY} ${TV_SERVER_PLATFORM_LIBRARIES})
+target_link_libraries(${QFUSION_TVSERVER_NAME} PRIVATE ${CURL_LIBRARY} ${ZLIB_LIBRARY} ${TV_SERVER_PLATFORM_LIBRARIES})
 qf_set_output_dir(${QFUSION_TVSERVER_NAME} "")
 
 set_target_properties(${QFUSION_TVSERVER_NAME} PROPERTIES COMPILE_DEFINITIONS "DEDICATED_ONLY;TV_SERVER_ONLY;TV_MODULE_HARD_LINKED")

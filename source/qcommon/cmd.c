@@ -30,16 +30,16 @@ typedef struct cmdalias_s
 {
 	char *name;
 	char *value;
-	qboolean archive;
+	bool archive;
 } cmd_alias_t;
 
-static qboolean	cmd_preinitialized = qfalse;
-static qboolean	cmd_initialized = qfalse;
+static bool	cmd_preinitialized = false;
+static bool	cmd_initialized = false;
 
 static trie_t *cmd_alias_trie = NULL;
 static const trie_casing_t CMD_ALIAS_TRIE_CASING = CON_CASE_SENSITIVE ? TRIE_CASE_SENSITIVE : TRIE_CASE_INSENSITIVE;;
 
-static qboolean	cmd_wait;
+static bool	cmd_wait;
 static int alias_count;    // for detecting runaway loops
 
 static int Cmd_Archive( void *alias, void *ignored )
@@ -51,7 +51,7 @@ static int Cmd_Archive( void *alias, void *ignored )
 static int Cmd_PatternMatchesAlias( void *alias, void *pattern )
 {
 	assert( alias );
-	return !pattern || Com_GlobMatch( (const char *) pattern, ( (cmd_alias_t *) alias )->name, qfalse );
+	return !pattern || Com_GlobMatch( (const char *) pattern, ( (cmd_alias_t *) alias )->name, false );
 }
 
 //=============================================================================
@@ -65,7 +65,7 @@ static int Cmd_PatternMatchesAlias( void *alias, void *pattern )
 */
 static void Cmd_Wait_f( void )
 {
-	cmd_wait = qtrue;
+	cmd_wait = true;
 }
 
 
@@ -83,7 +83,7 @@ COMMAND BUFFER
 * position in the buffer
 */
 
-static qboolean cbuf_initialized = qfalse;
+static bool cbuf_initialized = false;
 
 #define MIN_CMD_TEXT_SIZE 1024
 
@@ -108,7 +108,7 @@ void Cbuf_Init( void )
 	cbuf_text_head = 0;
 	cbuf_text_tail = 0;
 
-	cbuf_initialized = qtrue;
+	cbuf_initialized = true;
 }
 
 /*
@@ -127,7 +127,7 @@ void Cbuf_Shutdown( void )
 
 	Mem_FreePool( &cbuf_pool );
 
-	cbuf_initialized = qfalse;
+	cbuf_initialized = false;
 }
 
 /*
@@ -179,6 +179,7 @@ void Cbuf_FreeSpace( void )
 void Cbuf_EnsureSpace( size_t size )
 {
 	size_t free;
+	size_t diff;
 
 	if( cbuf_text_head >= cbuf_text_tail )
 	{
@@ -192,14 +193,14 @@ void Cbuf_EnsureSpace( size_t size )
 	if( free > size )
 		return;
 
-	cbuf_text_size += ( size - free ) + MIN_CMD_TEXT_SIZE;
+	diff = ( size - free ) + MIN_CMD_TEXT_SIZE;
+	cbuf_text_size += diff;
 	cbuf_text = Mem_Realloc( cbuf_text, cbuf_text_size );
 
 	if( cbuf_text_head < cbuf_text_tail )
 	{
-		memcpy( cbuf_text + cbuf_text_tail, cbuf_text + cbuf_text_tail + ( size - free ) + MIN_CMD_TEXT_SIZE,
-			cbuf_text_size - cbuf_text_tail );
-		cbuf_text_tail += ( size - free ) + MIN_CMD_TEXT_SIZE;
+		memmove( cbuf_text + cbuf_text_tail + diff, cbuf_text + cbuf_text_tail, diff );
+		cbuf_text_tail += diff;
 	}
 }
 
@@ -288,7 +289,7 @@ void Cbuf_Execute( void )
 {
 	size_t i;
 	char line[MAX_STRING_CHARS];
-	qboolean quotes, quoteskip;
+	bool quotes, quoteskip;
 
 	alias_count = 0;    // don't allow infinite alias loops
 
@@ -296,19 +297,19 @@ void Cbuf_Execute( void )
 	{
 		// find a \n or ; line break
 		i = 0;
-		quotes = qfalse;
-		quoteskip = qfalse;
+		quotes = false;
+		quoteskip = false;
 		while( cbuf_text_tail != cbuf_text_head && i < sizeof( line )-1 )
 		{
 			if( !quoteskip && cbuf_text[cbuf_text_tail] == '"' )
 				quotes = !quotes;
 			if( !quoteskip && cbuf_text[cbuf_text_tail] == '\\' )
 			{
-				quoteskip = qtrue;
+				quoteskip = true;
 			}
 			else
 			{
-				quoteskip = qfalse;
+				quoteskip = false;
 			}
 
 			line[i] = cbuf_text[cbuf_text_tail];
@@ -336,7 +337,7 @@ void Cbuf_Execute( void )
 		{
 			// skip out while text still remains in buffer, leaving it
 			// for next frame
-			cmd_wait = qfalse;
+			cmd_wait = false;
 			break;
 		}
 	}
@@ -362,7 +363,7 @@ void Cbuf_Execute( void )
 * 
 * Other commands are added late, after all initialization is complete.
 */
-void Cbuf_AddEarlyCommands( qboolean second_run )
+void Cbuf_AddEarlyCommands( bool second_run )
 {
 	int i;
 	const char *s;
@@ -404,7 +405,7 @@ void Cbuf_AddEarlyCommands( qboolean second_run )
 * Returns true if any late commands were added, which
 * will keep the demoloop from immediately starting
 */
-qboolean Cbuf_AddLateCommands( void )
+bool Cbuf_AddLateCommands( void )
 {
 	int i;
 	size_t text_size;
@@ -419,7 +420,7 @@ qboolean Cbuf_AddLateCommands( void )
 		text_size += strlen( COM_Argv( i ) ) + 2 /* quatation marks */ + 1 /* space */;
 	}
 	if( text_size == 0 )
-		return qfalse;
+		return false;
 
 	text_size += 2; // '\n' and '\0' at the end
 	text = Cbuf_Malloc( (int)text_size );
@@ -444,7 +445,7 @@ qboolean Cbuf_AddLateCommands( void )
 	Cbuf_AddText( text );
 	Cbuf_Free( text );
 
-	return qtrue;
+	return true;
 }
 
 
@@ -464,7 +465,7 @@ static void Cmd_Exec_f( void )
 {
 	char *f, *name;
 	const char *arg = Cmd_Argv( 1 );
-	qboolean silent = Cmd_Argc() >= 3 && !Q_stricmp( Cmd_Argv( 2 ), "silent" );
+	bool silent = Cmd_Argc() >= 3 && !Q_stricmp( Cmd_Argv( 2 ), "silent" );
 	int len, name_size;
 
 	if( Cmd_Argc() < 2 || !arg[0] )
@@ -489,6 +490,13 @@ static void Cmd_Exec_f( void )
 
 	COM_DefaultExtension( name, ".cfg", name_size );
 
+	if( FS_PakNameForFile( name ) ) {
+		if( !silent )
+			Com_Printf( "Ignoring %s\n", name );
+		Mem_TempFree( name );
+		return;
+	}
+
 	len = FS_LoadFile( name, (void **)&f, NULL, 0 );
 	if( !f )
 	{
@@ -502,7 +510,7 @@ static void Cmd_Exec_f( void )
 		Com_Printf( "Executing: %s\n", name );
 
 	Cbuf_InsertText( "\n" );
-	if (len >= 3 && ((qbyte)f[0] == 0xEF && (qbyte)f[1] == 0xBB && (qbyte)f[2] == 0xBF))
+	if (len >= 3 && ((uint8_t)f[0] == 0xEF && (uint8_t)f[1] == 0xBB && (uint8_t)f[2] == 0xBF))
 		Cbuf_InsertText( f+3 );	// skip Windows UTF-8 marker
 	else
 		Cbuf_InsertText( f );
@@ -516,7 +524,7 @@ static void Cmd_Exec_f( void )
 */
 static char **CL_CompleteExecBuildList( const char *partial )
 {
-	return Cmd_CompleteFileList( partial, "", ".cfg", qtrue );
+	return Cmd_CompleteFileList( partial, "", ".cfg", true );
 }
 
 /*
@@ -572,7 +580,7 @@ static void Cmd_AliasList_f( void )
 * 
 * Creates a new command that executes a command string (possibly ; separated)
 */
-static void Cmd_Alias_f_( qboolean archive )
+static void Cmd_Alias_f_( bool archive )
 {
 	cmd_alias_t *a;
 	char cmd[1024];
@@ -601,8 +609,8 @@ static void Cmd_Alias_f_( qboolean archive )
 		if( Cmd_Argc() == 2 )
 		{
 			if( archive )
-				a->archive = qtrue;
-			Com_Printf( "alias \"%s" S_COLOR_WHITE "\" is \"%s\"\n", a->name, a->value );
+				a->archive = true;
+			Com_Printf( "alias \"%s\" is \"%s" S_COLOR_WHITE "\"\n", a->name, a->value );
 			return;
 		}
 		Mem_ZoneFree( a->value );
@@ -610,13 +618,13 @@ static void Cmd_Alias_f_( qboolean archive )
 	else
 	{
 		a = Mem_ZoneMalloc( (int) ( sizeof( cmd_alias_t ) + len + 1 ) );
-		a->name = (char *) ( (qbyte *)a + sizeof( cmd_alias_t ) );
+		a->name = (char *) ( (uint8_t *)a + sizeof( cmd_alias_t ) );
 		strcpy( a->name, s );
 		Trie_Insert( cmd_alias_trie, s, a );
 	}
 
 	if( archive )
-		a->archive = qtrue;
+		a->archive = true;
 
 	// copy the rest of the command line
 	cmd[0] = 0; // start out with a null string
@@ -636,7 +644,7 @@ static void Cmd_Alias_f_( qboolean archive )
 */
 static void Cmd_Alias_f( void )
 {
-	Cmd_Alias_f_( qfalse );
+	Cmd_Alias_f_( false );
 }
 
 /*
@@ -644,7 +652,7 @@ static void Cmd_Alias_f( void )
 */
 static void Cmd_Aliasa_f( void )
 {
-	Cmd_Alias_f_( qtrue );
+	Cmd_Alias_f_( true );
 }
 
 /*
@@ -752,12 +760,12 @@ static char *cmd_null_string = "";
 static char cmd_args[MAX_STRING_CHARS];
 
 static trie_t *cmd_function_trie = NULL;
-static const trie_casing_t CMD_FUNCTION_TRIE_CASING = CON_CASE_SENSITIVE ? TRIE_CASE_SENSITIVE : TRIE_CASE_INSENSITIVE;;
+static const trie_casing_t CMD_FUNCTION_TRIE_CASING = CON_CASE_SENSITIVE ? TRIE_CASE_SENSITIVE : TRIE_CASE_INSENSITIVE;
 
 static int Cmd_PatternMatchesFunction( void *cmd, void *pattern )
 {
 	assert( cmd );
-	return !pattern || Com_GlobMatch( (const char *) pattern, ( (cmd_function_t *) cmd )->name, qfalse );
+	return !pattern || Com_GlobMatch( (const char *) pattern, ( (cmd_function_t *) cmd )->name, false );
 }
 
 // The functions that execute commands get their parameters with these
@@ -901,7 +909,7 @@ void Cmd_AddCommand( const char *cmd_name, xcommand_t function )
 	}
 
 	cmd = Mem_ZoneMalloc( (int)( sizeof( cmd_function_t ) + strlen( cmd_name ) + 1 ) );
-	cmd->name = (char *) ( (qbyte *)cmd + sizeof( cmd_function_t ) );
+	cmd->name = (char *) ( (uint8_t *)cmd + sizeof( cmd_function_t ) );
 	strcpy( cmd->name, cmd_name );
 	cmd->function = function;
 	cmd->completion_func = NULL;
@@ -930,7 +938,7 @@ void Cmd_RemoveCommand( const char *cmd_name )
 * Cmd_Exists
 * // used by the cvar code to check for cvar / command name overlap
 */
-qboolean Cmd_Exists( const char *cmd_name )
+bool Cmd_Exists( const char *cmd_name )
 {
 	cmd_function_t *cmd;
 
@@ -1051,7 +1059,7 @@ char **Cmd_CompleteBuildArgList( const char *partial )
 *
 * Find matching files
 */
-char **Cmd_CompleteFileList( const char *partial, const char *basedir, const char *extension, qboolean subdirectories )
+char **Cmd_CompleteFileList( const char *partial, const char *basedir, const char *extension, bool subdirectories )
 {
 	const char *p;
 	char dir[MAX_QPATH];
@@ -1265,7 +1273,7 @@ char **Cmd_CompleteAliasBuildList( const char *partial )
 * 
 * Used by console code to check if text typed is a command/cvar/alias or chat
 */
-qboolean Cmd_CheckForCommand( char *text )
+bool Cmd_CheckForCommand( char *text )
 {
 	char	cmd[MAX_STRING_CHARS];
 	cmd_alias_t *a;
@@ -1282,15 +1290,15 @@ qboolean Cmd_CheckForCommand( char *text )
 	cmd[i] = 0;
 
 	if( Cmd_Exists( cmd ) )
-		return qtrue;
+		return true;
 	if( Cvar_Find( cmd ) )
-		return qtrue;
+		return true;
 	if( Trie_Find( cmd_alias_trie, cmd, TRIE_EXACT_MATCH, (void **)&a ) == TRIE_OK )
-		return qtrue;
+		return true;
 	if( Dynvar_Lookup( cmd ) )
-		return qtrue;
+		return true;
 
-	return qfalse;
+	return false;
 }
 
 /*
@@ -1355,7 +1363,7 @@ void Cmd_ExecuteString( const char *text )
 	}
 	else
 	{
-		Com_Printf( "Unknown command \"%s\"\n", str );
+		Com_Printf( "Unknown command \"%s" S_COLOR_WHITE "\"\n", str );
 	}
 }
 
@@ -1399,7 +1407,7 @@ void Cmd_PreInit( void )
 	Trie_Create( CMD_ALIAS_TRIE_CASING, &cmd_alias_trie );
 	Trie_Create( CMD_FUNCTION_TRIE_CASING, &cmd_function_trie );
 
-	cmd_preinitialized = qtrue;
+	cmd_preinitialized = true;
 }
 
 /*
@@ -1432,7 +1440,7 @@ void Cmd_Init( void )
 	Cmd_SetCompletionFunc( "unalias", Cmd_CompleteAliasBuildList );
 	Cmd_SetCompletionFunc( "exec", CL_CompleteExecBuildList );
 
-	cmd_initialized = qtrue;
+	cmd_initialized = true;
 }
 
 void Cmd_Shutdown( void )
@@ -1474,7 +1482,7 @@ void Cmd_Shutdown( void )
 		}
 		Trie_FreeDump( dump );
 
-		cmd_initialized = qfalse;
+		cmd_initialized = false;
 	}
 
 	if( cmd_preinitialized )
@@ -1487,6 +1495,6 @@ void Cmd_Shutdown( void )
 		Trie_Destroy( cmd_function_trie );
 		cmd_function_trie = NULL;
 
-		cmd_preinitialized = qfalse;
+		cmd_preinitialized = false;
 	}
 }

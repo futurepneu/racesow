@@ -1,59 +1,44 @@
-qfusion - racesow
+qfusion
 =======
 
-Source code for the Racesow mod for the Warsow game
+http://www.qfusion.net/
 
-Added Features
-=============
+qfusion is the id Tech 2 derived game engine powering the game <a href="http://warsow.net/">Warsow</a>
 
-# Server
+## Features (incomplete list)
 
-## Pure mode
+- Fully open-source under the GPLv2 and easy to mod
+- Runs on Linux, OS X, Windows and Android (in development)
+- Modern and fast OpenGL 3.0 and OpenGL ES 2.0 renderer
+- <a href="http://librocket.com/wiki/documentation">User Interface</a> based on XHTML/CSS standards with support for remote content
+- Support for vertex and skeletal animation
+- Powerful multiplayer & e-sports features (global stats, friend lists, IRC, TV-server, etc.)
+- Ready to go FPS example gametype scripts from Warsow
+- Multithreaded sound mixer design
+- OpenAL support
+- Hardware-accelerated Ogg Theora video playback
 
-Set `sv_pure` to `2` to skip shaders in pure checks. Useful when having many
-maps with repeated and potentially conflicting shaders.
+## Extensible
 
-# Client
+- C/C++ mods (plugins) can ship new gameplay features while maintaining compatibility with the core
+- UI and game mechanics scriptable with <a href="http://www.angelcode.com/angelscript/">AngelScript</a> (C++ style syntax)
+- Flexible HUD scripting
+- "Pure" (models, maps, textures, sounds) game content is automatically delivered to players by game servers
+- Players are allowed to locally override non-"pure" game content
 
-## Player Trails
+## License (GPLv2)
 
-Adds a paritcle trail that follow all players. Can be controlled with the
-following cvars.
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
 
- * `cg_showPlayerTrails` - The partile lifetime in seconds, lower values give
-   shorter trails. Disable trails by setting this to `0`.
- * `cg_playerTrailsAlpha` - Initial opacity of the particles. `1.0` is opaque and
-   `0` is transparent.
- * `cg_playerTrailsColor` - Color string of the form `"r g b"` where `r`, `g`,
-   and `b` are values from 0-1. Set `r`, `g`, or `b` to  `-1` for a random
-   color. Set the string to `"1"` to color each player individually.
- * `cg_playerTrailsSize` - Size of the spawned particles.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-## Auto demo recording
+See the GNU General Public License for more details.
 
-Will automatically record race demos and name them according to
-`gametype/map/map_time_random` on map completion. Control with the following
-cvars.
-
- * `rs_autoRaceDemo` - Set 1 to enable automatic recording, 0 to disable.
- * `rs_autoRaceScreenshot` - Set 1 to automatically take a screenshot at finish
-   if `rs_autoRaceDemo` is enabled.
-
-## Other Miscellaneous Options
-
- * `rs_ignoreTeleEffect` - Set to 1 to disable teleporter particles and sound.
-
-## Additional HUD Variables and cvars
-
-### Hud Cvars
-
- * `cg_showAcceleration` - sets `SHOW_ACCEL` HUD variable
-
-### Hud Variables
-
- * `ROCKETACCEL` - Signed speed change when acceleration is above a certain
-   threshold. Intended to display speed gained from rocket jumps.
- * `JUMPSPEED` - Speed the player had at the last jump.
- * `MAX_ACCEL` - Theoretical maximum acceleration from strafing. Should be
-   compared against `ACCELERATION`.
- * `CP<N>` - Time at the given checkpoint. `<N>` can be a integer from 1 to 15.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.

@@ -33,6 +33,7 @@ typedef struct r_backend_stats_s
 {
 	unsigned int numVerts, numElems;
 	unsigned int c_totalVerts, c_totalTris, c_totalStaticVerts, c_totalStaticTris, c_totalDraws, c_totalBinds;
+	unsigned int c_totalPrograms;
 } rbStats_t;
 
 typedef struct
@@ -63,7 +64,7 @@ typedef struct r_backend_s
 		int 			currentElemArrayVBO;
 
 		int				faceCull;
-		qboolean		frontFace;
+		bool			frontFace;
 
 		int				viewport[4];
 		int				scissor[4];
@@ -74,7 +75,7 @@ typedef struct r_backend_s
 
 		float			depthmin, depthmax;
 
-		qboolean		depthoffset;
+		bool		depthoffset;
 	} gl;
 
 	unsigned int time;
@@ -98,8 +99,15 @@ typedef struct r_backend_s
 	const mesh_vbo_t *currentMeshVBO;
 	rbBonesData_t bonesData;
 	const portalSurface_t *currentPortalSurface;
+	
+	// glUseProgram cache
 	int	currentProgram;
 	int currentProgramObject;
+
+	// RP_RegisterProgram cache
+	int	currentRegProgram;
+	int currentRegProgramType;
+	r_glslfeat_t currentRegProgramFeatures;
 
 	mesh_t batchMesh;
 	rbDrawElements_t batches[RB_VBO_NUM_STREAMS];
@@ -130,26 +138,26 @@ typedef struct r_backend_s
 	double currentShaderTime;
 	int currentShaderState;
 	int shaderStateORmask, shaderStateANDmask;
-	qboolean dirtyUniformState;
-	qboolean doneDepthPass;
+	bool dirtyUniformState;
+	bool doneDepthPass;
 	int donePassesTotal;
 
-	qboolean triangleOutlines;
+	bool triangleOutlines;
 
 	const superLightStyle_t *superLightStyle;
 
-	qbyte entityColor[4];
-	qbyte entityOutlineColor[4];
+	uint8_t entityColor[4];
+	uint8_t entityOutlineColor[4];
 	entity_t nullEnt;
 
 	const mfog_t *fog, *texFog, *colorFog;
 
-	qboolean greyscale;
-	qboolean alphaHack;
+	bool greyscale;
+	bool alphaHack;
 	float hackedAlpha;
 
 	float minLight;
-	qboolean noWorldLight;
+	bool noWorldLight;
 } rbackend_t;
 
 extern rbackend_t rb;
@@ -167,9 +175,11 @@ void RB_DrawElementsReal( rbDrawElements_t *de );
 void RB_InitShading( void );
 void RB_DrawOutlinedElements( void );
 void RB_DrawShadedElements( void );
+int RB_RegisterProgram( int type, const char *name, const char *deformsKey, 
+	const deformv_t *deforms, int numDeforms, r_glslfeat_t features );
 int RB_BindProgram( int program );
 void RB_BindTexture( int tmu, const image_t *tex );
 void RB_SetInstanceData( int numInstances, instancePoint_t *instances );
-qboolean RB_ScissorForBounds( vec3_t bbox[8], int *x, int *y, int *w, int *h );
+bool RB_ScissorForBounds( vec3_t bbox[8], int *x, int *y, int *w, int *h );
 
 #endif // R_BACKEND_LOCAL_H

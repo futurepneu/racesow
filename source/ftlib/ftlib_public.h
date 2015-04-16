@@ -23,12 +23,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // ftlib_public.h - font provider subsystem
 
-#define	FTLIB_API_VERSION			4
+#define	FTLIB_API_VERSION			9
 
 //===============================================================
 
 struct shader_s;
 struct qfontface_s;
+
+typedef void ( *fdrawchar_t )( int x, int y, int w, int h, float s1, float t1, float s2, float t2, const vec4_t color, const struct shader_s *shader );
 
 //
 // functions provided by the main engine
@@ -73,25 +75,27 @@ typedef struct
 	int ( *FS_Eof )( int file );
 	int ( *FS_Flush )( int file );
 	void ( *FS_FCloseFile )( int file );
-	qboolean ( *FS_RemoveFile )( const char *filename );
+	bool ( *FS_RemoveFile )( const char *filename );
 	int ( *FS_GetFileList )( const char *dir, const char *extension, char *buf, size_t bufsize, int start, int end );
-	qboolean ( *FS_IsUrl )( const char *url );
+	bool ( *FS_IsUrl )( const char *url );
 
 	// clock
 	unsigned int	( *Milliseconds )( void );
-	quint64			( *Microseconds )( void );
+	uint64_t			( *Microseconds )( void );
 
 	// renderer
 	struct shader_s *( *R_RegisterPic )( const char *name );
-	struct shader_s * ( *R_RegisterRawPic )( const char *name, int width, int height, qbyte *data );
+	struct shader_s * ( *R_RegisterRawPic )( const char *name, int width, int height, uint8_t *data, int samples );
 	void ( *R_DrawStretchPic )( int x, int y, int w, int h, float s1, float t1, float s2, float t2, const vec4_t color, const struct shader_s *shader );
+	void ( *R_ReplaceRawSubPic )( struct shader_s *shader, int x, int y, int width, int height, uint8_t *data );
 	void ( *R_Scissor )( int x, int y, int w, int h );
 	void ( *R_GetScissor )( int *x, int *y, int *w, int *h );
 	void ( *R_ResetScissor )( void );
 
 	// managed memory allocation
 	struct mempool_s *( *Mem_AllocPool )( const char *name, const char *filename, int fileline );
-	void *( *Mem_Alloc )( struct mempool_s *pool, int size, const char *filename, int fileline );
+	void *( *Mem_Alloc )( struct mempool_s *pool, size_t size, const char *filename, int fileline );
+	void *( *Mem_Realloc )( void *data, size_t size, const char *filename, int fileline );
 	void ( *Mem_Free )( void *data, const char *filename, int fileline );
 	void ( *Mem_FreePool )( struct mempool_s **pool, const char *filename, int fileline );
 	void ( *Mem_EmptyPool )( struct mempool_s *pool, const char *filename, int fileline );
@@ -109,24 +113,29 @@ typedef struct
 	int ( *API )( void );
 
 	// the init function will be called at each restart
-	qboolean ( *Init )( qboolean verbose );
-	void ( *Shutdown )( qboolean verbose );
+	bool ( *Init )( bool verbose );
+	void ( *Shutdown )( bool verbose );
 
 	// core functions
-	void ( *PrecacheFonts )( qboolean verbose );
-	struct qfontface_s *( *RegisterFont )( const char *family, int style, unsigned int size, unsigned int lastChar );
+	void ( *PrecacheFonts )( bool verbose );
+	struct qfontface_s *( *RegisterFont )( const char *family, const char *fallback, int style, unsigned int size );
 	void ( *TouchFont )( struct qfontface_s *qfont );
 	void ( *TouchAllFonts )( void );
-	void ( *FreeFonts )( qboolean verbose );
+	void ( *FreeFonts )( bool verbose );
 
 	// drawing functions
+	size_t ( *FontSize )( struct qfontface_s *font );
 	size_t ( *FontHeight )( struct qfontface_s *font );
-	size_t ( *StringWidth )( const char *str, struct qfontface_s *font, size_t maxlen );
-	size_t ( *StrlenForWidth )( const char *str, struct qfontface_s *font, size_t maxwidth );
-	void ( *DrawClampChar )( int x, int y, qwchar num, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, vec4_t color );
-	void ( *DrawRawChar )( int x, int y, qwchar num, struct qfontface_s *font, vec4_t color );
-	void ( *DrawClampString )( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, vec4_t color );
-	size_t ( *DrawRawString )( int x, int y, const char *str, size_t maxwidth, struct qfontface_s *font, vec4_t color );
+	size_t ( *StringWidth )( const char *str, struct qfontface_s *font, size_t maxlen, int flags );
+	size_t ( *StrlenForWidth )( const char *str, struct qfontface_s *font, size_t maxwidth, int flags );
+	int ( *FontUnderline )( struct qfontface_s *font, int *thickness );
+	size_t ( *FontAdvance )( struct qfontface_s *font );
+	size_t ( *FontXHeight )( struct qfontface_s *font );
+	void ( *DrawClampChar )( int x, int y, wchar_t num, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, vec4_t color );
+	void ( *DrawRawChar )( int x, int y, wchar_t num, struct qfontface_s *font, vec4_t color );
+	void ( *DrawClampString )( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, vec4_t color, int flags );
+	size_t ( *DrawRawString )( int x, int y, const char *str, size_t maxwidth, int *width, struct qfontface_s *font, vec4_t color, int flags );
+	fdrawchar_t ( *SetDrawIntercept )( fdrawchar_t intercept );
 } ftlib_export_t;
 
 #endif

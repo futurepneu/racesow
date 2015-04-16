@@ -36,10 +36,27 @@ extern "C" {
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#ifndef _MSC_VER
+#include <strings.h>
+#endif
 #include <stdlib.h>
 #include <time.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+
+#ifdef __cplusplus
+};
+#endif
+
+#ifdef __cplusplus
+#include <type_traits>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 //==============================================
 
@@ -47,6 +64,8 @@ extern "C" {
 
 // wsw : pb : zlib 1.2.3
 //# define ZLIB_WINAPI
+
+#ifdef _MSC_VER
 
 // unknown pragmas are SUPPOSED to be ignored, but....
 #pragma warning( disable : 4244 )       // MIPS
@@ -70,6 +89,8 @@ extern "C" {
 
 #if defined _M_AMD64
 #pragma warning( disable : 4267 )       // conversion from 'size_t' to whatever, possible loss of data
+#endif
+
 #endif
 
 #if defined(_MSC_VER) && defined(_I64_MAX)
@@ -96,6 +117,7 @@ extern "C" {
 #endif
 
 #define LIB_DIRECTORY "libs"
+#define LIB_PREFIX ""
 #define LIB_SUFFIX ".dll"
 
 #define VID_INITFIRST
@@ -161,6 +183,7 @@ typedef UINT_PTR socket_handle_t;
 #endif
 
 #define LIB_DIRECTORY "libs"
+#define LIB_PREFIX "lib"
 #define LIB_SUFFIX ".so"
 
 #ifndef __ANDROID__
@@ -255,6 +278,7 @@ typedef int socket_handle_t;
 #endif
 
 #define LIB_DIRECTORY "libs"
+#define LIB_PREFIX "lib"
 #define LIB_SUFFIX ".dylib"
 
 #define MUMBLE_SUPPORT
@@ -409,18 +433,6 @@ typedef int socket_handle_t;
 #endif
 
 //==============================================
-
-typedef uint8_t qbyte;
-typedef int64_t qint64;
-typedef uint64_t quint64;
-typedef intptr_t qintptr;
-typedef uintptr_t quintptr;
-
-typedef bool qboolean;
-#define qtrue true
-#define qfalse false
-
-typedef unsigned int qwchar;	// Unicode character
 
 #ifndef NULL
 #define NULL ( (void *)0 )

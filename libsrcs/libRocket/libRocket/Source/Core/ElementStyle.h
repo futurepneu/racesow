@@ -36,8 +36,6 @@ namespace Core {
 
 class ElementStyleCache;
 
-typedef std::map<String, int> PropCounter;
-
 /**
 	Manages an element's style and property information.
 	@author Lloyd Weehuizen
@@ -136,6 +134,8 @@ public:
 
 	// Dirties every property.
 	void DirtyProperties();
+	// Dirties every inherited property.
+	void DirtyInheritedProperties();
 	// Dirties em-relative properties.
 	void DirtyEmProperties();
 	// Dirties font-size on child elements if appropriate.
@@ -173,8 +173,6 @@ public:
 	int GetTextTransform();
 	/// Returns 'vertical-align' property value from element's style or local cache.
 	const Property *GetVerticalAlignProperty();
-
-	static PropCounter &GetPropCounter();
 
 private:
 	// Sets a single property as dirty.

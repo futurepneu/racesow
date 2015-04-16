@@ -145,7 +145,7 @@ static inline void trap_FS_FCloseFile( int file )
 	CIN_IMPORT.FS_FCloseFile( file );
 }
 
-static inline qboolean trap_FS_RemoveFile( const char *filename )
+static inline bool trap_FS_RemoveFile( const char *filename )
 {
 	return CIN_IMPORT.FS_RemoveFile( filename );
 }
@@ -155,7 +155,7 @@ static inline int trap_FS_GetFileList( const char *dir, const char *extension, c
 	return CIN_IMPORT.FS_GetFileList( dir, extension, buf, bufsize, start, end );
 }
 
-static inline qboolean trap_FS_IsUrl( const char *url )
+static inline bool trap_FS_IsUrl( const char *url )
 {
 	return CIN_IMPORT.FS_IsUrl( url );
 }
@@ -166,7 +166,7 @@ static inline unsigned int trap_Milliseconds( void )
 	return CIN_IMPORT.Milliseconds();
 }
 
-static inline quint64 trap_Microseconds( void )
+static inline uint64_t trap_Microseconds( void )
 {
 	return CIN_IMPORT.Microseconds();
 }

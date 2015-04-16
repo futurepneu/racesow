@@ -10,6 +10,7 @@
 
 #include "kernel/ui_rocketmodule.h"
 #include "kernel/ui_documentloader.h"
+#include "kernel/ui_navigationstack.h"
 #include "kernel/ui_streamcache.h"
 #include "kernel/ui_demoinfo.h"
 #include "kernel/ui_downloadinfo.h"
@@ -39,7 +40,6 @@ class VideoDataSource;
 class DemosDataSource;
 class ModsDataSource;
 class ModelsDataSource;
-class CrosshairDataSource;
 class TVChannelsDataSource;
 class IrcChannelsDataSource;
 class GameAjaxDataSource;
@@ -47,7 +47,6 @@ class GameAjaxDataSource;
 class LevelShotFormatter;
 class DatetimeFormatter;
 class DurationFormatter;
-class CrosshairFormatter;
 class FiletypeFormatter;
 class ColorCodeFormatter;
 class EmptyFormatter;
@@ -70,7 +69,7 @@ public:
 	void addToServerList( const char *adr, const char *info );
 
 	void mouseMove( int x, int y, bool absolute );
-	void textInput( qwchar c );
+	void textInput( wchar_t c );
 	void keyEvent( int key, bool pressed );
 
 	// Commands (these could be private)
@@ -92,6 +91,7 @@ public:
 		int protocol, const char *demoExtension, const char *basePath );
 	static UI_Main *Get( void );
 	static void Destroy( void );
+	static bool preloadEnabled( void );
 
 	// Public methods
 	void showUI( bool show );
@@ -113,7 +113,7 @@ public:
 	std::string getServerName( void ) const { return serverName; }
 	std::string getRejectMessage( void ) const { return rejectMessage; }
 	const DownloadInfo *getDownloadInfo ( void ) const { return &downloadInfo; }
-	int getGameProtocol( void ) const;
+	static int getGameProtocol( void );
 
 	bool debugOn( void );
 
@@ -163,7 +163,6 @@ private:
 	DurationFormatter *duration_fmt;
 	FiletypeFormatter *filetype_fmt;
 	ColorCodeFormatter *colorcode_fmt;
-	CrosshairFormatter *crosshair_fmt;
 	EmptyFormatter *empty_fmt;
 
 	ServerBrowserDataSource *serverBrowser;
@@ -175,7 +174,6 @@ private:
 	DemosDataSource *demos;
 	ModsDataSource *mods;
 	ModelsDataSource *playerModels;
-	CrosshairDataSource *crosshairs;
 	TVChannelsDataSource *tvchannels;
 	IrcChannelsDataSource *ircchannels;
 	GameAjaxDataSource *gameajax;
@@ -210,6 +208,7 @@ private:
 	cvar_t *ui_basepath;
 	cvar_t *ui_cursor;
 	cvar_t *ui_developer;
+	cvar_t *ui_preload;
 };
 
 }

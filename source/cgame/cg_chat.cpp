@@ -58,33 +58,6 @@ void CG_StackChatString( cg_gamechat_t *chat, const char *str )
 	chat->nextMsg = (chat->nextMsg + 1) % GAMECHAT_STACK_SIZE;
 }
 
-#define WHITEPSACE_CHAR(c) ((c) == ' ' || (c) == '\t' || (c) == '\n')
-
-/*
-** CG_ColorStrLastColor
-*
-* Copied from console.c
-*/
-static void CG_ColorStrLastColor( int *lastcolor, const char *s, int byteofs )
-{
-	char c;
-	int colorindex;
-	const char *end = s + byteofs;
-
-	while( s < end )
-	{
-		int gc = Q_GrabCharFromColorString( &s, &c, &colorindex );
-		if( gc == GRABCHAR_CHAR )
-			;
-		else if( gc == GRABCHAR_COLOR )
-			*lastcolor = colorindex;
-		else if( gc == GRABCHAR_END )
-			break;
-		else
-			assert( 0 );
-	}
-}
-
 /*
 ** CG_SetChatCvars
 */
@@ -122,6 +95,7 @@ void CG_DrawChat( cg_gamechat_t *chat, int x, int y, char *fontName, struct qfon
 {
 	int i, j;
 	int s, e, w;
+	int utf_len;
 	int l, total_lines, lines;
 	int x_offset, y_offset;
 	int str_width;
@@ -136,8 +110,11 @@ void CG_DrawChat( cg_gamechat_t *chat, int x, int y, char *fontName, struct qfon
 	vec4_t fontColor;
 	bool chat_active = false;
 	bool background_drawn = false;
+	int corner_radius = 12 * cgs.vidHeight / 600;
+	int background_y;
+	int first_candidate;
 
-	font_height = trap_SCR_strHeight( font );
+	font_height = trap_SCR_FontHeight( font );
 	message_mode = (int)trap_Cvar_Value( "con_messageMode" );
 	chat_active = ( chat->lastMsgTime + GAMECHAT_WAIT_IN_TIME + GAMECHAT_FADE_IN_TIME > cg.realTime || message_mode );
 	lines = 0;
@@ -207,7 +184,25 @@ void CG_DrawChat( cg_gamechat_t *chat, int x, int y, char *fontName, struct qfon
 					break;
 			}
 
-			trap_R_DrawStretchPic( x, y, width, height, 0, 0, 1, 1, backColor, backShader );
+			background_y = y;
+			trap_R_DrawStretchPic( x, background_y, width, height - corner_radius,
+				0.0f, 0.0f, 1.0f, 0.5f, backColor, backShader );
+			background_y += height - corner_radius;
+
+			if( trap_IN_IME_GetCandidates( NULL, 0, 10, NULL, &first_candidate ) )
+			{
+				int candidates_height = ( first_candidate ? 3 : 5 ) * font_height;
+				trap_R_DrawStretchPic( x, background_y, width, candidates_height,
+					0.0f, 0.5f, 1.0f, 0.5f, backColor, backShader );
+				background_y += candidates_height;
+			}
+
+			trap_R_DrawStretchPic( x, background_y, corner_radius, corner_radius,
+				0.0f, 0.5f, 0.5f, 1.0f, backColor, backShader );
+			trap_R_DrawStretchPic( x + corner_radius, background_y, width - corner_radius * 2, corner_radius,
+				0.5f, 0.5f, 0.5f, 1.0f, backColor, backShader );
+			trap_R_DrawStretchPic( x + width - corner_radius, background_y, corner_radius, corner_radius,
+				0.5f, 0.5f, 1.0f, 1.0f, backColor, backShader );
 
 			background_drawn = true;
 		}
@@ -228,7 +223,7 @@ parse_string:
 			memset( tstr, 0, sizeof( tstr ) );
 
 			// skip whitespaces at start
-			for( ; WHITEPSACE_CHAR( text[s] ); s++ );
+			for( ; text[s] == '\n' || Q_IsBreakingSpace( text + s ); s = Q_Utf8SyncPos( text, s + 1, UTF8SYNC_RIGHT ) );
 
 			// empty string
 			if( !text[s] )
@@ -236,12 +231,13 @@ parse_string:
 
 			w = -1;
 			j = s; // start
-			for( ; text[j] != '\0'; j++ )
+			for( ; text[j] != '\0'; j += utf_len )
 			{
-				tstr[j-s] = text[j];
+				utf_len = Q_Utf8SyncPos( text + j, 1, UTF8SYNC_RIGHT );
+				memcpy( tstr + j - s, text + j, utf_len );
 				str_width = trap_SCR_strWidth( tstr, font, 0 );
 
-				if( WHITEPSACE_CHAR( text[j] ) )
+				if( text[j] == '\n' || Q_IsBreakingSpace( text + j ) )
 					w = j; // last whitespace
 
 				if( text[j] == '\n' || str_width > width - padding_x )
@@ -302,7 +298,7 @@ parse_string:
 			if( pass )
 			{
 				// grab the last color token to carry it over to the next line
-				CG_ColorStrLastColor( &lastcolor, tstr, j - s );
+				lastcolor = Q_ColorStrLastColor( lastcolor, tstr, j - s );
 			}
 
 			s = j;

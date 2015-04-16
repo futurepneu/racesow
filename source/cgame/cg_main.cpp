@@ -122,7 +122,6 @@ cvar_t *cg_simpleItemsSize;
 cvar_t *cg_showObituaries;
 cvar_t *cg_particles;
 cvar_t *cg_showhelp;
-cvar_t *cg_scoreboardStats;
 cvar_t *cg_showClamp;
 
 cvar_t *cg_damage_indicator;
@@ -204,11 +203,10 @@ void CG_Printf( const char *format, ... )
 /*
 * CG_LocalPrint
 */
-#define LOCALPRINT_MSG_SIZE 1024
 void CG_LocalPrint( const char *format, ... )
 {
 	va_list	argptr;
-	char msg[LOCALPRINT_MSG_SIZE];
+	char msg[GAMECHAT_STRING_SIZE];
 
 	va_start( argptr, format );
 	Q_vsnprintfz( msg, sizeof( msg ), format, argptr );
@@ -417,8 +415,18 @@ char *_CG_CopyString( const char *in, const char *filename, int fileline )
 */
 static void CG_InitL10n( void )
 {
+	char mapl10n[10+MAX_CONFIGSTRING_CHARS];
+
 	trap_L10n_ClearDomain();
 	trap_L10n_LoadLangPOFile( "l10n/cgame" );
+
+	Q_strncpyz( mapl10n, "l10n/", sizeof( mapl10n ) );
+	Q_strncpyz( mapl10n+5, cgs.configStrings[CS_WORLDMODEL], sizeof( mapl10n ) - 5 );
+	COM_StripExtension( mapl10n );
+
+	if( mapl10n[0] ) {
+		trap_L10n_LoadLangPOFile( mapl10n );
+	}
 }
 
 /*
@@ -710,7 +718,7 @@ static void CG_RegisterVariables( void )
 	cg_autoaction_stats =	trap_Cvar_Get( "cg_autoaction_stats", "0", CVAR_ARCHIVE );
 	cg_autoaction_spectator = trap_Cvar_Get( "cg_autoaction_spectator", "0", CVAR_ARCHIVE );
 	cg_simpleItems =	trap_Cvar_Get( "cg_simpleItems", "0", CVAR_ARCHIVE );
-	cg_simpleItemsSize =	trap_Cvar_Get( "cg_simpleItemsSize", "12", CVAR_ARCHIVE );
+	cg_simpleItemsSize =	trap_Cvar_Get( "cg_simpleItemsSize", "16", CVAR_ARCHIVE );
 	cg_particles =		trap_Cvar_Get( "cg_particles", "1", CVAR_ARCHIVE );
 	cg_showhelp =		trap_Cvar_Get( "cg_showhelp", "1", CVAR_ARCHIVE );
 	cg_predictLaserBeam =	trap_Cvar_Get( "cg_predictLaserBeam", "1", CVAR_ARCHIVE );
@@ -738,8 +746,6 @@ static void CG_RegisterVariables( void )
 	cg_chatFilter =		trap_Cvar_Get( "cg_chatFilter", "0", CVAR_ARCHIVE );
 	cg_chatFilterTV =	trap_Cvar_Get( "cg_chatFilterTV", "2", CVAR_ARCHIVE );
 
-	cg_scoreboardStats =	trap_Cvar_Get( "cg_scoreboardStats", "1", CVAR_ARCHIVE );
-
 	// developer cvars
 	developer =		trap_Cvar_Get( "developer", "0", CVAR_CHEAT );
 	cg_showClamp =		trap_Cvar_Get( "cg_showClamp", "0", CVAR_DEVELOPER );
@@ -748,23 +754,23 @@ static void CG_RegisterVariables( void )
 	cg_teamPLAYERSmodel =	trap_Cvar_Get( "cg_teamPLAYERSmodel", "", CVAR_ARCHIVE );
 	cg_teamPLAYERSskin =	trap_Cvar_Get( "cg_teamPLAYERSskin", "default", CVAR_ARCHIVE );
 	cg_teamPLAYERScolor =	trap_Cvar_Get( "cg_teamPLAYERScolor", "", CVAR_ARCHIVE );
-	cg_teamPLAYERSmodel->modified = qtrue;
-	cg_teamPLAYERSskin->modified = qtrue;
-	cg_teamPLAYERScolor->modified = qtrue;
+	cg_teamPLAYERSmodel->modified = true;
+	cg_teamPLAYERSskin->modified = true;
+	cg_teamPLAYERScolor->modified = true;
 
 	cg_teamALPHAmodel =	trap_Cvar_Get( "cg_teamALPHAmodel", "", CVAR_ARCHIVE );
 	cg_teamALPHAskin =	trap_Cvar_Get( "cg_teamALPHAskin", "default", CVAR_ARCHIVE );
 	cg_teamALPHAcolor =	trap_Cvar_Get( "cg_teamALPHAcolor", DEFAULT_TEAMALPHA_COLOR, CVAR_ARCHIVE );
-	cg_teamALPHAmodel->modified = qtrue;
-	cg_teamALPHAskin->modified = qtrue;
-	cg_teamALPHAcolor->modified = qtrue;
+	cg_teamALPHAmodel->modified = true;
+	cg_teamALPHAskin->modified = true;
+	cg_teamALPHAcolor->modified = true;
 
 	cg_teamBETAmodel =	trap_Cvar_Get( "cg_teamBETAmodel", "", CVAR_ARCHIVE );
 	cg_teamBETAskin =	trap_Cvar_Get( "cg_teamBETAskin", "default", CVAR_ARCHIVE );
 	cg_teamBETAcolor =	trap_Cvar_Get( "cg_teamBETAcolor", DEFAULT_TEAMBETA_COLOR, CVAR_ARCHIVE );
-	cg_teamBETAmodel->modified = qtrue;
-	cg_teamBETAskin->modified = qtrue;
-	cg_teamBETAcolor->modified = qtrue;
+	cg_teamBETAmodel->modified = true;
+	cg_teamBETAskin->modified = true;
+	cg_teamBETAcolor->modified = true;
 
 	cg_forceMyTeamAlpha =		trap_Cvar_Get( "cg_forceMyTeamAlpha", "0", CVAR_ARCHIVE );
 	cg_forceTeamPlayersTeamBeta =	trap_Cvar_Get( "cg_forceTeamPlayersTeamBeta", "0", CVAR_ARCHIVE );
@@ -788,6 +794,8 @@ static void CG_RegisterVariables( void )
 	cg_strafeHUD = trap_Cvar_Get( "cg_strafeHUD", "0", CVAR_ARCHIVE );
 	cg_touch_flip = trap_Cvar_Get( "cg_touch_flip", "0", CVAR_ARCHIVE );
 	cg_touch_scale = trap_Cvar_Get( "cg_touch_scale", "100", CVAR_ARCHIVE );
+	cg_touch_zoomThres = trap_Cvar_Get( "cg_touch_zoomThres", "4", CVAR_ARCHIVE );
+	cg_touch_zoomTime = trap_Cvar_Get( "cg_touch_zoomTime", "250", CVAR_ARCHIVE );
 
 	cg_playList = trap_Cvar_Get( "cg_playList", S_PLAYLIST_MATCH, CVAR_ARCHIVE );
 	cg_playListShuffle = trap_Cvar_Get( "cg_playListShuffle", "1", CVAR_ARCHIVE );
@@ -906,7 +914,7 @@ static void CG_RegisterConfigStrings( void )
 
 	cg.precacheCount = cg.precacheTotal = 0;
 
-	for( i = 0; i < CS_GENERAL; i++ )
+	for( i = 0; i < MAX_CONFIGSTRINGS; i++ )
 	{
 		trap_GetConfigString( i, cgs.configStrings[i], MAX_CONFIGSTRING_CHARS );
 
@@ -954,9 +962,9 @@ void CG_StartBackgroundTrack( void )
 	Q_strncpyz( loop, COM_Parse( &string ), sizeof( loop ) );
 
 	if( intro[0] )
-		trap_S_StartBackgroundTrack( intro, loop );
+		trap_S_StartBackgroundTrack( intro, loop, 0 );
 	else if( cg_playList->string[0] )
-		trap_S_StartBackgroundTrack( cg_playList->string, cg_playListShuffle->integer ? "1" : "0" );
+		trap_S_StartBackgroundTrack( cg_playList->string, NULL, cg_playListShuffle->integer ? 1 : 0 );
 }
 
 /*
@@ -1003,8 +1011,8 @@ void CG_Reset( void )
 */
 void CG_Init( const char *serverName, unsigned int playerNum,
 			 int vidWidth, int vidHeight, float pixelRatio,
-			 qboolean demoplaying, const char *demoName, qboolean pure, 
-			 unsigned int snapFrameTime, int protocol, int sharedSeed )
+			 bool demoplaying, const char *demoName, bool pure, 
+			 unsigned int snapFrameTime, int protocol, int sharedSeed, bool gameStart )
 {
 	CG_InitGameShared();
 
@@ -1030,11 +1038,11 @@ void CG_Init( const char *serverName, unsigned int playerNum,
 	cgs.pixelRatio = pixelRatio;
 
 	// demo
-	cgs.demoPlaying = demoplaying == qtrue;
+	cgs.demoPlaying = demoplaying == true;
 	cgs.demoName = demoName;
 
 	// whether to only allow pure files
-	cgs.pure = pure == qtrue;
+	cgs.pure = pure == true;
 
 	// whether we are connected to a tv-server
 	cgs.tv = false;
@@ -1045,6 +1053,7 @@ void CG_Init( const char *serverName, unsigned int playerNum,
 	cgs.snapFrameTime = snapFrameTime;
 
 	cgs.hasGametypeMenu = false; // this will update as soon as we receive configstrings
+	cgs.gameMenuRequested = !gameStart;
 
 	CG_RegisterVariables();
 	CG_InitTemporaryBoneposesCache();

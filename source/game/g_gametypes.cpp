@@ -337,7 +337,7 @@ void G_Gametype_GENERIC_PlayerKilled( edict_t *targ, edict_t *attacker, edict_t 
 		}
 
 		// drop ammo pack (won't drop anything if player doesn't have any strong ammo)
-		Drop_Item( targ, GS_FindItemByTag( AMMO_PACK_WEAK ) );
+		Drop_Item( targ, GS_FindItemByTag( AMMO_PACK ) );
 	}
 }
 
@@ -400,6 +400,7 @@ static void G_Gametype_GENERIC_Init( void )
 
 	level.gametype.isTeamBased = false;
 	level.gametype.isRace = false;
+	level.gametype.isTutorial = false;
 	level.gametype.inverseScore = false;
 	level.gametype.hasChallengersQueue = false;
 	level.gametype.maxPlayersPerTeam = 0;
@@ -529,7 +530,7 @@ bool G_Match_CheckExtendPlayTime( void )
 					G_AnnouncerSound( NULL, trap_SoundIndex( S_ANNOUNCER_OVERTIME_OVERTIME ), GS_MAX_TEAMS, true, NULL );
 
 				G_PrintMsg( NULL, "Match tied. Timelimit extended by %i minutes!\n", g_match_extendedtime->integer );
-				G_CenterPrintMsg( NULL, "%i MINUTE OVERTIME\n", g_match_extendedtime->integer );
+				G_CenterPrintFormatMsg( NULL, "%s MINUTE OVERTIME\n", va( "%i", g_match_extendedtime->integer ), NULL );
 				gs.gameState.longstats[GAMELONG_MATCHDURATION] = (unsigned int)( ( fabs( g_match_extendedtime->value ) * 60 ) * 1000 );
 			}
 			else
@@ -1869,6 +1870,7 @@ void G_Gametype_SetDefaults( void )
 
     level.gametype.isTeamBased = false;
     level.gametype.isRace = false;
+	level.gametype.isTutorial = false;
     level.gametype.inverseScore = false;
     level.gametype.hasChallengersQueue = false;
     level.gametype.maxPlayersPerTeam = 0;

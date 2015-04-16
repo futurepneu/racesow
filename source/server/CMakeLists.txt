@@ -4,6 +4,12 @@ include_directories(${ZLIB_INCLUDE_DIR} ${CURL_INCLUDE_DIR})
 
 file(GLOB SERVER_HEADERS
     "*.h"
+	"../gameshared/q_*.h"
+	"../gameshared/anorms.h"
+	"../gameshared/config.h"	
+	"../qcommon/*.h"
+	"../qalgo/*.h"
+	"../matchmaker/*.h"
 )
 
 file(GLOB SERVER_SOURCES
@@ -74,7 +80,8 @@ else()
 endif()
 
 add_executable(${QFUSION_SERVER_NAME} ${SERVER_BINARY_TYPE} ${SERVER_HEADERS} ${SERVER_SOURCES} ${SERVER_PLATFORM_SOURCES})
-target_link_libraries(${QFUSION_SERVER_NAME} ${CURL_LIBRARY} ${ZLIB_LIBRARY} ${SERVER_PLATFORM_LIBRARIES})
+add_dependencies(${QFUSION_SERVER_NAME} angelwrap game irc)
+target_link_libraries(${QFUSION_SERVER_NAME} PRIVATE ${CURL_LIBRARY} ${ZLIB_LIBRARY} ${SERVER_PLATFORM_LIBRARIES})
 qf_set_output_dir(${QFUSION_SERVER_NAME} "")
 
 set_target_properties(${QFUSION_SERVER_NAME} PROPERTIES COMPILE_DEFINITIONS "DEDICATED_ONLY")

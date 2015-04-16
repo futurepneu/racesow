@@ -37,8 +37,10 @@
 #include <limits.h>
 #include <string>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <vector>
+#include <new>
 
 #include "Platform.h"
 #include "Debug.h"
@@ -85,6 +87,7 @@ typedef uintptr_t FileHandle;
 typedef uintptr_t TextureHandle;
 typedef uintptr_t CompiledGeometryHandle;
 typedef uintptr_t DecoratorDataHandle;
+typedef uintptr_t FontHandle;
 
 // List of elements.
 typedef std::vector< Element* > ElementList;

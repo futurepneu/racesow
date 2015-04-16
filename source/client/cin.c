@@ -84,7 +84,7 @@ static void CL_CinModule_MemEmptyPool( mempool_t *pool, const char *filename, in
 /*
 * CIN_LoadLibrary
 */
-void CIN_LoadLibrary( qboolean verbose )
+void CIN_LoadLibrary( bool verbose )
 {
 	static cin_import_t import;
 	dllfunc_t funcs[2];
@@ -143,7 +143,7 @@ void CIN_LoadLibrary( qboolean verbose )
 	funcs[0].name = "GetCinematicsAPI";
 	funcs[0].funcPointer = ( void ** ) &GetCinematicsAPI;
 	funcs[1].name = NULL;
-	cin_libhandle = Com_LoadLibrary( LIB_DIRECTORY "/cin_" ARCH LIB_SUFFIX, funcs );
+	cin_libhandle = Com_LoadLibrary( LIB_DIRECTORY "/" LIB_PREFIX "cin_" ARCH LIB_SUFFIX, funcs );
 
 	if( cin_libhandle )
 	{
@@ -194,7 +194,7 @@ void CIN_LoadLibrary( qboolean verbose )
 /*
 * CIN_UnloadLibrary
 */
-void CIN_UnloadLibrary( qboolean verbose )
+void CIN_UnloadLibrary( bool verbose )
 {
 	if( cin_export != NULL ) {
 		cin_export->Shutdown( verbose );
@@ -217,24 +217,32 @@ void CIN_UnloadLibrary( qboolean verbose )
 }
 
 struct cinematics_s *CIN_Open( const char *name, unsigned int start_time, 
-	qboolean loop, qboolean *yuv, float *framerate )
+	int flags, bool *yuv, float *framerate )
 {
 	if( cin_export ) {
-		return cin_export->Open( name, start_time, loop, yuv, framerate );
+		return cin_export->Open( name, start_time, flags, yuv, framerate );
 	}
 	return NULL;
 }
 
-qboolean CIN_NeedNextFrame( struct cinematics_s *cin, unsigned int curtime )
+bool CIN_HasOggAudio( struct cinematics_s *cin )
+{
+	if( cin_export ) {
+		return cin_export->HasOggAudio( cin );
+	}
+	return false;
+}
+
+bool CIN_NeedNextFrame( struct cinematics_s *cin, unsigned int curtime )
 {
 	if( cin_export ) {
 		return cin_export->NeedNextFrame( cin, curtime );
 	}
-	return qfalse;
+	return false;
 }
 
-qbyte *CIN_ReadNextFrame( struct cinematics_s *cin, int *width, 
-	int *height, int *aspect_numerator, int *aspect_denominator, qboolean *redraw )
+uint8_t *CIN_ReadNextFrame( struct cinematics_s *cin, int *width, 
+	int *height, int *aspect_numerator, int *aspect_denominator, bool *redraw )
 {
 	if( cin_export ) {
 		return cin_export->ReadNextFrame( cin, width, height, 
@@ -245,7 +253,7 @@ qbyte *CIN_ReadNextFrame( struct cinematics_s *cin, int *width,
 
 ref_yuv_t *CIN_ReadNextFrameYUV( struct cinematics_s *cin, 
 	int *width, int *height, int *aspect_numerator, int *aspect_denominator, 
-	qboolean *redraw )
+	bool *redraw )
 {
 	if( cin_export ) {
 		return ( ref_yuv_t * )cin_export->ReadNextFrameYUV( cin, width, height, 
@@ -254,12 +262,12 @@ ref_yuv_t *CIN_ReadNextFrameYUV( struct cinematics_s *cin,
 	return NULL;
 }
 
-qboolean CIN_AddRawSamplesListener( struct cinematics_s *cin, void *listener, 
+bool CIN_AddRawSamplesListener( struct cinematics_s *cin, void *listener, 
 	cin_raw_samples_cb_t rs, cin_get_raw_samples_cb_t grs ) {
 	if( cin_export ) {
 		return cin_export->AddRawSamplesListener( cin, listener, rs, grs );
 	}
-	return qfalse;
+	return false;
 }
 
 void CIN_Reset( struct cinematics_s *cin, unsigned int cur_time )

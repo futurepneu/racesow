@@ -61,7 +61,7 @@ void R_TransformBounds( const vec3_t origin, const mat3_t axis, vec3_t mins, vec
 * 
 * Returns the on-screen scissor box for given bounding box in 3D-space.
 */
-qboolean R_ScissorForBounds( vec3_t bbox[8], int *x, int *y, int *w, int *h )
+bool R_ScissorForBounds( vec3_t bbox[8], int *x, int *y, int *w, int *h )
 {
 	int i;
 	int ix1, iy1, ix2, iy2;
@@ -106,18 +106,18 @@ qboolean R_ScissorForBounds( vec3_t bbox[8], int *x, int *y, int *w, int *h )
 
 	ix1 = max( x1 - 1.0f, 0 ); ix2 = min( x2 + 1.0f, rn.refdef.width );
 	if( ix1 >= ix2 )
-		return qfalse; // FIXME
+		return false; // FIXME
 
 	iy1 = max( y1 - 1.0f, 0 ); iy2 = min( y2 + 1.0f, rn.refdef.height );
 	if( iy1 >= iy2 )
-		return qfalse; // FIXME
+		return false; // FIXME
 
 	*x = ix1;
 	*y = rn.refdef.height - iy2;
 	*w = ix2 - ix1;
 	*h = iy2 - iy1;
 
-	return qtrue;
+	return true;
 }
 
 /*
@@ -125,7 +125,7 @@ qboolean R_ScissorForBounds( vec3_t bbox[8], int *x, int *y, int *w, int *h )
 * 
 * Returns the on-screen scissor box for given bounding box in 3D-space.
 */
-qboolean R_ScissorForEntity( const entity_t *ent, vec3_t mins, vec3_t maxs, int *x, int *y, int *w, int *h )
+bool R_ScissorForEntity( const entity_t *ent, vec3_t mins, vec3_t maxs, int *x, int *y, int *w, int *h )
 {
 	vec3_t bbox[8];
 
@@ -214,21 +214,21 @@ void R_TransformForEntity( const entity_t *e )
 /*
 * R_LerpTag
 */
-qboolean R_LerpTag( orientation_t *orient, const model_t *mod, int oldframe, int frame, float lerpfrac, const char *name )
+bool R_LerpTag( orientation_t *orient, const model_t *mod, int oldframe, int frame, float lerpfrac, const char *name )
 {
 	if( !orient )
-		return qfalse;
+		return false;
 
 	VectorClear( orient->origin );
 	Matrix3_Identity( orient->axis );
 
 	if( !name )
-		return qfalse;
+		return false;
 
 	if( mod->type == mod_alias )
 		return R_AliasModelLerpTag( orient, (const maliasmodel_t *)mod->extradata, oldframe, frame, lerpfrac, name );
 
-	return qfalse;
+	return false;
 }
 
 /*
@@ -288,7 +288,7 @@ mfog_t *R_FogForSphere( const vec3_t centre, const float radius )
 /*
 * R_CompletelyFogged
 */
-qboolean R_CompletelyFogged( const mfog_t *fog, vec3_t origin, float radius )
+bool R_CompletelyFogged( const mfog_t *fog, vec3_t origin, float radius )
 {
 	// note that fog->distanceToEye < 0 is always true if
 	// globalfog is not NULL and we're inside the world boundaries
@@ -300,7 +300,7 @@ qboolean R_CompletelyFogged( const mfog_t *fog, vec3_t origin, float radius )
 		return ( ( vpnDist + radius ) / fog->shader->fog_dist ) < -1;
 	}
 
-	return qfalse;
+	return false;
 }
 
 /*
@@ -349,7 +349,7 @@ void R_SetCustomColor( int num, int r, int g, int b )
 {
 	if( num < 0 || num >= NUM_CUSTOMCOLORS )
 		return;
-	Vector4Set( r_customColors[num], (qbyte)r, (qbyte)g, (qbyte)b, 255 );
+	Vector4Set( r_customColors[num], (uint8_t)r, (uint8_t)g, (uint8_t)b, 255 );
 }
 /*
 * R_GetCustomColor
@@ -382,10 +382,10 @@ drawSurfaceType_t spriteDrawSurf = ST_SPRITE;
 /*
 * R_BeginSpriteSurf
 */
-qboolean R_BeginSpriteSurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfaceType_t *drawSurf )
+bool R_BeginSpriteSurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfaceType_t *drawSurf )
 {
 	RB_BindVBO( RB_VBO_STREAM_QUAD, GL_TRIANGLES );
-	return qtrue;
+	return true;
 }
 
 /*
@@ -451,12 +451,12 @@ void R_BatchSpriteSurf( const entity_t *e, const shader_t *shader, const mfog_t 
 /*
 * R_AddSpriteToDrawList
 */
-static qboolean R_AddSpriteToDrawList( const entity_t *e )
+static bool R_AddSpriteToDrawList( const entity_t *e )
 {
 	float dist;
 
 	if( e->radius <= 0 || e->customShader == NULL || e->scale <= 0 ) {
-		return qfalse;
+		return false;
 	}
 
 	dist =
@@ -464,14 +464,14 @@ static qboolean R_AddSpriteToDrawList( const entity_t *e )
 		( e->origin[1] - rn.refdef.vieworg[1] ) * rn.viewAxis[AXIS_FORWARD+1] +
 		( e->origin[2] - rn.refdef.vieworg[2] ) * rn.viewAxis[AXIS_FORWARD+2];
 	if( dist <= 0 )
-		return qfalse; // cull it because we don't want to sort unneeded things
+		return false; // cull it because we don't want to sort unneeded things
 
 	if( !R_AddDSurfToDrawList( e, R_FogForSphere( e->origin, e->radius ), 
 		e->customShader, dist, 0, NULL, &spriteDrawSurf ) ) {
-		return qfalse;
+		return false;
 	}
 
-	return qtrue;
+	return true;
 }
 
 //==================================================================================
@@ -531,31 +531,31 @@ mesh_vbo_t *R_InitNullModelVBO( void )
 /*
 * R_DrawNullSurf
 */
-qboolean R_DrawNullSurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfaceType_t *drawSurf )
+bool R_DrawNullSurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfaceType_t *drawSurf )
 {
 	assert( rsh.nullVBO != NULL );
 	if( !rsh.nullVBO ) {
-		return qfalse;
+		return false;
 	}
 
 	RB_BindVBO( rsh.nullVBO->index, GL_LINES );
 
 	RB_DrawElements( 0, 6, 0, 6, 0, 0, 0, 0 );
 
-	return qfalse;
+	return false;
 }
 
 /*
 * R_AddNullSurfToDrawList
 */
-static qboolean R_AddNullSurfToDrawList( const entity_t *e )
+static bool R_AddNullSurfToDrawList( const entity_t *e )
 {
 	if( !R_AddDSurfToDrawList( e, R_FogForSphere( e->origin, 0.1f ), 
 		rsh.whiteShader, 0, 0, NULL, &nullDrawSurf ) ) {
-		return qfalse;
+		return false;
 	}
 
-	return qtrue;
+	return true;
 }
 
 //==================================================================================
@@ -580,7 +580,7 @@ static void R_ResetStretchPic( void )
 /*
 * R_BeginStretchBatch
 */
-void R_BeginStretchBatch( const shader_t *shader, float x_offset, float y_offset, qboolean quad )
+void R_BeginStretchBatch( const shader_t *shader, float x_offset, float y_offset, bool quad )
 {
 	if( pic_mbuffer_shader != shader
 		|| x_offset != pic_x_offset || y_offset != pic_y_offset ) {
@@ -636,16 +636,16 @@ void R_EndStretchBatch( void )
 *
 * Note that this sets the viewport to size of the active framebuffer.
 */
-void R_Set2DMode( qboolean enable )
+void R_Set2DMode( bool enable )
 {
 	int width, height;
 
 	width = rf.frameBufferWidth;
 	height = rf.frameBufferHeight;
 
-	if( rf.in2D == qtrue && enable == qtrue && width == rf.width2D && height == rf.height2D ) {
+	if( rf.in2D == true && enable == true && width == rf.width2D && height == rf.height2D ) {
 		return;
-	} else if( rf.in2D == qfalse && enable == qfalse ) {
+	} else if( rf.in2D == false && enable == false ) {
 		return;
 	}
 
@@ -696,7 +696,7 @@ void R_DrawRotatedStretchPic( int x, int y, int w, int h, float s1, float t1, fl
 		return;
 	}
 
-	R_BeginStretchBatch( shader, 0, 0, qtrue );
+	R_BeginStretchBatch( shader, 0, 0, true );
 
 	// lower-left
 	Vector2Set( pic_xyz[0], x, y );
@@ -760,7 +760,7 @@ void R_DrawStretchPic( int x, int y, int w, int h, float s1, float t1, float s2,
 * Passing NULL for data redraws last uploaded frame
 */
 void R_DrawStretchRaw( int x, int y, int w, int h, int cols, int rows, 
-	float s1, float t1, float s2, float t2, qbyte *data )
+	float s1, float t1, float s2, float t2, uint8_t *data )
 {
 	float h_scale, v_scale;
 
@@ -770,10 +770,10 @@ void R_DrawStretchRaw( int x, int y, int w, int h, int cols, int rows,
 
 	if( data ) {
 		if( rsh.rawTexture->width != cols || rsh.rawTexture->height != rows ) {
-			qbyte *nodata[1] = { NULL };
+			uint8_t *nodata[1] = { NULL };
 			R_ReplaceImage( rsh.rawTexture, nodata, cols, rows, rsh.rawTexture->flags, 3 );
 		}
-		R_ReplaceSubImage( rsh.rawTexture, 0, &data, cols, rows );
+		R_ReplaceSubImage( rsh.rawTexture, 0, 0, 0, &data, cols, rows );
 	}
 
 	h_scale = (float)rsh.rawTexture->width / rsh.rawTexture->upload_width;
@@ -822,7 +822,7 @@ void R_DrawStretchRawYUVBuiltin( int x, int y, int w, int h,
 		int i;
 
 		for( i = 0; i < 3; i++ ) {
-			qbyte *data = yuv[i].data;
+			uint8_t *data = yuv[i].data;
 			int flags = yuvTextures[i]->flags;
 			int stride = yuv[i].stride;
 			int height = yuv[i].height;
@@ -835,10 +835,10 @@ void R_DrawStretchRawYUVBuiltin( int x, int y, int w, int h,
 			}
 
 			if( yuvTextures[i]->width != stride || yuvTextures[i]->height != height ) {
-				qbyte *nodata[1] = { NULL };
+				uint8_t *nodata[1] = { NULL };
 				R_ReplaceImage( yuvTextures[i], nodata, stride, height, flags, 1 );
 			}
-			R_ReplaceSubImage( yuvTextures[i], 0, &data, stride, height );
+			R_ReplaceSubImage( yuvTextures[i], 0, 0, 0, &data, stride, height );
 		}
 	}
 
@@ -971,7 +971,7 @@ void R_ResetScissor( void )
 /*
 * R_EnableScissor
 */
-void R_EnableScissor( qboolean enable )
+void R_EnableScissor( bool enable )
 {
 	RB_EnableScissor( enable );
 }
@@ -986,7 +986,7 @@ static void R_PolyBlend( void )
 	if( rsc.refdef.blend[3] < 0.01f )
 		return;
 
-	R_Set2DMode( qtrue );
+	R_Set2DMode( true );
 	R_DrawStretchPic( 0, 0, rf.frameBufferWidth, rf.frameBufferHeight, 0, 0, 1, 1, rsc.refdef.blend, rsh.whiteShader );
 	R_EndStretchBatch();
 }
@@ -1007,10 +1007,38 @@ static void R_ApplyBrightness( void )
 
 	color[0] = color[1] = color[2] = c, color[3] = 1;
 
-	R_Set2DMode( qtrue );
+	R_Set2DMode( true );
 	R_DrawStretchQuick( 0, 0, rf.frameBufferWidth, rf.frameBufferHeight, 0, 0, 1, 1,
 		color, GLSL_PROGRAM_TYPE_NONE, rsh.whiteTexture, GLSTATE_SRCBLEND_ONE|GLSTATE_DSTBLEND_ONE );
 	R_EndStretchBatch();
+}
+
+/*
+* R_InitPostProcessingVBO
+*/
+mesh_vbo_t *R_InitPostProcessingVBO( void )
+{
+	vec4_t xyz[4] = { {0,0,0,1}, {1,0,0,1}, {1,1,0,1}, {0,1,0,1} };
+	elem_t elems[6] = { 0, 1, 2, 0, 2, 3 };
+	mesh_t mesh;
+	vattribmask_t vattribs = VATTRIB_POSITION_BIT;
+	mesh_vbo_t *vbo;
+	
+	vbo = R_CreateMeshVBO( &rf, 4, 6, 0, vattribs, VBO_TAG_NONE, vattribs );
+	if( !vbo ) {
+		return NULL;
+	}
+
+	memset( &mesh, 0, sizeof( mesh ) );
+	mesh.numVerts = 4;
+	mesh.xyzArray = xyz;
+	mesh.numElems = 6;
+	mesh.elems = elems;
+
+	R_UploadVBOVertexData( vbo, 0, vattribs, &mesh, VBO_HINT_NONE );
+	R_UploadVBOElemData( vbo, 0, 0, &mesh, VBO_HINT_NONE );
+
+	return vbo;
 }
 
 //=======================================================================
@@ -1149,9 +1177,9 @@ static void R_SetupViewMatrices( void )
 static void R_Clear( int bitMask )
 {
 	int bits;
-	qbyte *envColor = rsh.worldModel && !( rn.refdef.rdflags & RDF_NOWORLDMODEL ) && rsh.worldBrushModel->globalfog ?
+	uint8_t *envColor = rsh.worldModel && !( rn.refdef.rdflags & RDF_NOWORLDMODEL ) && rsh.worldBrushModel->globalfog ?
 		rsh.worldBrushModel->globalfog->shader->fog_color : mapConfig.environmentColor;
-	qboolean rgbShadow = ( rn.renderFlags & RF_SHADOWMAPVIEW ) && rn.fbColorAttachment != NULL ? qtrue : qfalse;
+	bool rgbShadow = ( rn.renderFlags & RF_SHADOWMAPVIEW ) && rn.fbColorAttachment != NULL ? true : false;
 
 	bits = GL_DEPTH_BUFFER_BIT;
 
@@ -1188,7 +1216,7 @@ static void R_SetupGL( int clearBitMask )
 
 	RB_SetCamera( rn.viewOrigin, rn.viewAxis );
 
-	RB_SetLightParams( rn.refdef.minLight, rn.refdef.rdflags & RDF_NOWORLDMODEL ? qtrue : qfalse );
+	RB_SetLightParams( rn.refdef.minLight, rn.refdef.rdflags & RDF_NOWORLDMODEL ? true : false );
 
 	RB_SetRenderFlags( rn.renderFlags );
 
@@ -1226,8 +1254,8 @@ static void R_DrawEntities( void )
 {
 	unsigned int i;
 	entity_t *e;
-	qboolean shadowmap = ( ( rn.renderFlags & RF_SHADOWMAPVIEW ) != 0 );
-	qboolean culled = qtrue;
+	bool shadowmap = ( ( rn.renderFlags & RF_SHADOWMAPVIEW ) != 0 );
+	bool culled = true;
 
 	if( rn.renderFlags & RF_NOENTS )
 		return;
@@ -1249,7 +1277,7 @@ static void R_DrawEntities( void )
 	for( i = rsc.numLocalEntities; i < rsc.numEntities; i++ )
 	{
 		e = R_NUM2ENT(i);
-		culled = qtrue;
+		culled = true;
 
 		if( !r_lerpmodels->integer )
 			e->backlerp = 0;
@@ -1328,7 +1356,7 @@ static void R_BindRefInstFBO( void )
 void R_RenderView( const refdef_t *fd )
 {
 	int msec = 0;
-	qboolean shadowMap = rn.renderFlags & RF_SHADOWMAPVIEW ? qtrue : qfalse;
+	bool shadowMap = rn.renderFlags & RF_SHADOWMAPVIEW ? true : false;
 
 	rn.refdef = *fd;
 	rn.numVisSurfaces = 0;
@@ -1466,14 +1494,14 @@ void R_ClearRefInstStack( void )
 /*
 * R_PushRefInst
 */
-qboolean R_PushRefInst( void )
+bool R_PushRefInst( void )
 {
 	if( riStackSize == REFINST_STACK_SIZE ) {
-		return qfalse;
+		return false;
 	}
 	riStack[riStackSize++] = rn;
 	R_EndGL();
-	return qtrue;
+	return true;
 }
 
 /*
@@ -1496,7 +1524,7 @@ void R_PopRefInst( int clearBitMask )
 /*
 * R_SwapInterval
 */
-static void R_SwapInterval( qboolean swapInterval )
+static void R_SwapInterval( bool swapInterval )
 {
 	if( !glConfig.stereoEnabled )
 	{
@@ -1514,8 +1542,8 @@ static void R_UpdateSwapInterval( void )
 {
 	if( r_swapinterval->modified )
 	{
-		r_swapinterval->modified = qfalse;
-		R_SwapInterval( r_swapinterval->integer ? qtrue : qfalse );
+		r_swapinterval->modified = false;
+		R_SwapInterval( r_swapinterval->integer ? true : false );
 	}
 }
 
@@ -1546,7 +1574,7 @@ static void R_UpdateHWGamma( void )
 /*
 * R_ScreenDisabled
 */
-qboolean R_ScreenEnabled( void )
+bool R_ScreenEnabled( void )
 {
 	return GLimp_ScreenEnabled();
 }
@@ -1554,7 +1582,7 @@ qboolean R_ScreenEnabled( void )
 /*
 * R_BeginFrame
 */
-void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVsync )
+void R_BeginFrame( float cameraSeparation, bool forceClear, bool forceVsync )
 {
 	GLimp_BeginFrame();
 
@@ -1581,11 +1609,11 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 	}
 
 	if( mapConfig.forceClear )
-		forceClear = qtrue;
+		forceClear = true;
 
 	if( r_clear->integer || forceClear )
 	{
-		const qbyte *color = mapConfig.environmentColor;
+		const uint8_t *color = mapConfig.environmentColor;
 		RB_Clear( GL_COLOR_BUFFER_BIT, 
 			color[0]*( 1.0/255.0 ), color[1]*( 1.0/255.0 ), color[2]*( 1.0/255.0 ), 1 );
 	}
@@ -1593,7 +1621,7 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 	// update gamma
 	if( r_gamma->modified )
 	{
-		r_gamma->modified = qfalse;
+		r_gamma->modified = false;
 		R_UpdateHWGamma();
 	}
 
@@ -1608,7 +1636,7 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 			rsh.floorColor[i] = bound( 0, floor(rsh.floorColor[i]) / 255.0, 1.0 );
 		}
 
-		r_wallcolor->modified = r_floorcolor->modified = qfalse;
+		r_wallcolor->modified = r_floorcolor->modified = false;
 	}
 
 	// run cinematic passes on shaders
@@ -1617,7 +1645,7 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 	// draw buffer stuff
 	if( gl_drawbuffer->modified )
 	{
-		gl_drawbuffer->modified = qfalse;
+		gl_drawbuffer->modified = false;
 
 #ifndef GL_ES_VERSION_2_0
 		if( cameraSeparation == 0 || !glConfig.stereoEnabled )
@@ -1634,13 +1662,13 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 	if( r_texturemode->modified )
 	{
 		R_TextureMode( r_texturemode->string );
-		r_texturemode->modified = qfalse;
+		r_texturemode->modified = false;
 	}
 
 	if( r_texturefilter->modified )
 	{
 		R_AnisotropicFilter( r_texturefilter->integer );
-		r_texturefilter->modified = qfalse;
+		r_texturefilter->modified = false;
 	}
 
 	// keep r_outlines_cutoff value in sane bounds to prevent wallhacking
@@ -1651,21 +1679,21 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 		else if( r_outlines_scale->value > 3 ) {
 			ri.Cvar_ForceSet( r_outlines_scale->name, "3" );
 		}
-		r_outlines_scale->modified = qfalse;
+		r_outlines_scale->modified = false;
 	}
 
 	// swapinterval stuff (vertical synchronization)
 	if( forceVsync ) {
-		R_SwapInterval( qtrue );
+		R_SwapInterval( true );
 	}
 	else {
-		r_swapinterval->modified = qtrue;
+		r_swapinterval->modified = true;
 		R_UpdateSwapInterval();
 	}
 
 	memset( &rf.stats, 0, sizeof( rf.stats ) );
 
-	R_Set2DMode( qtrue );
+	R_Set2DMode( true );
 }
 
 /*
@@ -1682,7 +1710,7 @@ void R_EndFrame( void )
 
 	// reset the 2D state so that the mode will be 
 	// properly set back again in R_BeginFrame
-	R_Set2DMode( qfalse );
+	R_Set2DMode( false );
 
 	RB_EndFrame();
 
@@ -1692,7 +1720,7 @@ void R_EndFrame( void )
 /*
 * R_AppActivate
 */
-void R_AppActivate( qboolean active, qboolean destroy )
+void R_AppActivate( bool active, bool destroy )
 {
 	qglFlush();
 	GLimp_AppActivate( active, destroy );
@@ -1794,13 +1822,17 @@ void R_BeginAviDemo( void )
 /*
 * R_WriteAviFrame
 */
-void R_WriteAviFrame( int frame, qboolean scissor )
+void R_WriteAviFrame( int frame, bool scissor )
 {
 	int x, y, w, h;
-	int checkname_size;
 	int quality;
+	const char *writedir, *gamedir;
+	size_t checkname_size;
 	char *checkname;
 	const char *extension;
+
+	if( !R_ScreenEnabled() )
+		return;
 
 	if( scissor )
 	{
@@ -1826,14 +1858,14 @@ void R_WriteAviFrame( int frame, qboolean scissor )
 		quality = 100;
 	}
 
-	checkname_size = sizeof( char ) * ( strlen( "avi/avi" ) + 6 + strlen( extension ) + 1 );
-	checkname = malloc( checkname_size );
-	Q_snprintfz( checkname, checkname_size, "avi/avi%06i", frame );
+	writedir = ri.FS_WriteDirectory();
+	gamedir = ri.FS_GameDirectory();
+	checkname_size = strlen( writedir ) + 1 + strlen( gamedir ) + strlen( "/avi/avi" ) + 6 + strlen( extension ) + 1;
+	checkname = alloca( checkname_size );
+	Q_snprintfz( checkname, checkname_size, "%s/%s/avi/avi%06i", writedir, gamedir, frame );
 	COM_DefaultExtension( checkname, extension, checkname_size );
 
-	R_ScreenShot( checkname, x, y, w, h, quality, qfalse, qfalse, qfalse, qtrue );
-
-	free( checkname );
+	R_ScreenShot( checkname, x, y, w, h, quality, false, false, false, true );
 }
 
 /*
@@ -1856,8 +1888,8 @@ void R_TransformVectorToScreen( const refdef_t *rd, const vec3_t in, vec2_t out 
 		return;
 
 	trd = *rd;
-	if( glConfig.wideScreen && !( trd.rdflags & RDF_NOFOVADJUSTMENT ) ) {
-		AdjustFov( &trd.fov_x, &trd.fov_y, glConfig.width, glConfig.height, qfalse );
+	if( !( trd.rdflags & RDF_NOFOVADJUSTMENT ) ) {
+		AdjustFov( &trd.fov_x, &trd.fov_y, glConfig.width, glConfig.height, false );
 	}
 
 	temp[0] = in[0];
@@ -1937,7 +1969,7 @@ struct cinematics_s *R_GetShaderCinematic( shader_t *shader )
 /*
 * R_NormToLatLong
 */
-void R_NormToLatLong( const vec_t *normal, qbyte latlong[2] )
+void R_NormToLatLong( const vec_t *normal, uint8_t latlong[2] )
 {
 	float flatlong[2];
 
@@ -1949,7 +1981,7 @@ void R_NormToLatLong( const vec_t *normal, qbyte latlong[2] )
 /*
 * R_LatLongToNorm4
 */
-void R_LatLongToNorm4( const qbyte latlong[2], vec4_t out )
+void R_LatLongToNorm4( const uint8_t latlong[2], vec4_t out )
 {
 	static float * const sinTable = rsh.sinTableByte;
 	float sin_a, sin_b, cos_a, cos_b;
@@ -1965,7 +1997,7 @@ void R_LatLongToNorm4( const qbyte latlong[2], vec4_t out )
 /*
 * R_LatLongToNorm
 */
-void R_LatLongToNorm( const qbyte latlong[2], vec3_t out )
+void R_LatLongToNorm( const uint8_t latlong[2], vec3_t out )
 {
 	vec4_t t;
 	R_LatLongToNorm4( latlong, t );
@@ -1988,16 +2020,16 @@ char *R_CopyString_( const char *in, const char *filename, int fileline )
 /*
 * R_LoadFile
 */
-int R_LoadFile_( const char *path, void **buffer, const char *filename, int fileline )
+int R_LoadFile_( const char *path, int flags, void **buffer, const char *filename, int fileline )
 {
-	qbyte *buf;
+	uint8_t *buf;
 	unsigned int len;
 	int fhandle;
 
 	buf = NULL; // quiet compiler warning
 
 	// look for it in the filesystem or pack files
-	len = ri.FS_FOpenFile( path, &fhandle, FS_READ );
+	len = ri.FS_FOpenFile( path, &fhandle, FS_READ|flags );
 
 	if( !fhandle )
 	{
@@ -2012,7 +2044,7 @@ int R_LoadFile_( const char *path, void **buffer, const char *filename, int file
 		return len;
 	}
 
-	buf = ( qbyte *)ri.Mem_AllocExt( r_mempool, len + 1, 16, 0, filename, fileline );
+	buf = ( uint8_t *)ri.Mem_AllocExt( r_mempool, len + 1, 16, 0, filename, fileline );
 	buf[len] = 0;
 	*buffer = buf;
 

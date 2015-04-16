@@ -77,8 +77,8 @@ HWND cl_hwnd;           // Main window handle for life of program
 HWND cl_parent_hwnd;	// pointer to parent window handle
 
 static HHOOK WinKeyHook;
-static qboolean s_winkeys_hooked;
-static qboolean s_alttab_disabled;
+static bool s_winkeys_hooked;
+static bool s_alttab_disabled;
 extern unsigned	sys_msg_time;
 
 /*
@@ -113,7 +113,7 @@ LRESULT CALLBACK LLWinKeyHook( int Code, WPARAM wParam, LPARAM lParam )
 /*
 * VID_EnableAltTab
 */
-void VID_EnableAltTab( qboolean enable )
+void VID_EnableAltTab( bool enable )
 {
 	if( enable )
 	{
@@ -121,7 +121,7 @@ void VID_EnableAltTab( qboolean enable )
 		{
 			UnregisterHotKey( 0, 0 );
 			UnregisterHotKey( 0, 1 );
-			s_alttab_disabled = qfalse;
+			s_alttab_disabled = false;
 		}
 	}
 	else
@@ -132,21 +132,21 @@ void VID_EnableAltTab( qboolean enable )
 		RegisterHotKey( 0, 0, MOD_ALT, VK_TAB );
 		RegisterHotKey( 0, 1, MOD_ALT, VK_RETURN );
 
-		s_alttab_disabled = qtrue;
+		s_alttab_disabled = true;
 	}
 }
 
 /*
 * VID_EnableWinKeys
 */
-void VID_EnableWinKeys( qboolean enable )
+void VID_EnableWinKeys( bool enable )
 {
 	if( enable )
 	{
 		if( !s_winkeys_hooked )
 		{
 			if( ( WinKeyHook = SetWindowsHookEx( 13, LLWinKeyHook, global_hInstance, 0 ) ) )
-				s_winkeys_hooked = qtrue;
+				s_winkeys_hooked = true;
 			else
 				Com_Printf( "Failed to install winkey hook.\n" );
 		}
@@ -156,7 +156,7 @@ void VID_EnableWinKeys( qboolean enable )
 		if( s_winkeys_hooked )
 		{
 			UnhookWindowsHookEx( WinKeyHook );
-			s_winkeys_hooked = qfalse;
+			s_winkeys_hooked = false;
 		}
 	}
 }
@@ -201,7 +201,7 @@ int IN_MapKey( int key )
 {
 	int result;
 	int modified;
-	qboolean is_extended;
+	bool is_extended;
 
 	//	Com_Printf( "0x%x\n", key);
 
@@ -212,11 +212,11 @@ int IN_MapKey( int key )
 
 	if( key & ( 1 << 24 ) )
 	{
-		is_extended = qtrue;
+		is_extended = true;
 	}
 	else
 	{
-		is_extended = qfalse;
+		is_extended = false;
 	}
 
 	result = s_scantokey[modified];
@@ -273,6 +273,8 @@ int IN_MapKey( int key )
 
 static void AppActivate( BOOL fActive, BOOL minimize, BOOL destroy )
 {
+	int prevActiveApp;
+
 	Minimized = minimize;
 	if( destroy )
 		fActive = minimize = FALSE;
@@ -280,15 +282,20 @@ static void AppActivate( BOOL fActive, BOOL minimize, BOOL destroy )
 	Key_ClearStates();
 
 	// we don't want to act like we're active if we're minimized
+	prevActiveApp = ActiveApp;
 	if( fActive && !Minimized )
-		ActiveApp = qtrue;
+		ActiveApp = true;
 	else
-		ActiveApp = qfalse;
+		ActiveApp = false;
 
 	// minimize/restore mouse-capture on demand
 	IN_Activate( ActiveApp );
 
-	CL_SoundModule_Activate( ActiveApp );
+	if( prevActiveApp != ActiveApp ) {
+		SCR_PauseCinematic( !ActiveApp );
+		CL_SoundModule_Activate( ActiveApp );
+	}
+
 	if( win_noalttab->integer )
 		VID_EnableAltTab( !ActiveApp );
 	if( win_nowinkeys->integer )
@@ -308,25 +315,6 @@ LONG WINAPI MainWndProc(
 						WPARAM wParam,
 						LPARAM lParam )
 {
-	if( uMsg == MSH_MOUSEWHEEL )
-	{
-		if( mouse_wheel_type != MWHEEL_DINPUT )
-		{
-			mouse_wheel_type = MWHEEL_WM;
-			if( ( ( int ) wParam ) > 0 )
-			{
-				Key_Event( K_MWHEELUP, qtrue, sys_msg_time );
-				Key_Event( K_MWHEELUP, qfalse, sys_msg_time );
-			}
-			else
-			{
-				Key_Event( K_MWHEELDOWN, qtrue, sys_msg_time );
-				Key_Event( K_MWHEELDOWN, qfalse, sys_msg_time );
-			}
-		}
-		return DefWindowProcW( hWnd, uMsg, wParam, lParam );
-	}
-
 	switch( uMsg )
 	{
 	case WM_MOUSEWHEEL:
@@ -339,13 +327,13 @@ LONG WINAPI MainWndProc(
 			mouse_wheel_type = MWHEEL_WM;
 			if( ( short ) HIWORD( wParam ) > 0 )
 			{
-				Key_Event( K_MWHEELUP, qtrue, sys_msg_time );
-				Key_Event( K_MWHEELUP, qfalse, sys_msg_time );
+				Key_Event( K_MWHEELUP, true, sys_msg_time );
+				Key_Event( K_MWHEELUP, false, sys_msg_time );
 			}
 			else
 			{
-				Key_Event( K_MWHEELDOWN, qtrue, sys_msg_time );
-				Key_Event( K_MWHEELDOWN, qfalse, sys_msg_time );
+				Key_Event( K_MWHEELDOWN, true, sys_msg_time );
+				Key_Event( K_MWHEELDOWN, false, sys_msg_time );
 			}
 		}
 		break;
@@ -360,19 +348,21 @@ LONG WINAPI MainWndProc(
 	case WM_CREATE:
 		cl_hwnd = hWnd;
 		cl_parent_hwnd = GetParent( hWnd );
+		IN_WinIME_AssociateContext();
 		AppActivate( TRUE, FALSE, FALSE );
 		MSH_MOUSEWHEEL = RegisterWindowMessage( "MSWHEEL_ROLLMSG" );
-		return DefWindowProcW( hWnd, uMsg, wParam, lParam );
+		break;
 
 	case WM_PAINT:
-		return DefWindowProcW( hWnd, uMsg, wParam, lParam );
+		break;
 
 	case WM_DESTROY:
 		// let sound and input know about this?
 		cl_hwnd = NULL;
 		cl_parent_hwnd = NULL;
+		IN_WinIME_AssociateContext();
 		AppActivate( FALSE, FALSE, TRUE );
-		return DefWindowProcW( hWnd, uMsg, wParam, lParam );
+		break;
 
 	case WM_ACTIVATE:
 		{
@@ -395,7 +385,7 @@ LONG WINAPI MainWndProc(
 					ShowWindow( cl_hwnd, SW_MINIMIZE );
 			}
 		}
-		return DefWindowProcW( hWnd, uMsg, wParam, lParam );
+		break;
 
 	case WM_MOVE:
 		{
@@ -418,13 +408,13 @@ LONG WINAPI MainWndProc(
 
 				Cvar_SetValue( "vid_xpos", xPos + r.left );
 				Cvar_SetValue( "vid_ypos", yPos + r.top );
-				vid_xpos->modified = qfalse;
-				vid_ypos->modified = qfalse;
+				vid_xpos->modified = false;
+				vid_ypos->modified = false;
 				if( ActiveApp )
-					IN_Activate( qtrue );
+					IN_Activate( true );
 			}
 		}
-		return DefWindowProcW( hWnd, uMsg, wParam, lParam );
+		break;
 
 		// this is complicated because Win32 seems to pack multiple mouse events into
 		// one update sometimes, so we always check all states and look for events
@@ -453,7 +443,8 @@ LONG WINAPI MainWndProc(
 	case WM_SYSCOMMAND:
 		if( wParam == SC_SCREENSAVE )
 			return 0;
-		return DefWindowProcW( hWnd, uMsg, wParam, lParam );
+		break;
+
 	case WM_SYSKEYDOWN:
 		if( wParam == VK_RETURN ) {
 			Cbuf_ExecuteText( EXEC_APPEND, "toggle vid_fullscreen\n" );
@@ -461,24 +452,27 @@ LONG WINAPI MainWndProc(
 		}
 		if( wParam == VK_F10)
 		{
-			Key_Event( IN_MapKey( lParam ), qtrue, sys_msg_time );
+			Key_Event( IN_MapKey( lParam ), true, sys_msg_time );
 			return 0;	// don't let the default handler activate the menu in windowed mode
 		}
-
 		// fall through
 	case WM_KEYDOWN:
-		Key_Event( IN_MapKey( lParam ), qtrue, sys_msg_time );
+		if( wParam == VK_PROCESSKEY )
+			return 0;
+		Key_Event( IN_MapKey( lParam ), true, sys_msg_time );
 		break;
 
 	case WM_SYSKEYUP:
 		if( wParam == 18 )
 		{ // ALT-key
-			Key_Event( IN_MapKey( lParam ), qfalse, sys_msg_time );
+			Key_Event( IN_MapKey( lParam ), false, sys_msg_time );
 			return 0;
 		}
 		// fall through
 	case WM_KEYUP:
-		Key_Event( IN_MapKey( lParam ), qfalse, sys_msg_time );
+		if( wParam == VK_PROCESSKEY )
+			return 0;
+		Key_Event( IN_MapKey( lParam ), false, sys_msg_time );
 		break;
 
 	case WM_CLOSE:
@@ -486,11 +480,11 @@ LONG WINAPI MainWndProc(
 		break;
 
 	case WM_KILLFOCUS:
-		AppFocused = qfalse;
+		AppFocused = false;
 		break;
 
 	case WM_SETFOCUS:
-		AppFocused = qtrue;
+		AppFocused = true;
 		break;
 
 	// wsw : pb : new keyboard code using WM_CHAR event
@@ -505,8 +499,30 @@ LONG WINAPI MainWndProc(
 		CL_SoundModule_Clear();
 		break;
 
-	default: // pass all unhandled messages to DefWindowProc
-		return DefWindowProcW( hWnd, uMsg, wParam, lParam );
+	case WM_IME_STARTCOMPOSITION:
+		return 0;
+
+	case WM_IME_SETCONTEXT:
+		lParam &= ~ISC_SHOWUIALL;
+		break;
+	}
+
+	if( uMsg == MSH_MOUSEWHEEL )
+	{
+		if( mouse_wheel_type != MWHEEL_DINPUT )
+		{
+			mouse_wheel_type = MWHEEL_WM;
+			if( ( ( int ) wParam ) > 0 )
+			{
+				Key_Event( K_MWHEELUP, true, sys_msg_time );
+				Key_Event( K_MWHEELUP, false, sys_msg_time );
+			}
+			else
+			{
+				Key_Event( K_MWHEELDOWN, true, sys_msg_time );
+				Key_Event( K_MWHEELDOWN, false, sys_msg_time );
+			}
+		}
 	}
 
 	/* return 0 if handled message, 1 if not */
@@ -525,7 +541,7 @@ void *VID_GetWindowHandle( void )
 ** VID_Sys_Init
 */
 rserr_t VID_Sys_Init( int x, int y, int width, int height, int displayFrequency,
-	void *parentWindow, qboolean fullScreen, qboolean wideScreen, qboolean verbose )
+	void *parentWindow, bool fullScreen, bool wideScreen, bool verbose )
 {
 	return re.Init( APPLICATION, APP_SCREENSHOTS_PREFIX, APP_STARTUP_COLOR,
 		global_hInstance, MainWndProc, parentWindow, 
@@ -568,7 +584,7 @@ void VID_Front_f( void )
 /*
 ** VID_GetDisplaySize
 */
-qboolean VID_GetDisplaySize( int *width, int *height )
+bool VID_GetDisplaySize( int *width, int *height )
 {
 	DEVMODE dm;
 		
@@ -580,7 +596,7 @@ qboolean VID_GetDisplaySize( int *width, int *height )
 	*width = dm.dmPelsWidth;
 	*height = dm.dmPelsHeight;
 
-	return qtrue;
+	return true;
 }
 
 /*

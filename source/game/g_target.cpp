@@ -718,6 +718,7 @@ void SP_target_location( edict_t *self )
 //This will print a message on the center of the screen when triggered. By default, all the clients will see the message.
 //-------- KEYS --------
 //message : text string to print on screen.
+//helpmessage : sets persistent message to be displayed on players HUD
 //targetname : the activating trigger points to this.
 //notsingle : when set to 1, entity will not spawn in Single Player mode
 //notfree : when set to 1, entity will not spawn in "Free for all" and "Tournament" modes.
@@ -729,6 +730,16 @@ void SP_target_location( edict_t *self )
 //OTHERTEAM : &2 only players in other than activator's team will see the message.
 //PRIVATE : &4 only the player that activates the target will see the message.
 
+static void SP_target_print_print( edict_t *self, edict_t *activator )
+{
+	if( self->helpmessage && self->mapmessage_index <= MAX_HELPMESSAGES ) {
+		G_SetPlayerHelpMessage( activator, self->mapmessage_index );
+		return;
+	}
+
+	G_CenterPrintMsg( activator, self->message );
+}
+
 static void SP_target_print_use( edict_t *self, edict_t *other, edict_t *activator )
 {
 	int n;
@@ -736,7 +747,7 @@ static void SP_target_print_use( edict_t *self, edict_t *other, edict_t *activat
 
 	if( activator->r.client && ( self->spawnflags & 4 ) )
 	{
-		G_CenterPrintMsg( activator, self->message );
+		SP_target_print_print( self, activator );
 		return;
 	}
 
@@ -749,9 +760,9 @@ static void SP_target_print_use( edict_t *self, edict_t *other, edict_t *activat
 			if( e->r.inuse && e->s.team )
 			{
 				if( self->spawnflags & 1 && e->s.team == activator->s.team )
-					G_CenterPrintMsg( e, self->message );
+					SP_target_print_print( self, e );
 				if( self->spawnflags & 2 && e->s.team != activator->s.team )
-					G_CenterPrintMsg( e, self->message );
+					SP_target_print_print( self, e );
 			}
 		}
 		return;
@@ -763,13 +774,13 @@ static void SP_target_print_use( edict_t *self, edict_t *other, edict_t *activat
 		if( !player->r.inuse )
 			continue;
 
-		G_CenterPrintMsg( player, self->message );
+		SP_target_print_print( self, player );
 	}
 }
 
 void SP_target_print( edict_t *self )
 {
-	if( !self->message )
+	if( !self->message && !self->helpmessage )
 	{
 		G_FreeEdict( self );
 		return;

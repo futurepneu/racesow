@@ -143,12 +143,12 @@ qgl_initerr_t QGL_Init( const char *dllname )
 	}
 
 #define QGL_FUNC( type, name, params )                                   \
-	( q##name ) = (void *)qglGetProcAddress( #name );                    \
+	( q##name ) = (void *)qglGetProcAddress( (const GLubyte *)#name );   \
 	if( !( q##name ) ) {                                                 \
 		Com_Printf( "QGL_Init: Failed to get address for %s\n", #name ); \
 		return qgl_initerr_invalid_driver;                               \
 	}
-#define QGL_FUNC_OPT( type, name, params ) ( q##name ) = (void *)qglGetProcAddress( #name );
+#define QGL_FUNC_OPT( type, name, params ) ( q##name ) = (void *)qglGetProcAddress( (const GLubyte *)#name );
 #define QGL_EXT( type, name, params ) ( q##name ) = NULL;
 #define QGL_WGL( type, name, params )
 #define QGL_WGL_EXT( type, name, params )
@@ -169,7 +169,7 @@ qgl_initerr_t QGL_Init( const char *dllname )
 #undef QGL_FUNC_OPT
 #undef QGL_FUNC
 
-	qglGetGLWExtensionsString = _qglGetGLWExtensionsStringInit;
+	qglGetGLWExtensionsString = _qglGetGLWExtensionsString;
 
 	return qgl_initerr_ok;
 }
@@ -197,12 +197,6 @@ void *qglGetProcAddress( const GLubyte *procName )
 /*
 ** qglGetGLWExtensionsString
 */
-static const char *_qglGetGLWExtensionsStringInit( void )
-{
-	qglGetGLWExtensionsString = _qglGetGLWExtensionsString;
-	return qglGetGLWExtensionsString();
-}
-
 static const char *_qglGetGLWExtensionsString( void )
 {
 	return NULL;

@@ -460,7 +460,7 @@ static void CG_Democam_ExecutePathAnalysis( void )
 bool CG_LoadRecamScriptFile( char *filename )
 {
 	int filelen, filehandle;
-	qbyte *buf = NULL;
+	uint8_t *buf = NULL;
 	char *ptr, *token;
 	int linecount;
 	cg_democam_t *cam = NULL;
@@ -478,7 +478,7 @@ bool CG_LoadRecamScriptFile( char *filename )
 	}
 	else
 	{
-		buf = ( qbyte * )CG_Malloc( filelen + 1 );
+		buf = ( uint8_t * )CG_Malloc( filelen + 1 );
 		filelen = trap_FS_Read( buf, filelen, filehandle );
 		trap_FS_FCloseFile( filehandle );
 	}
@@ -491,7 +491,7 @@ bool CG_LoadRecamScriptFile( char *filename )
 	ptr = ( char * )buf;
 	while( ptr )
 	{
-		token = COM_ParseExt( &ptr, qtrue );
+		token = COM_ParseExt( &ptr, true );
 		if( !token[0] )
 			break;
 
@@ -502,15 +502,15 @@ bool CG_LoadRecamScriptFile( char *filename )
 			sub = CG_Democam_RegisterSubtitle();
 			sub->highprint = ( Q_stricmp( token, "print" ) == 0 );
 
-			token = COM_ParseExt( &ptr, qtrue );
+			token = COM_ParseExt( &ptr, true );
 			if( !token[0] )
 				break;
 			sub->timeStamp = (unsigned int)atoi( token );
-			token = COM_ParseExt( &ptr, qtrue );
+			token = COM_ParseExt( &ptr, true );
 			if( !token[0] )
 				break;
 			sub->maxDuration = (unsigned int)atoi( token );
-			sub->text = CG_CopyString( COM_ParseExt( &ptr, qtrue ) );
+			sub->text = CG_CopyString( COM_ParseExt( &ptr, true ) );
 
 			linecount = 0;
 		}
@@ -763,7 +763,7 @@ void CG_Democam_DrawCenterSubtitle( int y, unsigned int maxwidth, struct qfontfa
 			ptr = s;
 		}
 
-		y += trap_SCR_strHeight( font );
+		y += trap_SCR_FontHeight( font );
 	}
 }
 
@@ -808,14 +808,14 @@ void CG_DrawDemocam2D( void )
 		if( *cgs.demoName )
 		{
 			trap_SCR_DrawString( xpos, ypos, ALIGN_LEFT_TOP, va( "Demo: %s", cgs.demoName ), cgs.fontSystemSmall, colorWhite );
-			ypos += trap_SCR_strHeight( cgs.fontSystemSmall );
+			ypos += trap_SCR_FontHeight( cgs.fontSystemSmall );
 		}
 
 		trap_SCR_DrawString( xpos, ypos, ALIGN_LEFT_TOP, va( "Play mode: %s%s%s", S_COLOR_ORANGE, CamIsFree ? "Free Fly" : "Preview", S_COLOR_WHITE ), cgs.fontSystemSmall, colorWhite );
-		ypos += trap_SCR_strHeight( cgs.fontSystemSmall );
+		ypos += trap_SCR_FontHeight( cgs.fontSystemSmall );
 
 		trap_SCR_DrawString( xpos, ypos, ALIGN_LEFT_TOP, va( "Time: %i", demo_time ), cgs.fontSystemSmall, colorWhite );
-		ypos += trap_SCR_strHeight( cgs.fontSystemSmall );
+		ypos += trap_SCR_FontHeight( cgs.fontSystemSmall );
 
 		cam_type_name = "none";
 		cam_timestamp = 0;
@@ -836,7 +836,7 @@ void CG_DrawDemocam2D( void )
 		trap_SCR_DrawString( xpos, ypos, ALIGN_LEFT_TOP, va( "Current cam: " S_COLOR_ORANGE "%s" S_COLOR_WHITE " Fov " S_COLOR_ORANGE "%s" S_COLOR_WHITE " Start %i Tracking " S_COLOR_ORANGE "%s" S_COLOR_WHITE,
 			cam_type_name, sfov, cam_timestamp, strack ),
 			cgs.fontSystemSmall, colorWhite );
-		ypos += trap_SCR_strHeight( cgs.fontSystemSmall );
+		ypos += trap_SCR_FontHeight( cgs.fontSystemSmall );
 
 		if( currentcam )
 		{
@@ -844,7 +844,7 @@ void CG_DrawDemocam2D( void )
 				currentcam->angles[PITCH], currentcam->angles[YAW], currentcam->angles[ROLL] ),
 				cgs.fontSystemSmall, colorWhite );
 		}
-		ypos += trap_SCR_strHeight( cgs.fontSystemSmall );
+		ypos += trap_SCR_FontHeight( cgs.fontSystemSmall );
 
 		cam_type_name = "none";
 		cam_timestamp = 0;
@@ -865,7 +865,7 @@ void CG_DrawDemocam2D( void )
 		trap_SCR_DrawString( xpos, ypos, ALIGN_LEFT_TOP, va( "Next cam: " S_COLOR_ORANGE "%s" S_COLOR_WHITE " Fov " S_COLOR_ORANGE "%s" S_COLOR_WHITE " Start %i Tracking " S_COLOR_ORANGE "%s" S_COLOR_WHITE,
 			cam_type_name, sfov, cam_timestamp, strack ),
 			cgs.fontSystemSmall, colorWhite );
-		ypos += trap_SCR_strHeight( cgs.fontSystemSmall );
+		ypos += trap_SCR_FontHeight( cgs.fontSystemSmall );
 
 		if( nextcam )
 		{
@@ -873,7 +873,7 @@ void CG_DrawDemocam2D( void )
 				nextcam->angles[PITCH], nextcam->angles[YAW], nextcam->angles[ROLL] ),
 				cgs.fontSystemSmall, colorWhite );
 		}
-		ypos += trap_SCR_strHeight( cgs.fontSystemSmall );
+		ypos += trap_SCR_FontHeight( cgs.fontSystemSmall );
 	}
 }
 

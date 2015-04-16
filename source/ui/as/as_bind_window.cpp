@@ -85,6 +85,19 @@ public:
 		return ui_document->getRocketDocument();
 	}
 
+	void preload( const asstring_t &location )
+	{
+		if( !UI_Main::preloadEnabled() ) {
+			return;
+		}
+
+		WSWUI::NavigationStack *stack = GetCurrentUIStack();
+		if( stack == NULL ) {
+			return;
+		}
+		stack->preloadDocument( location.buffer );
+	}
+
 	/// Loads modal document from the URL.
 	/// FIXME: move to window.
 	void modal( const asstring_t &location, int defaultCode = -1 )
@@ -297,7 +310,7 @@ public:
 	void startBackgroundTrack( const asstring_t &intro, const asstring_t &loop, bool stopIfPlaying )
 	{
 		if( stopIfPlaying || !backgroundTrackPlaying ) {
-			trap::S_StartBackgroundTrack( intro.buffer, loop.buffer );
+			trap::S_StartBackgroundTrack( intro.buffer, loop.buffer, 3 );
 			backgroundTrackPlaying = true;
 		}
 	}
@@ -318,9 +331,9 @@ public:
 		return UI_Main::Get()->getConnectCount();
 	}
 
-	void showIME( bool show )
+	void showSoftKeyboard( bool show )
 	{
-		trap::IN_ShowIME( show ? qtrue : qfalse );
+		trap::IN_ShowSoftKeyboard( show ? true : false );
 	}
 
 private:
@@ -435,6 +448,7 @@ void BindWindow( ASInterface *as )
 		.method2( &ASWindow::close, "void close( int code = 0 )" )
 		.method2( &ASWindow::modal, "void modal( const String &location, int defaultCode = -1 )" )
 		.method( &ASWindow::getModalValue, "getModalValue" )
+		.method( &ASWindow::preload, "preload" )
 
 		.method( &ASWindow::getDocument, "get_document" )
 
@@ -471,7 +485,7 @@ void BindWindow( ASInterface *as )
 
 		.method( &ASWindow::getConnectCount, "get_connectCount" )
 
-		.method( &ASWindow::showIME, "showIME" );
+		.method( &ASWindow::showSoftKeyboard, "showSoftKeyboard" );
 	;
 }
 
@@ -497,7 +511,8 @@ void RunWindowFrame( void )
 
 void UnbindWindow( void )
 {
-	__delete__( asWindow );
+	if( asWindow )
+		__delete__( asWindow );
 	asWindow = NULL;
 }
 

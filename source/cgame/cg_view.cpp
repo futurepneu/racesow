@@ -132,7 +132,7 @@ static void CG_AddLocalSounds( void )
 	{
 		if( !postmatchsound_set && !demostream )
 		{
-			trap_S_StartBackgroundTrack( S_PLAYLIST_POSTMATCH, "3" ); // loop random track from the playlist
+			trap_S_StartBackgroundTrack( S_PLAYLIST_POSTMATCH, NULL, 3 ); // loop random track from the playlist
 			postmatchsound_set = true;
 			background = false;
 		}
@@ -141,7 +141,7 @@ static void CG_AddLocalSounds( void )
 	{
 		if( cgs.demoPlaying && cgs.demoAudioStream && !demostream )
 		{
-			trap_S_StartBackgroundTrack( cgs.demoAudioStream, NULL );
+			trap_S_StartBackgroundTrack( cgs.demoAudioStream, NULL, 0 );
 			demostream = true;
 		}
 
@@ -501,7 +501,7 @@ int CG_SkyPortal( void )
 		float off = cg.view.refdef.time * 0.001f;
 
 		sp->fov = fov;
-		sp->noEnts = (noents ? qtrue : qfalse);
+		sp->noEnts = (noents ? true : false);
 		sp->scale = scale ? 1.0f / scale : 0;
 		VectorSet( sp->viewanglesOffset, anglemod( off * pitchspeed ), anglemod( off * yawspeed ), anglemod( off * rollspeed ) );
 		return RDF_SKYPORTALINVIEW;
@@ -997,6 +997,16 @@ void CG_RenderView( float frameTime, float realFrameTime, int realTime, unsigned
 		trap_S_Update( vec3_origin, vec3_origin, axis_identity, cgs.clientInfo[cgs.playerNum].name );
 
 		return;
+	}
+
+	// bring up the game menu after reconnecting
+	if( !cgs.tv && !cgs.demoPlaying ) {
+		if( ISREALSPECTATOR() && !cg.firstFrame ) {
+			if( !cgs.gameMenuRequested ) {
+				trap_Cmd_ExecuteText( EXEC_NOW, "gamemenu\n" );
+			}
+			cgs.gameMenuRequested = true;
+		}
 	}
 
 	if( !cg.viewFrameCount )

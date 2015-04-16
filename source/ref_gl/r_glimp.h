@@ -149,7 +149,7 @@ typedef struct
 	int			_extMarker;
 
 	//
-	// only qbytes must follow the extensionsBoolMarker
+	// only uint8_ts must follow the extensionsBoolMarker
 	//
 
 	char		draw_range_elements
@@ -185,11 +185,14 @@ typedef struct
 				,rgb8_rgba8
 				,ES3_compatibility
 				,blend_func_separate
-				,texture3D
 				,texture_array
+				,fragment_precision_high
 				;
 	union {
 		char	shadow, shadow_samplers;
+	};
+	union {
+		char	texture3D, texture_3D;
 	};
 	union {
 		char	texture_non_power_of_two, texture_npot;
@@ -213,19 +216,22 @@ typedef struct
 	int				shadingLanguageVersion;
 
 	int				width, height;
-	qboolean		fullScreen;
-	qboolean		wideScreen;
+	bool			fullScreen;
+	bool			wideScreen;
 
-	qboolean		stereoEnabled;
+	bool			stereoEnabled;
 	int				stencilBits;
 
-	qboolean		hwGamma;
+	bool			hwGamma;
 	unsigned short	gammaRampSize;
 	unsigned short	originalGammaRamp[3*GAMMARAMP_STRIDE];
+
+	float			depthEpsilon;
 
 	int				maxTextureSize
 					,maxTextureUnits
 					,maxTextureCubemapSize
+					,maxTexture3DSize
 					,maxTextureLayers
 					,maxTextureFilterAnisotropic
 					,maxRenderbufferSize
@@ -248,20 +254,20 @@ IMPLEMENTATION SPECIFIC FUNCTIONS
 ====================================================================
 */
 
-qboolean	GLimp_ScreenEnabled( void );
-void		GLimp_BeginFrame( void );
-void		GLimp_EndFrame( void );
-int			GLimp_Init( const char *applicationName, void *hinstance, void *wndproc, void *parenthWnd );
-void	    GLimp_Shutdown( void );
-rserr_t		GLimp_SetMode( int x, int y, int width, int height, int displayFrequency,
-				qboolean fullscreen, qboolean wideScreen );
-qboolean	GLimp_SetWindow( void *hinstance, void *wndproc, void *parenthWnd );
-void	    GLimp_AppActivate( qboolean active, qboolean destroy );
-qboolean	GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp );
-void		GLimp_SetGammaRamp( size_t stride, unsigned short   size, unsigned short *ramp );
+bool	GLimp_ScreenEnabled( void );
+void	GLimp_BeginFrame( void );
+void	GLimp_EndFrame( void );
+int		GLimp_Init( const char *applicationName, void *hinstance, void *wndproc, void *parenthWnd );
+void	GLimp_Shutdown( void );
+rserr_t	GLimp_SetMode( int x, int y, int width, int height, int displayFrequency,
+				bool fullscreen, bool wideScreen );
+bool	GLimp_SetWindow( void *hinstance, void *wndproc, void *parenthWnd );
+void	GLimp_AppActivate( bool active, bool destroy );
+bool	GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp );
+void	GLimp_SetGammaRamp( size_t stride, unsigned short   size, unsigned short *ramp );
 
-qboolean	GLimp_SharedContext_Create( void **context, void **surface );
-qboolean	GLimp_SharedContext_MakeCurrent( void *context, void *surface );
-void		GLimp_SharedContext_Destroy( void *context, void *surface );
+bool	GLimp_SharedContext_Create( void **context, void **surface );
+bool	GLimp_SharedContext_MakeCurrent( void *context, void *surface );
+void	GLimp_SharedContext_Destroy( void *context, void *surface );
 
 #endif // R_GLIMP_H

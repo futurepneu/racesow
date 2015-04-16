@@ -254,9 +254,9 @@ void CL_GameModule_L10n_ClearDomain( void )
 * CL_GameModule_S_RawSamples
 */
 static void CL_GameModule_S_RawSamples( unsigned int samples, unsigned int rate, 
-	unsigned short width, unsigned short channels, const qbyte *data )
+	unsigned short width, unsigned short channels, const uint8_t *data )
 {
-	CL_SoundModule_RawSamples( samples, rate, width, channels, data, qfalse );
+	CL_SoundModule_RawSamples( samples, rate, width, channels, data, false );
 }
 
 //==============================================
@@ -269,7 +269,7 @@ static void CL_GameModule_S_RawSamples( unsigned int samples, unsigned int rate,
 #define MAX_CGAME_RAW_SAMPLES_LISTENERS	8
 
 typedef struct {
-	qboolean inuse;
+	bool inuse;
 	struct cinematics_s *cin;
 	void *ptr;
 	int load_seq;
@@ -284,7 +284,7 @@ cg_raw_samples_listener_t cg_raw_samples_listeners[MAX_CGAME_RAW_SAMPLES_LISTENE
 */
 static void CL_GameModule_RawSamples( void *ptr, unsigned int samples, 
 	unsigned int rate, unsigned short width, unsigned short channels, 
-	const qbyte *data )
+	const uint8_t *data )
 {
 	cg_raw_samples_listener_t *cglistener;
 
@@ -292,7 +292,7 @@ static void CL_GameModule_RawSamples( void *ptr, unsigned int samples,
 	cglistener = ( cg_raw_samples_listener_t * )ptr;
 
 	// each listener gets samples passed exactly once
-	cglistener->inuse = qfalse;
+	cglistener->inuse = false;
 
 	if( cglistener->load_seq != cg_load_seq ) {
 		return;
@@ -317,7 +317,7 @@ static unsigned int CL_GameModule_GetRawSamplesLength( void *ptr )
 /*
 * CL_GameModule_AddRawSamplesListener
 */
-static qboolean CL_GameModule_AddRawSamplesListener( struct cinematics_s *cin, 
+static bool CL_GameModule_AddRawSamplesListener( struct cinematics_s *cin, 
 	void *listener, cg_raw_samples_cb_t rs, cg_get_raw_samples_cb_t grs )
 {
 	int i;
@@ -337,18 +337,18 @@ static qboolean CL_GameModule_AddRawSamplesListener( struct cinematics_s *cin,
 			&& cglistener->rs == rs
 			&& cglistener->grs == grs ) {
 				// same listener
-				return qtrue;
+				return true;
 		}
 		cglistener++;
 	}
 	
 	if( !freel ) {
-		return qfalse;
+		return false;
 	}
 
 	// fill in our proxy
 	cglistener = freel;
-	cglistener->inuse = qtrue;
+	cglistener->inuse = true;
 	cglistener->cin = cin;
 	cglistener->ptr = listener;
 	cglistener->load_seq = cg_load_seq;
@@ -358,11 +358,11 @@ static qboolean CL_GameModule_AddRawSamplesListener( struct cinematics_s *cin,
 	if( !CIN_AddRawSamplesListener( cin, cglistener, &CL_GameModule_RawSamples, 
 		&CL_GameModule_GetRawSamplesLength ) ) {
 		// free listener
-		cglistener->inuse = qfalse;
-		return qfalse;
+		cglistener->inuse = false;
+		return false;
 	}
 
-	return qtrue;
+	return true;
 }
 
 //==============================================
@@ -382,7 +382,7 @@ void CL_GameModule_Init( void )
 #endif
 
 	// stop all playing sounds
-	CL_SoundModule_StopAllSounds( qtrue, qtrue );
+	CL_SoundModule_StopAllSounds( true, true );
 
 	CL_GameModule_Shutdown();
 
@@ -512,13 +512,21 @@ void CL_GameModule_Init( void )
 	import.S_PositionedRawSamples = CL_SoundModule_PositionedRawSamples;
 	import.S_GetRawSamplesLength = CL_SoundModule_GetRawSamplesLength;
 	import.S_GetPositionedRawSamplesLength = CL_SoundModule_GetPositionedRawSamplesLength;
+	import.S_SetEntitySpatilization = CL_SoundModule_SetEntitySpatilization;
 
 	import.SCR_RegisterFont = SCR_RegisterFont;
 	import.SCR_RegisterSpecialFont = SCR_RegisterSpecialFont;
 	import.SCR_DrawString = SCR_DrawString;
 	import.SCR_DrawStringWidth = SCR_DrawStringWidth;
 	import.SCR_DrawClampString = SCR_DrawClampString;
-	import.SCR_strHeight = SCR_strHeight;
+	import.SCR_DrawRawChar = SCR_DrawRawChar;
+	import.SCR_DrawClampChar = SCR_DrawClampChar;
+	import.SCR_FontSize = SCR_FontSize;
+	import.SCR_FontHeight = SCR_FontHeight;
+	import.SCR_FontUnderline = SCR_FontUnderline;
+	import.SCR_FontAdvance = SCR_FontAdvance;
+	import.SCR_FontXHeight = SCR_FontXHeight;
+	import.SCR_SetDrawCharIntercept = SCR_SetDrawCharIntercept;
 	import.SCR_strWidth = SCR_strWidth;
 	import.SCR_StrlenForWidth = SCR_StrlenForWidth;
 
@@ -535,6 +543,9 @@ void CL_GameModule_Init( void )
 	import.L10n_ClearDomain = &CL_GameModule_L10n_ClearDomain;
 
 	import.CIN_AddRawSamplesListener = &CL_GameModule_AddRawSamplesListener;
+
+	import.IN_IME_GetCandidates = &IN_IME_GetCandidates;
+	import.IN_SoftKeyboardAvailable = &IN_SoftKeyboardAvailable;
 
 	if( builtinAPIfunc ) {
 		cge = builtinAPIfunc( &import );
@@ -565,12 +576,13 @@ void CL_GameModule_Init( void )
 	cge->Init( cls.servername, cl.playernum,
 		viddef.width, viddef.height, VID_GetPixelRatio(),
 		cls.demo.playing, cls.demo.playing ? cls.demo.filename : "",
-		cls.sv_pure, cl.snapFrameTime, APP_PROTOCOL_VERSION, cls.mediaRandomSeed );
+		cls.sv_pure, cl.snapFrameTime, APP_PROTOCOL_VERSION, cls.mediaRandomSeed, cl.gamestart );
 
 	Com_DPrintf( "CL_GameModule_Init: %.2f seconds\n", (float)( Sys_Milliseconds() - start ) * 0.001f );
 
+	cl.gamestart = false;
 	cls.state = oldState;
-	cls.cgameActive = qtrue;
+	cls.cgameActive = true;
 
 	// check memory integrity
 	Mem_DebugCheckSentinelsGlobal();
@@ -596,7 +608,7 @@ void CL_GameModule_Shutdown( void )
 		return;
 
 	cg_load_seq++;
-	cls.cgameActive = qfalse;
+	cls.cgameActive = false;
 
 	CL_GameModule_AsyncStream_Shutdown();
 
@@ -649,7 +661,7 @@ float CL_GameModule_GetSensitivityScale( float sens, float zoomSens )
 /*
 * CL_GameModule_NewSnapshot
 */
-qboolean CL_GameModule_NewSnapshot( int pendingSnapshot )
+bool CL_GameModule_NewSnapshot( int pendingSnapshot )
 {
 	snapshot_t *currentSnap, *newSnap;
 
@@ -658,10 +670,10 @@ qboolean CL_GameModule_NewSnapshot( int pendingSnapshot )
 		currentSnap = ( cl.currentSnapNum <= 0 ) ? NULL : &cl.snapShots[cl.currentSnapNum & UPDATE_MASK];
 		newSnap = &cl.snapShots[pendingSnapshot & UPDATE_MASK];
 		cge->NewFrameSnapshot( newSnap, currentSnap );
-		return qtrue;
+		return true;
 	}
 
-	return qfalse;
+	return false;
 }
 
 /*
@@ -686,10 +698,10 @@ void CL_GameModule_AddMovement( usercmd_t *cmd, vec3_t viewangles, int frametime
 /*
 * CL_GameModule_TouchEvent
 */
-void CL_GameModule_TouchEvent( int id, touchevent_t type, int x, int y )
+void CL_GameModule_TouchEvent( int id, touchevent_t type, int x, int y, unsigned int time )
 {
 	if( cge )
-		cge->TouchEvent( id, type, x, y );
+		cge->TouchEvent( id, type, x, y, time );
 }
 
 /*

@@ -36,8 +36,8 @@ typedef struct mesh_s
 	byte_vec4_t			*lmlayersArray[( MAX_LIGHTMAPS + 3 ) / 4];
 	byte_vec4_t			*colorsArray[MAX_LIGHTMAPS];
 
-	qbyte				*blendIndices;
-	qbyte				*blendWeights;
+	uint8_t				*blendIndices;
+	uint8_t				*blendWeights;
 
 	unsigned short		numElems;
 	elem_t				*elems;
@@ -68,7 +68,7 @@ typedef struct
 	unsigned			numSliceElems, numSliceElemsReal;
 } drawList_t;
 
-typedef qboolean (*beginDrawSurf_cb)( const entity_t *, const struct shader_s *, const struct mfog_s *, void * );
+typedef bool (*beginDrawSurf_cb)( const entity_t *, const struct shader_s *, const struct mfog_s *, void * );
 typedef void (*batchDrawSurf_cb)( const entity_t *, const struct shader_s *, const struct mfog_s *, void * );
 
 #endif // R_MESH_H

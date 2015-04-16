@@ -12,6 +12,8 @@
 
 unsigned sys_frame_time;
 
+void Sys_InitTime( void );
+
 void Sys_Sleep( unsigned int millis )
 {
 	SDL_Delay( millis );
@@ -113,6 +115,9 @@ int main( int argc, char **argv )
 #endif
 
 #if defined( __WIN32__ )
+#if defined( _DEBUG )
+	SDL_SetHint( SDL_HINT_ALLOW_TOPMOST, "0" );
+#endif
 	SDL_SetHint( SDL_HINT_WINDOWS_WINDOW_HICON_MAKEINTRESOURCE, va( "%d", IDI_APPICON_VALUE ) );
 #endif
 
@@ -121,7 +126,7 @@ int main( int argc, char **argv )
 	Qcommon_Init( argc, argv );
 
 	oldtime = Sys_Milliseconds();
-	while( qtrue ) {
+	while( true ) {
 		// find time spent rendering last frame
 		do {
 			newtime = Sys_Milliseconds();

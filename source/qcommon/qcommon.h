@@ -54,15 +54,15 @@ struct fatvis_s;
 
 typedef struct
 {
-	qbyte *data;
+	uint8_t *data;
 	size_t maxsize;
 	size_t cursize;
 	size_t readcount;
-	qboolean compressed;
+	bool compressed;
 } msg_t;
 
 // msg.c
-void MSG_Init( msg_t *buf, qbyte *data, size_t length );
+void MSG_Init( msg_t *buf, uint8_t *data, size_t length );
 void MSG_Clear( msg_t *buf );
 void *MSG_GetSpace( msg_t *buf, size_t length );
 void MSG_WriteData( msg_t *msg, const void *data, size_t length );
@@ -85,7 +85,7 @@ void MSG_WriteString( msg_t *sb, const char *s );
 #define MSG_WriteAngle( sb, f ) ( MSG_WriteByte( ( sb ), ANGLE2BYTE( ( f ) ) ) )
 #define MSG_WriteAngle16( sb, f ) ( MSG_WriteShort( ( sb ), ANGLE2SHORT( ( f ) ) ) )
 void MSG_WriteDeltaUsercmd( msg_t *sb, struct usercmd_s *from, struct usercmd_s *cmd );
-void MSG_WriteDeltaEntity( struct entity_state_s *from, struct entity_state_s *to, msg_t *msg, qboolean force, qboolean newentity );
+void MSG_WriteDeltaEntity( struct entity_state_s *from, struct entity_state_s *to, msg_t *msg, bool force, bool newentity );
 void MSG_WriteDir( msg_t *sb, vec3_t vector );
 
 
@@ -148,7 +148,7 @@ void SNAP_WriteFrameSnapToClient( struct ginfo_s *gi, struct client_s *client, m
 void SNAP_BuildClientFrameSnap( struct cmodel_state_s *cms, struct ginfo_s *gi, unsigned int frameNum, unsigned int timeStamp,
 							   struct fatvis_s *fatvis, struct client_s *client, 
 							   game_state_t *gameState, struct client_entities_s *client_entities,
-							   qboolean relay, struct mempool_s *mempool );
+							   bool relay, struct mempool_s *mempool );
 
 void SNAP_FreeClientFrames( struct client_s *client );
 
@@ -183,7 +183,7 @@ char *_ZoneCopyString( const char *str, const char *filename, int fileline );
 char *_TempCopyString( const char *str, const char *filename, int fileline );
 #define TempCopyString( str ) _TempCopyString( str, __FILE__, __LINE__ )
 
-int Com_GlobMatch( const char *pattern, const char *text, const qboolean casecmp );
+int Com_GlobMatch( const char *pattern, const char *text, const bool casecmp );
 
 void Info_Print( char *s );
 
@@ -191,9 +191,9 @@ void Info_Print( char *s );
 
 /* crc.h */
 void CRC_Init( unsigned short *crcvalue );
-void CRC_ProcessByte( unsigned short *crcvalue, qbyte data );
+void CRC_ProcessByte( unsigned short *crcvalue, uint8_t data );
 unsigned short CRC_Value( unsigned short crcvalue );
-unsigned short CRC_Block( qbyte *start, int count );
+unsigned short CRC_Block( uint8_t *start, int count );
 
 /*
 ==============================================================
@@ -398,7 +398,7 @@ void Com_UnloadLibrary( void **lib );
 void *Com_LoadLibrary( const char *name, dllfunc_t *funcs ); // NULL-terminated array of functions
 
 void *Com_LoadGameLibrary( const char *basename, const char *apifuncname, void **handle, void *parms,
-                           qboolean pure, char *manifest );
+                           bool pure, char *manifest );
 void Com_UnloadGameLibrary( void **handle );
 
 /*
@@ -425,8 +425,8 @@ void	    Cbuf_Shutdown( void );
 void	    Cbuf_AddText( const char *text );
 void	    Cbuf_InsertText( const char *text );
 void	    Cbuf_ExecuteText( int exec_when, const char *text );
-void	    Cbuf_AddEarlyCommands( qboolean clear );
-qboolean    Cbuf_AddLateCommands( void );
+void	    Cbuf_AddEarlyCommands( bool clear );
+bool    Cbuf_AddLateCommands( void );
 void	    Cbuf_Execute( void );
 
 
@@ -447,8 +447,8 @@ void	    Cmd_Init( void );
 void	    Cmd_Shutdown( void );
 void	    Cmd_AddCommand( const char *cmd_name, xcommand_t function );
 void	    Cmd_RemoveCommand( const char *cmd_name );
-qboolean    Cmd_Exists( const char *cmd_name );
-qboolean	Cmd_CheckForCommand( char *text );
+bool    Cmd_Exists( const char *cmd_name );
+bool	Cmd_CheckForCommand( char *text );
 void	    Cmd_WriteAliases( int file );
 int			Cmd_CompleteAliasCountPossible( const char *partial );
 char		**Cmd_CompleteAliasBuildList( const char *partial );
@@ -456,7 +456,7 @@ int			Cmd_CompleteCountPossible( const char *partial );
 char		**Cmd_CompleteBuildList( const char *partial );
 char		**Cmd_CompleteBuildArgList( const char *partial );
 char		**Cmd_CompleteBuildArgListExt( const char *command, const char *arguments );
-char		**Cmd_CompleteFileList( const char *partial, const char *basedir, const char *extension, qboolean subdirectories );
+char		**Cmd_CompleteFileList( const char *partial, const char *basedir, const char *extension, bool subdirectories );
 int			Cmd_Argc( void );
 char		*Cmd_Argv( int arg );
 char		*Cmd_Args( void );
@@ -497,7 +497,7 @@ void Irc_Connect_f( void );
 void Irc_Disconnect_f( void );
 dynvar_get_status_t Irc_GetConnected_f( void **connected );
 dynvar_set_status_t Irc_SetConnected_f( void *connected );
-qboolean Irc_IsConnected( void );
+bool Irc_IsConnected( void );
 size_t Irc_HistorySize( void );
 size_t Irc_HistoryTotalSize( void );
 const struct irc_chat_history_node_s *Irc_GetHistoryHeadNode(void);
@@ -546,13 +546,13 @@ typedef enum
 
 typedef struct netadr_ipv4_s
 {
-	qbyte ip [4];
+	uint8_t ip [4];
 	unsigned short port;
 } netadr_ipv4_t;
 
 typedef struct netadr_ipv6_s
 {
-	qbyte ip [16];
+	uint8_t ip [16];
 	unsigned short port;
 	unsigned long scope_id;
 } netadr_ipv6_t;
@@ -578,14 +578,14 @@ typedef enum
 
 typedef struct
 {
-	qboolean open;
+	bool open;
 
 	socket_type_t type;
 	netadr_t address;
-	qboolean server;
+	bool server;
 
 #ifdef TCP_SUPPORT
-	qboolean connected;
+	bool connected;
 #endif
 	netadr_t remoteAddress;
 
@@ -614,25 +614,28 @@ typedef enum
 void	    NET_Init( void );
 void	    NET_Shutdown( void );
 
-qboolean    NET_OpenSocket( socket_t *socket, socket_type_t type, const netadr_t *address, qboolean server );
+bool		NET_OpenSocket( socket_t *socket, socket_type_t type, const netadr_t *address, bool server );
 void	    NET_CloseSocket( socket_t *socket );
 
 #ifdef TCP_SUPPORT
 connection_status_t		NET_Connect( socket_t *socket, const netadr_t *address );
 connection_status_t		NET_CheckConnect( socket_t *socket );
-qboolean				NET_Listen( const socket_t *socket );
-int						NET_Accept( const socket_t *socket, socket_t *newsocket, netadr_t *address );
+bool		NET_Listen( const socket_t *socket );
+int			NET_Accept( const socket_t *socket, socket_t *newsocket, netadr_t *address );
 #endif
 
 int			NET_GetPacket( const socket_t *socket, netadr_t *address, msg_t *message );
-qboolean    NET_SendPacket( const socket_t *socket, const void *data, size_t length, const netadr_t *address );
+bool		NET_SendPacket( const socket_t *socket, const void *data, size_t length, const netadr_t *address );
 
 int			NET_Get( const socket_t *socket, netadr_t *address, void *data, size_t length );
 int         NET_Send( const socket_t *socket, const void *data, size_t length, const netadr_t *address );
+int64_t		NET_SendFile( const socket_t *socket, int file, size_t offset, size_t count, const netadr_t *address );
 
 void	    NET_Sleep( int msec, socket_t *sockets[] );
 int         NET_Monitor( int msec, socket_t *sockets[], 
-	void (*read_cb)(socket_t *socket, void*), void (*exception_cb)(socket_t *socket, void*), void *privatep[] );
+				void (*read_cb)(socket_t *socket, void*), 
+				void (*write_cb)(socket_t *socket, void*), 
+				void (*exception_cb)(socket_t *socket, void*), void *privatep[] );
 const char *NET_ErrorString( void );
 void	    NET_SetErrorString( const char *format, ... );
 void		NET_SetErrorStringFromLastError( const char *function );
@@ -642,18 +645,18 @@ int			NET_SetSocketNoDelay( socket_t *socket, int nodelay );
 const char *NET_SocketTypeToString( socket_type_t type );
 const char *NET_SocketToString( const socket_t *socket );
 char	   *NET_AddressToString( const netadr_t *address );
-qboolean    NET_StringToAddress( const char *s, netadr_t *address );
+bool		NET_StringToAddress( const char *s, netadr_t *address );
 
 unsigned short	NET_GetAddressPort( const netadr_t *address );
 void			NET_SetAddressPort( netadr_t *address, unsigned short port );
 
-qboolean    NET_CompareAddress( const netadr_t *a, const netadr_t *b );
-qboolean    NET_CompareBaseAddress( const netadr_t *a, const netadr_t *b );
-qboolean    NET_IsLANAddress( const netadr_t *address );
-qboolean    NET_IsLocalAddress( const netadr_t *address );
-qboolean    NET_IsAnyAddress( const netadr_t *address );
-void		NET_InitAddress( netadr_t *address, netadrtype_t type );
-void	    NET_BroadcastAddress( netadr_t *address, int port );
+bool    NET_CompareAddress( const netadr_t *a, const netadr_t *b );
+bool    NET_CompareBaseAddress( const netadr_t *a, const netadr_t *b );
+bool    NET_IsLANAddress( const netadr_t *address );
+bool    NET_IsLocalAddress( const netadr_t *address );
+bool    NET_IsAnyAddress( const netadr_t *address );
+void	NET_InitAddress( netadr_t *address, netadrtype_t type );
+void	NET_BroadcastAddress( netadr_t *address, int port );
 
 //============================================================================
 
@@ -674,17 +677,17 @@ typedef struct
 	// incoming fragment assembly buffer
 	int fragmentSequence;
 	size_t fragmentLength;
-	qbyte fragmentBuffer[MAX_MSGLEN];
+	uint8_t fragmentBuffer[MAX_MSGLEN];
 
 	// outgoing fragment buffer
 	// we need to space out the sending of large fragmented messages
-	qboolean unsentFragments;
+	bool unsentFragments;
 	size_t unsentFragmentStart;
 	size_t unsentLength;
-	qbyte unsentBuffer[MAX_MSGLEN];
-	qboolean unsentIsCompressed;
+	uint8_t unsentBuffer[MAX_MSGLEN];
+	bool unsentIsCompressed;
 
-	qboolean fatal_error;
+	bool fatal_error;
 } netchan_t;
 
 extern netadr_t	net_from;
@@ -693,13 +696,13 @@ extern netadr_t	net_from;
 void Netchan_Init( void );
 void Netchan_Shutdown( void );
 void Netchan_Setup( netchan_t *chan, const socket_t *socket, const netadr_t *address, int qport );
-qboolean Netchan_Process( netchan_t *chan, msg_t *msg );
-qboolean Netchan_Transmit( netchan_t *chan, msg_t *msg );
-qboolean Netchan_PushAllFragments( netchan_t *chan );
-qboolean Netchan_TransmitNextFragment( netchan_t *chan );
+bool Netchan_Process( netchan_t *chan, msg_t *msg );
+bool Netchan_Transmit( netchan_t *chan, msg_t *msg );
+bool Netchan_PushAllFragments( netchan_t *chan );
+bool Netchan_TransmitNextFragment( netchan_t *chan );
 int Netchan_CompressMessage( msg_t *msg );
 int Netchan_DecompressMessage( msg_t *msg );
-void Netchan_OutOfBand( const socket_t *socket, const netadr_t *address, size_t length, const qbyte *data );
+void Netchan_OutOfBand( const socket_t *socket, const netadr_t *address, size_t length, const uint8_t *data );
 void Netchan_OutOfBandPrint( const socket_t *socket, const netadr_t *address, const char *format, ... );
 int Netchan_GamePort( void );
 
@@ -723,7 +726,7 @@ void	    FS_Shutdown( void );
 
 const char *FS_GameDirectory( void );
 const char *FS_BaseGameDirectory( void );
-qboolean    FS_SetGameDirectory( const char *dir, qboolean force );
+bool		FS_SetGameDirectory( const char *dir, bool force );
 int			FS_GetGameDirectoryList( char *buf, size_t bufsize );
 int			FS_GetExplicitPurePakList( char ***paknames );
 
@@ -732,6 +735,7 @@ int			FS_GetExplicitPurePakList( char ***paknames );
 const char *FS_WriteDirectory( void );
 const char *FS_CacheDirectory( void );
 const char *FS_SecureDirectory( void );
+const char *FS_MediaDirectory( fs_mediatype_t type );
 void	    FS_CreateAbsolutePath( const char *path );
 const char *FS_AbsoluteNameForFile( const char *filename );
 const char *FS_AbsoluteNameForBaseFile( const char *filename );
@@ -751,37 +755,39 @@ int	    FS_Tell( int file );
 int	    FS_Seek( int file, int offset, int whence );
 int	    FS_Eof( int file );
 int	    FS_Flush( int file );
-qboolean FS_IsUrl( const char *url );
+bool	FS_IsUrl( const char *url );
+int		FS_FileNo( int file );
 
 void	FS_SetCompressionLevel( int file, int level );
 int		FS_GetCompressionLevel( int file );
 
 // file loading
-int	    FS_LoadFileExt( const char *path, void **buffer, void *stack, size_t stackSize, const char *filename, int fileline );
-int	    FS_LoadBaseFileExt( const char *path, void **buffer, void *stack, size_t stackSize, const char *filename, int fileline );
+int	    FS_LoadFileExt( const char *path, int flags, void **buffer, void *stack, size_t stackSize, const char *filename, int fileline );
+int	    FS_LoadBaseFileExt( const char *path, int flags, void **buffer, void *stack, size_t stackSize, const char *filename, int fileline );
 void	FS_FreeFile( void *buffer );
 void	FS_FreeBaseFile( void *buffer );
-#define FS_LoadFile(path,buffer,stack,stacksize) FS_LoadFileExt(path,buffer,stack,stacksize,__FILE__,__LINE__)
-#define FS_LoadBaseFile(path,buffer,stack,stacksize) FS_LoadBaseFileExt(path,buffer,stack,stacksize,__FILE__,__LINE__)
+#define FS_LoadFile(path,buffer,stack,stacksize) FS_LoadFileExt(path,0,buffer,stack,stacksize,__FILE__,__LINE__)
+#define FS_LoadBaseFile(path,buffer,stack,stacksize) FS_LoadBaseFileExt(path,0,buffer,stack,stacksize,__FILE__,__LINE__)
+#define FS_LoadCacheFile(path,buffer,stack,stacksize) FS_LoadFileExt(path,FS_CACHE,buffer,stack,stacksize,__FILE__,__LINE__)
 
 int		FS_GetNotifications( void );
 int		FS_RemoveNotifications( int bitmask );
 
 // util functions
-qboolean    FS_CopyFile( const char *src, const char *dst );
-qboolean    FS_CopyBaseFile( const char *src, const char *dst );
-qboolean    FS_ExtractFile( const char *src, const char *dst );
-qboolean    FS_MoveFile( const char *src, const char *dst );
-qboolean    FS_MoveBaseFile( const char *src, const char *dst );
-qboolean    FS_RemoveFile( const char *filename );
-qboolean    FS_RemoveBaseFile( const char *filename );
-qboolean    FS_RemoveAbsoluteFile( const char *filename );
-qboolean    FS_RemoveDirectory( const char *dirname );
-qboolean    FS_RemoveBaseDirectory( const char *dirname );
-qboolean    FS_RemoveAbsoluteDirectory( const char *dirname );
+bool    FS_CopyFile( const char *src, const char *dst );
+bool    FS_CopyBaseFile( const char *src, const char *dst );
+bool    FS_ExtractFile( const char *src, const char *dst );
+bool    FS_MoveFile( const char *src, const char *dst );
+bool    FS_MoveBaseFile( const char *src, const char *dst );
+bool    FS_RemoveFile( const char *filename );
+bool    FS_RemoveBaseFile( const char *filename );
+bool    FS_RemoveAbsoluteFile( const char *filename );
+bool    FS_RemoveDirectory( const char *dirname );
+bool    FS_RemoveBaseDirectory( const char *dirname );
+bool    FS_RemoveAbsoluteDirectory( const char *dirname );
 unsigned    FS_ChecksumAbsoluteFile( const char *filename );
 unsigned    FS_ChecksumBaseFile( const char *filename );
-qboolean	FS_CheckPakExtension( const char *filename );
+bool	FS_CheckPakExtension( const char *filename );
 
 time_t		FS_FileMTime( const char *filename );
 time_t		FS_BaseFileMTime( const char *filename );
@@ -789,7 +795,7 @@ time_t		FS_BaseFileMTime( const char *filename );
 // // only for game files
 const char *FS_FirstExtension( const char *filename, const char *extensions[], int num_extensions );
 const char *FS_PakNameForFile( const char *filename );
-qboolean    FS_IsPureFile( const char *pakname );
+bool    FS_IsPureFile( const char *pakname );
 const char *FS_FileManifest( const char *filename );
 const char *FS_BaseNameForFile( const char *filename );
 
@@ -797,9 +803,11 @@ int			FS_GetFileList( const char *dir, const char *extension, char *buf, size_t 
 int			FS_GetFileListExt( const char *dir, const char *extension, char *buf, size_t *bufsize, int start, int end );
 
 // // only for base files
-qboolean    FS_IsPakValid( const char *filename, unsigned *checksum );
-qboolean    FS_AddPurePak( unsigned checksum );
-void	    FS_RemovePurePaks( void );
+bool    FS_IsPakValid( const char *filename, unsigned *checksum );
+bool    FS_AddPurePak( unsigned checksum );
+void	FS_RemovePurePaks( void );
+
+void	FS_AddFileToMedia( const char *filename );
 
 /*
 ==============================================================
@@ -822,15 +830,15 @@ void	    Com_Quit( void );
 int			Com_ClientState( void );        // this should have just been a cvar...
 void	    Com_SetClientState( int state );
 
-qboolean    Com_DemoPlaying( void );
-void	    Com_SetDemoPlaying( qboolean state );
+bool    Com_DemoPlaying( void );
+void	    Com_SetDemoPlaying( bool state );
 
 int			Com_ServerState( void );        // this should have just been a cvar...
 void	    Com_SetServerState( int state );
 struct cmodel_state_s *Com_ServerCM( unsigned *checksum );
 void		Com_SetServerCM( struct cmodel_state_s *cms, unsigned checksum );
 
-void	    Com_PageInMemory( qbyte *buffer, int size );
+void	    Com_PageInMemory( uint8_t *buffer, int size );
 
 unsigned int Com_DaysSince1900( void );
 
@@ -949,7 +957,7 @@ void	Sys_InitDynvars( void );
 void	Sys_AppActivate( void );
 
 unsigned int	Sys_Milliseconds( void );
-quint64		Sys_Microseconds( void );
+uint64_t		Sys_Microseconds( void );
 void		Sys_Sleep( unsigned int millis );
 
 char	*Sys_ConsoleInput( void );
@@ -957,8 +965,8 @@ void	Sys_ConsoleOutput( char *string );
 void	Sys_SendKeyEvents( void );
 void	Sys_Error( const char *error, ... );
 void	Sys_Quit( void );
-char	*Sys_GetClipboardData( qboolean primary );
-qboolean Sys_SetClipboardData( char *data );
+char	*Sys_GetClipboardData( bool primary );
+bool Sys_SetClipboardData( const char *data );
 void	Sys_FreeClipboardData( char *data );
 const char *Sys_GetPreferredLanguage( void );
 
@@ -1010,9 +1018,9 @@ void SCR_BeginLoadingPlaque( void );
 
 void SV_Init( void );
 void SV_Shutdown( const char *finalmsg );
-void SV_ShutdownGame( const char *finalmsg, qboolean reconnect );
+void SV_ShutdownGame( const char *finalmsg, bool reconnect );
 void SV_Frame( int realmsec, int gamemsec );
-qboolean SV_SendMessageToClient( struct client_s *client, msg_t *msg );
+bool SV_SendMessageToClient( struct client_s *client, msg_t *msg );
 void SV_ParseClientMessage( struct client_s *client, msg_t *msg );
 
 /*
@@ -1026,7 +1034,7 @@ ANTICHEAT
 #define ANTICHEAT_CLIENT	0x01
 #define ANTICHEAT_SERVER	0x02
 
-qboolean AC_LoadLibrary( void *imports, void *exports, unsigned int flags );
+bool AC_LoadLibrary( void *imports, void *exports, unsigned int flags );
 
 /*
 ==============================================================
@@ -1047,8 +1055,8 @@ ANTICHEAT SYSTEMS
 
 ==============================================================
 */
-qboolean AC_LoadServerLibrary( void *exports, void *imports );
-qboolean AC_LoadClientLibrary( void *exports, void *imports );
+bool AC_LoadServerLibrary( void *exports, void *imports );
+bool AC_LoadClientLibrary( void *exports, void *imports );
 
 /*
 ==============================================================
@@ -1059,18 +1067,18 @@ MAPLIST SUBSYSTEM
 */
 void ML_Init( void );
 void ML_Shutdown( void );
-void ML_Restart( qboolean forcemaps );
-qboolean ML_Update( void );
+void ML_Restart( bool forcemaps );
+bool ML_Update( void );
 
-const char *ML_GetFilenameExt( const char *fullname, qboolean recursive );
+const char *ML_GetFilenameExt( const char *fullname, bool recursive );
 const char *ML_GetFilename( const char *fullname );
 const char *ML_GetFullname( const char *filename );
 size_t ML_GetMapByNum( int num, char *out, size_t size );
 
-qboolean ML_FilenameExists( const char *filename );
+bool ML_FilenameExists( const char *filename );
 
-qboolean ML_ValidateFilename( const char *filename );
-qboolean ML_ValidateFullname( const char *fullname );
+bool ML_ValidateFilename( const char *filename );
+bool ML_ValidateFullname( const char *fullname );
 
 char **ML_CompleteBuildList( const char *partial );
 

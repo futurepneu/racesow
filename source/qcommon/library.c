@@ -213,10 +213,10 @@ static void Com_LoadGameLibraryManifest( const char *libname, char *manifest )
 /*
 * Com_LoadGameLibrary
 */
-void *Com_LoadGameLibrary( const char *basename, const char *apifuncname, void **handle, void *parms, qboolean pure, char *manifest )
+void *Com_LoadGameLibrary( const char *basename, const char *apifuncname, void **handle, void *parms, bool pure, char *manifest )
 {
 	static int randomizer = 0; // random part of tempmodules dir, always the same for one launch of Warsow
-	static qint64 randomizer_time;
+	static int64_t randomizer_time;
 	const char *temppath;
 	char *tempname, *libname;
 	int libname_size;
@@ -236,9 +236,9 @@ void *Com_LoadGameLibrary( const char *basename, const char *apifuncname, void *
 	gamelib->lib = NULL;
 	gamelib->fullname = NULL;
 
-	libname_size = strlen( basename ) + 1 + strlen( ARCH ) + strlen( LIB_SUFFIX ) + 1;
+	libname_size = strlen( LIB_PREFIX ) + strlen( basename ) + 1 + strlen( ARCH ) + strlen( LIB_SUFFIX ) + 1;
 	libname = ( char* )Mem_TempMalloc( libname_size );
-	Q_snprintfz( libname, libname_size, "%s_" ARCH LIB_SUFFIX, basename );
+	Q_snprintfz( libname, libname_size, LIB_PREFIX "%s_" ARCH LIB_SUFFIX, basename );
 
 	// it exists?
 	if( FS_FOpenFile( libname, NULL, FS_READ ) == -1 )
