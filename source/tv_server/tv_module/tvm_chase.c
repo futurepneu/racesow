@@ -51,9 +51,9 @@ static void TVM_GhostClient( edict_t *ent )
 	GClip_LinkEntity( ent->relay, ent );
 }
 
-//====================
-//TVM_CanChase
-//====================
+/*
+* TVM_CanChase
+*/
 static qboolean TVM_Chase_IsValidTarget( edict_t *ent, edict_t *target )
 {
 	assert( ent && ent->local && ent->r.client );
@@ -247,9 +247,9 @@ static int TVM_Chase_FindFollowPOV( edict_t *ent )
 #undef CARRIERSWITCHDELAY
 }
 
-//=================
-//TVM_ChaseClientEndSnapFrame
-//=================
+/*
+* TVM_ChaseClientEndSnapFrame
+*/
 void TVM_ChaseClientEndSnapFrame( edict_t *ent )
 {
 	edict_t *target;
@@ -281,7 +281,6 @@ void TVM_ChaseClientEndSnapFrame( edict_t *ent )
 	// chasecam uses PM_CHASECAM
 	ent->r.client->ps.pmove.pm_type = PM_CHASECAM;
 	ent->r.client->ps.pmove.pm_flags |= PMF_NO_PREDICTION;
-	ent->r.client->ps.POVnum = PLAYERNUM( target ) + 1;
 
 	VectorCopy( ent->r.client->ps.pmove.origin, ent->s.origin );
 	VectorCopy( ent->r.client->ps.viewangles, ent->s.angles );
@@ -390,10 +389,10 @@ void TVM_ChasePlayer( edict_t *ent, char *name, int followmode )
 	}
 }
 
-//====================
-//TVM_ChaseChange
-// Can be called when no chase target set, will then find from beginning or end (depending on the step)
-//====================
+/*
+* TVM_ChaseChange
+* Can be called when no chase target set, will then find from beginning or end (depending on the step)
+*/
 static void TVM_ChaseChange( edict_t *ent, int step )
 {
 	int i, j;
@@ -447,9 +446,9 @@ static void TVM_ChaseChange( edict_t *ent, int step )
 	}
 }
 
-//====================
-//TVM_Cmd_ChaseNext
-//====================
+/*
+* TVM_Cmd_ChaseNext
+*/
 void TVM_Cmd_ChaseNext( edict_t *ent )
 {
 	assert( ent && ent->local && ent->r.client );
@@ -460,9 +459,9 @@ void TVM_Cmd_ChaseNext( edict_t *ent )
 	TVM_ChaseChange( ent, 1 );
 }
 
-//====================
-//TVM_Cmd_ChasePrev
-//====================
+/*
+* TVM_Cmd_ChasePrev
+*/
 void TVM_Cmd_ChasePrev( edict_t *ent )
 {
 	assert( ent && ent->local && ent->r.client );
@@ -473,9 +472,9 @@ void TVM_Cmd_ChasePrev( edict_t *ent )
 	TVM_ChaseChange( ent, -1 );
 }
 
-//====================
-//TVM_SpectatorMode
-//====================
+/*
+* TVM_SpectatorMode
+*/
 static void TVM_SpectatorMode( edict_t *ent )
 {
 	assert( ent && ent->local && ent->r.client );
@@ -487,9 +486,9 @@ static void TVM_SpectatorMode( edict_t *ent )
 	ent->r.client->ps.POVnum = ent->relay->playernum + 1;
 }
 
-//====================
-//TVM_Cmd_ChaseCam
-//====================
+/*
+* TVM_Cmd_ChaseCam
+*/
 void TVM_Cmd_ChaseCam( edict_t *ent )
 {
 	const char *arg1;
@@ -552,9 +551,9 @@ void TVM_Cmd_ChaseCam( edict_t *ent )
 	}
 }
 
-//====================
-//TVM_Cmd_SwitchChaseCamMode - Used by cgame for switching mode when clicking the mouse button
-//====================
+/*
+* TVM_Cmd_SwitchChaseCamMode - Used by cgame for switching mode when clicking the mouse button
+*/
 void TVM_Cmd_SwitchChaseCamMode( edict_t *ent )
 {
 	assert( ent && ent->local && ent->r.client );

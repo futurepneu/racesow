@@ -6,18 +6,18 @@ LOCALBASE?=/usr/local
 FREETYPE_INC?=-I../../../libsrcs/libfreetype/include
 
 CXXFLAGS:=$(subst -I../libsrcs/,-I../../../libsrcs/,$(CXXFLAGS))
-CXXFLAGS+=-DSTATIC_LIB -IInclude
+CXXFLAGS+=-DROCKET_STATIC_LIB -IInclude
 
 CXXFLAGS+=$(FREETYPE_INC)
 
 ifneq ($(USE_MINGW),YES)
-CXXFLAGS+=-I$(LOCALBASE)/include -fPIC
+CXXFLAGS+=-I$(LOCALBASE)/include -fPIC -fvisibility=hidden
 endif
 
 ifeq ($(DEBUG_BUILD),YES)
 	CXXFLAGS += -g -DROCKET_DEBUG
 else
-	CXXFLAGS += -O2
+	CXXFLAGS += -O2 -fno-strict-aliasing -ffast-math -funroll-loops -DNDEBUG
 endif
 
 BUILDDIR=obj

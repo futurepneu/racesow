@@ -44,6 +44,7 @@ void R_BatchPolySurf( const entity_t *e, const shader_t *shader, const mfog_t *f
 	mesh.xyzArray = poly->xyzArray;
 	mesh.normalsArray = poly->normalsArray;
 	mesh.lmstArray[0] = NULL;
+	mesh.lmlayersArray[0] = NULL;
 	mesh.stArray = poly->stArray;
 	mesh.colorsArray[0] = poly->colorsArray;
 	mesh.colorsArray[1] = NULL;
@@ -72,7 +73,7 @@ void R_DrawPolys( void )
 		else
 			fog = rsh.worldBrushModel->fogs + p->fogNum - 1;
 
-		if( !R_AddDSurfToDrawList( rsc.worldent, fog, p->shader, 0, i, NULL, p ) ) {
+		if( !R_AddDSurfToDrawList( rsc.polyent, fog, p->shader, 0, i, NULL, p ) ) {
 			continue;
 		}
 	}
@@ -84,14 +85,13 @@ void R_DrawPolys( void )
 void R_DrawStretchPoly( const poly_t *poly, float x_offset, float y_offset )
 {
 	mesh_t mesh;
+	vec4_t translated[1024];
 
 	assert( sizeof( *poly->elems ) == sizeof( elem_t ) );
 
 	if( !poly || !poly->shader ) {
 		return;
 	}
-
-	R_BeginStretchBatch( poly->shader, x_offset, y_offset, !poly->elems ? qtrue : qfalse );
 
 	memset( &mesh, 0, sizeof( mesh ) );
 	mesh.numVerts = poly->numverts;
@@ -101,6 +101,26 @@ void R_DrawStretchPoly( const poly_t *poly, float x_offset, float y_offset )
 	mesh.colorsArray[0] = poly->colors;
 	mesh.numElems = poly->numelems;
 	mesh.elems = ( elem_t * )poly->elems;
+
+	if( ( x_offset || y_offset ) && ( poly->numverts <= ( sizeof( translated ) / sizeof( translated[0] ) ) ) ) {
+		int i;
+		const vec_t *src = poly->verts[0];
+		vec_t *dest = translated[0];
+
+		for( i = 0; i < poly->numverts; i++, src += 4, dest += 4 ) {
+			dest[0] = src[0] + x_offset;
+			dest[1] = src[1] + y_offset;
+			dest[2] = src[2];
+			dest[3] = src[3];
+		}
+
+		x_offset = 0;
+		y_offset = 0;
+
+		mesh.xyzArray = translated;
+	}
+
+	R_BeginStretchBatch( poly->shader, x_offset, y_offset, !poly->elems ? qtrue : qfalse );
 
 	RB_BatchMesh( &mesh );
 }
@@ -383,7 +403,7 @@ tri2:
 /*
 * R_SurfPotentiallyFragmented
 */
-qboolean R_SurfPotentiallyFragmented( msurface_t *surf )
+qboolean R_SurfPotentiallyFragmented( const msurface_t *surf )
 {
 	if( surf->flags & ( SURF_NOMARKS|SURF_NOIMPACT|SURF_NODRAW ) )
 		return qfalse;

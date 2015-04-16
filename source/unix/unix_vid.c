@@ -37,7 +37,7 @@ int VID_Sys_Init( int x, int y, int width, int height, int displayFrequency,
 {
 	x11display.dpy = NULL;
 
-	return re.Init( APPLICATION, APP_SCREENSHOTS_PREFIX,
+	return re.Init( APPLICATION, APP_SCREENSHOTS_PREFIX, APP_STARTUP_COLOR,
 		NULL, &VID_WndProc, parentWindow, 
 		x, y, width, height, displayFrequency,
 		fullScreen, wideScreen, verbose );
@@ -150,4 +150,12 @@ qboolean VID_GetDisplaySize( int *width, int *height )
 	}
 
 	return qfalse;
+}
+
+/*
+** VID_GetPixelRatio
+*/
+float VID_GetPixelRatio( void )
+{
+	return 1.0f;
 }

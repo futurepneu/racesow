@@ -282,7 +282,6 @@ void CL_ParseGetStatusResponse( const socket_t *socket, const netadr_t *address,
 static void CL_QueryGetInfoMessage( const char *cmdname )
 {
 	netadr_t adr;
-	char *requeststring;
 	char *server;
 
 	//get what master
@@ -292,8 +291,6 @@ static void CL_QueryGetInfoMessage( const char *cmdname )
 		Com_Printf( "%s: no address provided %s...\n", Cmd_Argv( 0 ), server ? server : "" );
 		return;
 	}
-
-	requeststring = va( cmdname );
 
 	// send a broadcast packet
 	Com_DPrintf( "quering %s...\n", server );
@@ -306,7 +303,7 @@ static void CL_QueryGetInfoMessage( const char *cmdname )
 			NET_SetAddressPort( &adr, PORT_SERVER );
 
 		socket = ( adr.type == NA_IP6 ? &cls.socket_udp6 : &cls.socket_udp );
-		Netchan_OutOfBandPrint( socket, &adr, requeststring );
+		Netchan_OutOfBandPrint( socket, &adr, "%s", cmdname );
 	}
 	else
 	{
@@ -368,7 +365,7 @@ void CL_PingServer_f( void )
 		filter_allow_empty ? "empty" : "" );
 
 	socket = ( adr.type == NA_IP6 ? &cls.socket_udp6 : &cls.socket_udp );
-	Netchan_OutOfBandPrint( socket, &adr, requestString );
+	Netchan_OutOfBandPrint( socket, &adr, "%s", requestString );
 }
 
 /*
@@ -621,12 +618,21 @@ static void CL_MasterAddressCache_Shutdown( void )
 	trie_dump_t *dump;
 
 	if( resolverThreads ) {
+		QMutex_Lock( resolveLock );
+
+		for( i = 0; resolverThreads[i]; i++ ) {
+			QThread_Cancel( resolverThreads[i] );
+		}
+
+	    	QMutex_Unlock( resolveLock );
+
 		for( i = 0; resolverThreads[i]; i++ ) {
 			QThread_Join( resolverThreads[i] );
 		}
 		free( resolverThreads );
 		resolverThreads = NULL;
 	}
+
 
 	QMutex_Destroy( &resolveLock );
 
@@ -684,7 +690,7 @@ void CL_GetServers_f( void )
 		for( i = 0; i < NUM_BROADCAST_PORTS; i++ )
 		{
 			NET_BroadcastAddress( padr, PORT_SERVER + i );
-			Netchan_OutOfBandPrint( &cls.socket_udp, padr, requeststring );
+			Netchan_OutOfBandPrint( &cls.socket_udp, padr, "%s", requeststring );
 		}
 		return;
 	}
@@ -730,7 +736,7 @@ void CL_GetServers_f( void )
 		if( NET_GetAddressPort( padr ) == 0 )
 			NET_SetAddressPort( padr, PORT_MASTER );
 
-		Netchan_OutOfBandPrint( socket, padr, requeststring );
+		Netchan_OutOfBandPrint( socket, padr, "%s", requeststring );
 
 		Com_DPrintf( "quering %s...%s: %s\n", master, NET_AddressToString(padr), requeststring );
 	}

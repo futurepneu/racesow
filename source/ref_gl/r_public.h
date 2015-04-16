@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "../cgame/ref.h"
 
-#define REF_API_VERSION 6
+#define REF_API_VERSION 10
 
 struct mempool_s;
 struct cinematics_s;
@@ -103,11 +103,11 @@ typedef struct
 	size_t ( *Mem_PoolTotalSize )( struct mempool_s *pool );
 
 	// multithreading
-	int ( *Thread_Create )( struct qthread_s **pthread, void *(*routine) (void*), void *param );
+	struct qthread_s *( *Thread_Create )( void *(*routine) (void*), void *param );
 	void ( *Thread_Join )( struct qthread_s *thread );
 	void ( *Thread_Yield )( void );
-	int ( *Mutex_Create )( struct qmutex_s **pmutex );
-	void ( *Mutex_Destroy )( struct qmutex_s *mutex );
+	struct qmutex_s *( *Mutex_Create )( void );
+	void ( *Mutex_Destroy )( struct qmutex_s **mutex );
 	void ( *Mutex_Lock )( struct qmutex_s *mutex );
 	void ( *Mutex_Unlock )( struct qmutex_s *mutex );
 
@@ -123,7 +123,7 @@ typedef struct
 	// if API is different, the dll cannot be used
 	int			( *API )( void );
 
-	rserr_t		( *Init )( const char *applicationName, const char *screenshotsPrefix,
+	rserr_t		( *Init )( const char *applicationName, const char *screenshotsPrefix, int startupColor,
 					void *hinstance, void *wndproc, void *parenthWnd, 
 					int x, int y, int width, int height, int displayFrequency,
 					qboolean fullScreen, qboolean wideScreen, qboolean verbose );
@@ -181,6 +181,7 @@ typedef struct
 	void		( *DrawStretchPoly )( const poly_t *poly, float x_offset, float y_offset );
 	void		( *Scissor )( int x, int y, int w, int h );
 	void		( *GetScissor )( int *x, int *y, int *w, int *h );
+	void		( *ResetScissor )( void );
 
 	void		( *SetCustomColor )( int num, int r, int g, int b );
 	void		( *LightForOrigin )( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t diffuse, float radius );

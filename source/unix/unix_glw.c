@@ -890,7 +890,7 @@ static qboolean ChooseVisual( int colorbits, int stencilbits )
 	int colorsize;
 	int depthbits = colorbits;
 
-	if( colorbits == 24 ) colorsize = 8;
+	if( colorbits == 32 ) colorsize = 8;
 	else colorsize = 4;
 
 	{
@@ -900,6 +900,7 @@ static qboolean ChooseVisual( int colorbits, int stencilbits )
 			GLX_RED_SIZE, colorsize,
 			GLX_GREEN_SIZE, colorsize,
 			GLX_BLUE_SIZE, colorsize,
+			GLX_ALPHA_SIZE, colorsize,
 			GLX_DEPTH_SIZE, depthbits,
 			GLX_STENCIL_SIZE, stencilbits,
 			None
@@ -978,11 +979,11 @@ int GLimp_Init( const char *applicationName, void *hinstance, void *wndproc, voi
 	}
 	else
 	{
-		ChooseVisual( 24, stencilbits );
+		ChooseVisual( 32, stencilbits );
 		if( !x11display.visinfo ) ChooseVisual( 16, stencilbits );
-		if( !x11display.visinfo && stencilbits > 8 ) ChooseVisual( 24, 8 );
+		if( !x11display.visinfo && stencilbits > 8 ) ChooseVisual( 32, 8 );
 		if( !x11display.visinfo && stencilbits > 8 ) ChooseVisual( 16, 8 );
-		if( !x11display.visinfo && stencilbits > 0 ) ChooseVisual( 24, 0 );
+		if( !x11display.visinfo && stencilbits > 0 ) ChooseVisual( 32, 0 );
 		if( !x11display.visinfo && stencilbits > 0 ) ChooseVisual( 16, 0 );
 	}
 
@@ -1103,23 +1104,29 @@ qboolean GLimp_ScreenEnabled( void )
 /*
 ** GLimp_SharedContext_Create
 */
-void *GLimp_SharedContext_Create( void )
+qboolean GLimp_SharedContext_Create( void **context, void **surface )
 {
-	return qglXCreateContext( x11display.dpy, x11display.visinfo, x11display.ctx, True );
+	GLXContext ctx = qglXCreateContext( x11display.dpy, x11display.visinfo, x11display.ctx, True );
+	if( !ctx )
+		return qfalse;
+
+	*context = (void *)ctx;
+	*surface = (void *)x11display.gl_win;
+	return qtrue;
 }
 
 /*
 ** GLimp_SharedContext_MakeCurrent
 */
-qboolean GLimp_SharedContext_MakeCurrent( void *ctx )
+qboolean GLimp_SharedContext_MakeCurrent( void *context, void *surface )
 {
-	return qglXMakeCurrent( x11display.dpy, ctx ? x11display.gl_win : NULL, ctx ) == True ? qtrue : qfalse;
+	return qglXMakeCurrent( x11display.dpy, (GLXDrawable)surface, (GLXContext)context ) == True ? qtrue : qfalse;
 }
 
 /*
 ** GLimp_SharedContext_Destroy
 */
-void GLimp_SharedContext_Destroy( void *ctx )
+void GLimp_SharedContext_Destroy( void *context, void *surface )
 {
-	qglXDestroyContext( x11display.dpy, ctx );
+	qglXDestroyContext( x11display.dpy, context );
 }

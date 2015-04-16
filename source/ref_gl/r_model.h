@@ -135,6 +135,7 @@ typedef struct
 typedef struct
 {
 	int				texNum;
+	int				texLayer;
 	float			texMatrix[2][2];
 } mlightmapRect_t;
 
@@ -174,7 +175,7 @@ typedef struct mbrushmodel_s
 	mfog_t			*fogs;
 	mfog_t			*globalfog;
 
-	unsigned int	numareas;
+	/*unsigned*/int	numareas;
 
 	vec3_t			gridSize;
 	vec3_t			gridMins;

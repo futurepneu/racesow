@@ -21,7 +21,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "qcommon.h"
 #include "../qalgo/q_trie.h"
 #include "../client/console.h"
-#include "sys_threads.h"
 
 static qboolean	cvar_initialized = qfalse;
 static qboolean	cvar_preinitialized = qfalse;
@@ -390,7 +389,7 @@ void Cvar_SetValue( const char *var_name, float value )
 void Cvar_GetLatchedVars( cvar_flag_t flags )
 {
 	unsigned int i;
-	struct trie_dump_s *dump;
+	struct trie_dump_s *dump = NULL;
 	cvar_flag_t latchFlags;
 
 	Cvar_FlagsClear( &latchFlags );
@@ -429,7 +428,7 @@ void Cvar_GetLatchedVars( cvar_flag_t flags )
 */
 void Cvar_FixCheatVars( void )
 {
-	struct trie_dump_s *dump;
+	struct trie_dump_s *dump = NULL;
 	unsigned int i;
 	cvar_flag_t flags = CVAR_CHEAT;
 
@@ -589,7 +588,7 @@ static void Cvar_Toggle_f( void )
 void Cvar_WriteVariables( int file )
 {
 	char buffer[MAX_PRINTMSG];
-	struct trie_dump_s *dump;
+	struct trie_dump_s *dump = NULL;
 	unsigned int i;
 	cvar_flag_t cvar_archive = CVAR_ARCHIVE;
 
@@ -629,7 +628,7 @@ void Cvar_WriteVariables( int file )
 */
 static void Cvar_List_f( void )
 {
-	struct trie_dump_s *dump;
+	struct trie_dump_s *dump = NULL;
 	unsigned int i;
 	char *pattern;
 
@@ -716,7 +715,7 @@ qboolean userinfo_modified;
 static char *Cvar_BitInfo( int bit )
 {
 	static char info[MAX_INFO_STRING];
-	struct trie_dump_s *dump;
+	struct trie_dump_s *dump = NULL;
 	unsigned int i;
 
 	info[0] = 0;
@@ -801,7 +800,7 @@ int Cvar_CompleteCountPossible( const char *partial )
 */
 char **Cvar_CompleteBuildList( const char *partial )
 {
-	struct trie_dump_s *dump;
+	struct trie_dump_s *dump = NULL;
 	char **buf;
 	unsigned int i;
 
@@ -826,7 +825,7 @@ char **Cvar_CompleteBuildList( const char *partial )
 */
 char **Cvar_CompleteBuildListWithFlag( const char *partial, cvar_flag_t flag )
 {
-	struct trie_dump_s *dump;
+	struct trie_dump_s *dump = NULL;
 	char **buf;
 	unsigned int i;
 

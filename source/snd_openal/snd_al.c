@@ -267,6 +267,7 @@ static qboolean S_Init( void *hwnd, int maxEntities, qboolean verbose )
 static void S_Shutdown( qboolean verbose )
 {
 	S_StopStreams();
+	S_LockBackgroundTrack( qfalse );
 	S_StopBackgroundTrack();
 
 	S_ShutdownSources();
@@ -349,7 +350,6 @@ static void S_Update( void )
 	
 	S_UpdateStreams();
 	
-
 	s_volume->modified = qfalse; // Checked by src and stream
 	s_musicvolume->modified = qfalse; // Checked by stream and music
 
@@ -374,11 +374,13 @@ static void S_Update( void )
 /*
 * S_StopAllSounds
 */
-void S_StopAllSounds( void )
+void S_StopAllSounds( qboolean stopMusic )
 {
 	S_StopStreams();
 	S_StopAllSources();
-	S_StopBackgroundTrack();
+	if( stopMusic ) {
+		S_StopBackgroundTrack( );
+	}
 }
 
 /*
@@ -447,7 +449,7 @@ static unsigned S_HandleClearCmd( const sndCmdClear_t *cmd )
 static unsigned S_HandleStopCmd( const sndCmdStop_t *cmd )
 {
 	//Com_Printf("S_HandleStopCmd\n");
-	S_StopAllSounds();
+	S_StopAllSounds( cmd->stopMusic );
 	return sizeof( *cmd );
 }
 

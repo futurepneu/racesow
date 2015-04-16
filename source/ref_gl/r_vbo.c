@@ -36,16 +36,16 @@ typedef struct vbohandle_s
 	struct vbohandle_s *prev, *next;
 } vbohandle_t;
 
-#define MAX_MESH_VERTREX_BUFFER_OBJECTS 	8192
+#define MAX_MESH_VERTEX_BUFFER_OBJECTS 	0x4000
 
 #define VBO_ARRAY_USAGE_FOR_TAG(tag) \
-	(GLenum)((tag) == VBO_TAG_STREAM || (tag) == VBO_TAG_STREAM_STATIC_ELEMS ? GL_STREAM_DRAW_ARB : GL_STATIC_DRAW_ARB)
+	(GLenum)((tag) == VBO_TAG_STREAM || (tag) == VBO_TAG_STREAM_STATIC_ELEMS ? GL_DYNAMIC_DRAW_ARB : GL_STATIC_DRAW_ARB)
 #define VBO_ELEM_USAGE_FOR_TAG(tag) \
-	(GLenum)((tag) == VBO_TAG_STREAM_STATIC_ELEMS ? GL_STREAM_DRAW_ARB : GL_STATIC_DRAW_ARB)
+	(GLenum)((tag) == VBO_TAG_STREAM ? GL_DYNAMIC_DRAW_ARB : GL_STATIC_DRAW_ARB)
 
-static mesh_vbo_t r_mesh_vbo[MAX_MESH_VERTREX_BUFFER_OBJECTS];
+static mesh_vbo_t r_mesh_vbo[MAX_MESH_VERTEX_BUFFER_OBJECTS];
 
-static vbohandle_t r_vbohandles[MAX_MESH_VERTREX_BUFFER_OBJECTS];
+static vbohandle_t r_vbohandles[MAX_MESH_VERTEX_BUFFER_OBJECTS];
 static vbohandle_t r_vbohandles_headnode, *r_free_vbohandles;
 
 static elem_t *r_vbo_tempelems;
@@ -81,11 +81,11 @@ void R_InitVBO( void )
 	r_free_vbohandles = r_vbohandles;
 	r_vbohandles_headnode.prev = &r_vbohandles_headnode;
 	r_vbohandles_headnode.next = &r_vbohandles_headnode;
-	for( i = 0; i < MAX_MESH_VERTREX_BUFFER_OBJECTS; i++ ) {
+	for( i = 0; i < MAX_MESH_VERTEX_BUFFER_OBJECTS; i++ ) {
 		r_vbohandles[i].index = i;
 		r_vbohandles[i].vbo = &r_mesh_vbo[i];
 	}
-	for( i = 0; i < MAX_MESH_VERTREX_BUFFER_OBJECTS - 1; i++ ) {
+	for( i = 0; i < MAX_MESH_VERTEX_BUFFER_OBJECTS - 1; i++ ) {
 		r_vbohandles[i].next = &r_vbohandles[i+1];
 	}
 }
@@ -168,15 +168,25 @@ mesh_vbo_t *R_CreateMeshVBO( void *owner, int numVerts, int numElems, int numIns
 
 	// lightmap texture coordinates
 	lmattrbit = VATTRIB_LMCOORDS0_BIT;
-	for( i = 0; i < MAX_LIGHTMAPS/2; i++ ) {
+	for( i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
 		if( !(vattribs & lmattrbit) ) {
 			break;
 		}
 		assert( !(vertexSize & 3) );
 		vbo->lmstOffset[i] = vertexSize;
-		vbo->lmstSize[i] = vattribs & VATTRIB_LMCOORDS0_BIT<<1 ? 4 : 2;
+		vbo->lmstSize[i] = ( vattribs & ( lmattrbit << 1 ) ) ? 4 : 2;
 		vertexSize += FLOAT_VATTRIB_SIZE(VATTRIB_LMCOORDS0_BIT, halfFloatVattribs) * vbo->lmstSize[i];
 		lmattrbit = ( vattribbit_t )( ( vattribmask_t )lmattrbit << 2 );
+	}
+
+	// lightmap array texture layers
+	for( i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
+		if( !( vattribs & ( VATTRIB_LMLAYERS0123_BIT << i ) ) ) {
+			break;
+		}
+		assert( !( vertexSize & 3 ) );
+		vbo->lmlayersOffset[i] = vertexSize;
+		vertexSize += sizeof( int );
 	}
 
 	// vertex colors
@@ -293,7 +303,7 @@ void R_TouchMeshVBO( mesh_vbo_t *vbo )
 */
 mesh_vbo_t *R_GetVBOByIndex( int index )
 {
-	if( index >= 1 && index <= MAX_MESH_VERTREX_BUFFER_OBJECTS ) {
+	if( index >= 1 && index <= MAX_MESH_VERTEX_BUFFER_OBJECTS ) {
 		return r_mesh_vbo + index - 1;
 	}
 	return NULL;
@@ -318,7 +328,7 @@ void R_ReleaseMeshVBO( mesh_vbo_t *vbo )
 		qglDeleteBuffersARB( 1, &vbo_id );
 	}
 
-	if( vbo->index >= 1 && vbo->index <= MAX_MESH_VERTREX_BUFFER_OBJECTS ) {
+	if( vbo->index >= 1 && vbo->index <= MAX_MESH_VERTEX_BUFFER_OBJECTS ) {
 		vbohandle_t *vboh = &r_vbohandles[vbo->index - 1];
 
 		// remove from linked active list
@@ -461,10 +471,12 @@ vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset,
 	if( vbo->lmstOffset[0] && ( vattribs & VATTRIB_LMCOORDS0_BIT ) ) {
 		int i;
 		vattribbit_t lmattrbit;
+		int type = FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa );
+		int lmstSize = ( ( type == GL_HALF_FLOAT ) ? 2 * sizeof( GLhalfARB ) : 2 * sizeof( float ) );
 
 		lmattrbit = VATTRIB_LMCOORDS0_BIT;
 
-		for( i = 0; i < MAX_LIGHTMAPS/2; i++ ) {
+		for( i = 0; i < ( MAX_LIGHTMAPS + 1 ) / 2; i++ ) {
 			if( !(vattribs & lmattrbit) ) {
 				break;
 			}
@@ -473,7 +485,7 @@ vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset,
 				break;
 			}
 
-			R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa ), 
+			R_FillVertexBuffer_float_or_half( type, 
 				mesh->lmstArray[i*2+0][0],
 				2, vertSize, numVerts, data + vbo->lmstOffset[i] );
 
@@ -482,12 +494,36 @@ vattribmask_t R_UploadVBOVertexData( mesh_vbo_t *vbo, int vertsOffset,
 					errMask |= lmattrbit<<1;
 					break;
 				}
-				R_FillVertexBuffer_float_or_half( FLOAT_VATTRIB_GL_TYPE( VATTRIB_LMCOORDS0_BIT, hfa ), 
+				R_FillVertexBuffer_float_or_half( type,
 					mesh->lmstArray[i*2+1][0],
-					2, vertSize, numVerts, data + vbo->lmstOffset[i] + 2 * sizeof( float ) );
+					2, vertSize, numVerts, data + vbo->lmstOffset[i] + lmstSize );
 			}
 
 			lmattrbit <<= 2;
+		}
+	}
+
+	// upload lightmap array texture layers
+	if( vbo->lmlayersOffset[0] && ( vattribs & VATTRIB_LMLAYERS0123_BIT ) ) {
+		int i;
+		vattribbit_t lmattrbit;
+
+		lmattrbit = VATTRIB_LMLAYERS0123_BIT;
+
+		for( i = 0; i < ( MAX_LIGHTMAPS + 3 ) / 4; i++ ) {
+			if( !( vattribs & lmattrbit ) ) {
+				break;
+			}
+			if( !mesh->lmlayersArray[i] ) {
+				errMask |= lmattrbit;
+				break;
+			}
+
+			R_FillVertexBuffer( int, int, 
+				( int * )&mesh->lmlayersArray[i][0],
+				1, vertSize, numVerts, data + vbo->lmlayersOffset[i] );
+
+			lmattrbit <<= 1;
 		}
 	}
 

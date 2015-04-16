@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../qcommon/sys_threads.h"
 #include <pthread.h>
 #include <sched.h>
+#include <signal.h>
 
 struct qthread_s {
 	pthread_t t;
@@ -30,6 +31,11 @@ struct qthread_s {
 struct qmutex_s {
 	pthread_mutex_t m;
 };
+
+typedef struct {
+	void *(*routine)(void *);
+	void *param;
+} sys_thread_android_create_t;
 
 /*
 * Sys_Mutex_Create
@@ -45,7 +51,7 @@ int Sys_Mutex_Create( qmutex_t **pmutex )
 		return res;
 	}
 	
-	mutex = ( qmutex_t * )malloc( sizeof( *mutex ) );
+	mutex = ( qmutex_t * )Q_malloc( sizeof( *mutex ) );
 	mutex->m = m;
 	*pmutex = mutex;
 	return 0;
@@ -60,7 +66,7 @@ void Sys_Mutex_Destroy( qmutex_t *mutex )
 		return;
 	}
 	pthread_mutex_destroy( &mutex->m );
-	free( mutex );
+	Q_free( mutex );
 }
 
 /*
@@ -79,6 +85,30 @@ void Sys_Mutex_Unlock( qmutex_t *mutex )
 	pthread_mutex_unlock( &mutex->m );
 }
 
+#ifdef __ANDROID__
+/*
+* Sys_Thread_Android_CancelHandler
+*/
+static void Sys_Thread_Android_CancelHandler( int sig )
+{
+	pthread_exit( NULL );
+}
+
+/*
+* Sys_Thread_Android_Routine
+*/
+static void *Sys_Thread_Android_Routine( void *param )
+{
+	sys_thread_android_create_t params;
+
+	signal( SIGINT, Sys_Thread_Android_CancelHandler );
+
+	memcpy( &params, param, sizeof( params ) );
+	Q_free( param );
+	return params.routine( params.param );
+}
+#endif
+
 /*
 * Sys_Thread_Create
 */
@@ -87,13 +117,26 @@ int Sys_Thread_Create( qthread_t **pthread, void *(*routine) (void*), void *para
 	qthread_t *thread;
 	pthread_t t;
 	int res;
+#ifdef __ANDROID__
+	sys_thread_android_create_t *params;
+#endif
 
+#ifdef __ANDROID__
+	params = ( sys_thread_android_create_t * )Q_malloc( sizeof( *params ) );
+	params->routine = routine;
+	params->param = param;
+	res = pthread_create( &t, NULL, Sys_Thread_Android_Routine, params );
+#else
 	res = pthread_create( &t, NULL, routine, param );
+#endif
 	if( res != 0 ) {
+#ifdef __ANDROID__
+		Q_free( params );
+#endif
 		return res;
 	}
 
-	thread = ( qthread_t * )malloc( sizeof( *thread ) );
+	thread = ( qthread_t * )Q_malloc( sizeof( *thread ) );
 	thread->t = t;
 	*pthread = thread;
 	return 0;
@@ -115,6 +158,21 @@ void Sys_Thread_Join( qthread_t *thread )
 void Sys_Thread_Yield( void )
 {
 	sched_yield();
+}
+
+/*
+* Sys_Thread_Cancel
+*/
+int Sys_Thread_Cancel( qthread_t *thread )
+{
+	if( thread ) {
+#ifdef __ANDROID__
+		return pthread_kill( thread->t, SIGINT );
+#else
+		return pthread_cancel( thread->t );
+#endif
+	}
+	return 1;
 }
 
 /*

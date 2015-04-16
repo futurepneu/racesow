@@ -125,7 +125,6 @@ cvar_t *cg_showhelp;
 cvar_t *cg_scoreboardStats;
 cvar_t *cg_showClamp;
 
-cvar_t *cg_damage_kick;
 cvar_t *cg_damage_indicator;
 cvar_t *cg_damage_indicator_time;
 cvar_t *cg_pickup_flash;
@@ -206,7 +205,7 @@ void CG_Printf( const char *format, ... )
 * CG_LocalPrint
 */
 #define LOCALPRINT_MSG_SIZE 1024
-void CG_LocalPrint( bool team, const char *format, ... )
+void CG_LocalPrint( const char *format, ... )
 {
 	va_list	argptr;
 	char msg[LOCALPRINT_MSG_SIZE];
@@ -700,7 +699,7 @@ static void CG_RegisterVariables( void )
 	cg_bloodTrailAlpha =	trap_Cvar_Get( "cg_bloodTrailAlpha", "1.0", CVAR_ARCHIVE );
 	cg_explosionsRing =	trap_Cvar_Get( "cg_explosionsRing", "0", CVAR_ARCHIVE );
 	cg_explosionsDust =    trap_Cvar_Get( "cg_explosionsDust", "0", CVAR_ARCHIVE );
-	cg_gibs =		trap_Cvar_Get( "cg_gibs", "1", CVAR_ARCHIVE );
+	cg_gibs =		trap_Cvar_Get( "cg_gibs", "2", CVAR_ARCHIVE );
 	cg_outlineModels =	trap_Cvar_Get( "cg_outlineModels", "1", CVAR_ARCHIVE );
 	cg_outlineWorld =	trap_Cvar_Get( "cg_outlineWorld", "0", CVAR_ARCHIVE );
 	cg_outlinePlayers =	trap_Cvar_Get( "cg_outlinePlayers", "1", CVAR_ARCHIVE );
@@ -720,7 +719,6 @@ static void CG_RegisterVariables( void )
 	cg_cartoonEffects =		trap_Cvar_Get( "cg_cartoonEffects", "7", CVAR_ARCHIVE );
 	cg_cartoonHitEffect =	trap_Cvar_Get( "cg_cartoonHitEffect", "0", CVAR_ARCHIVE );
 
-	cg_damage_kick =	trap_Cvar_Get( "cg_damage_kick", "0", CVAR_ARCHIVE );
 	cg_damage_indicator =	trap_Cvar_Get( "cg_damage_indicator", "1", CVAR_ARCHIVE );
 	cg_damage_indicator_time =	trap_Cvar_Get( "cg_damage_indicator_time", "50", CVAR_ARCHIVE );
 	cg_pickup_flash =	trap_Cvar_Get( "cg_pickup_flash", "0", CVAR_ARCHIVE );
@@ -789,7 +787,7 @@ static void CG_RegisterVariables( void )
 	cg_placebo =  trap_Cvar_Get( "cg_placebo", "0", CVAR_ARCHIVE );
 	cg_strafeHUD = trap_Cvar_Get( "cg_strafeHUD", "0", CVAR_ARCHIVE );
 	cg_touch_flip = trap_Cvar_Get( "cg_touch_flip", "0", CVAR_ARCHIVE );
-	cg_touch_scale = trap_Cvar_Get( "cg_touch_scale", "1", CVAR_ARCHIVE );
+	cg_touch_scale = trap_Cvar_Get( "cg_touch_scale", "100", CVAR_ARCHIVE );
 
 	cg_playList = trap_Cvar_Get( "cg_playList", S_PLAYLIST_MATCH, CVAR_ARCHIVE );
 	cg_playListShuffle = trap_Cvar_Get( "cg_playListShuffle", "1", CVAR_ARCHIVE );
@@ -962,6 +960,14 @@ void CG_StartBackgroundTrack( void )
 }
 
 /*
+* CG_AddMovement
+*/
+void CG_AddMovement( usercmd_t *cmd, vec3_t viewangles, int frametime )
+{
+	CG_TouchMove( cmd, viewangles, frametime );
+}
+
+/*
 * CG_Reset
 */
 void CG_Reset( void )
@@ -973,12 +979,12 @@ void CG_Reset( void )
 	CG_ResetDamageIndicator();
 	CG_ResetItemTimers();
 
+	CG_SC_ResetObituaries();
+
 	CG_ClearDecals();
 	CG_ClearPolys();
 	CG_ClearEffects();
 	CG_ClearLocalEntities();
-
-	CG_DemocamReset();
 
 	// start up announcer events queue from clean
 	CG_ClearAnnouncerEvents();
@@ -995,7 +1001,8 @@ void CG_Reset( void )
 /*
 * CG_Init
 */
-void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int vidHeight, 
+void CG_Init( const char *serverName, unsigned int playerNum,
+			 int vidWidth, int vidHeight, float pixelRatio,
 			 qboolean demoplaying, const char *demoName, qboolean pure, 
 			 unsigned int snapFrameTime, int protocol, int sharedSeed )
 {
@@ -1009,6 +1016,8 @@ void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int 
 	CG_Printf( S_COLOR_MAGENTA"Hi, I'm an unpure bitch 7\n" );
 #endif
 
+	srand( time( NULL ) );
+
 	// save server name
 	cgs.serverName = CG_CopyString( serverName );
 
@@ -1018,6 +1027,7 @@ void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int 
 	// save current width and height
 	cgs.vidWidth = vidWidth;
 	cgs.vidHeight = vidHeight;
+	cgs.pixelRatio = pixelRatio;
 
 	// demo
 	cgs.demoPlaying = demoplaying == qtrue;
@@ -1033,9 +1043,6 @@ void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int 
 	// game protocol number
 	cgs.gameProtocol = protocol;
 	cgs.snapFrameTime = snapFrameTime;
-
-	cgs.initialSharedSeed = sharedSeed;
-	cg.sharedSeed = cgs.initialSharedSeed;
 
 	cgs.hasGametypeMenu = false; // this will update as soon as we receive configstrings
 

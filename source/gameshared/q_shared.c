@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 const char *SOUND_EXTENSIONS[] = { ".ogg", ".wav" };
 const size_t NUM_SOUND_EXTENSIONS = sizeof( SOUND_EXTENSIONS ) / sizeof( SOUND_EXTENSIONS[0] );
 
-const char *IMAGE_EXTENSIONS[] = { ".tga", ".jpg", ".png" };
+const char *IMAGE_EXTENSIONS[] = { ".tga", ".jpg", ".png", ".ktx" }; // .ktx must be the last extension
 const size_t NUM_IMAGE_EXTENSIONS = sizeof( IMAGE_EXTENSIONS ) / sizeof( IMAGE_EXTENSIONS[0] );
 
 //============================================================================
@@ -1397,12 +1397,13 @@ void Q_urlencode_unsafechars( const char *src, char *dst, size_t dst_size )
 size_t Q_urldecode( const char *src, char *dst, size_t dst_size )
 {
 	char *dst_start = dst, *dst_end = dst + dst_size - 1;
-	const char *src_end = src + strlen( src );
+	const char *src_end;
 
 	if( !src || !dst || !dst_size ) {
 		return 0;
 	}
 
+	src_end = src + strlen( src );
 	while( src < src_end ) {
 		if( dst == dst_end ) {
 			break;

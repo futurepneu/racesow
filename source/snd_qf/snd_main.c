@@ -109,6 +109,14 @@ static void SF_SoundInfo_f( void )
 	Com_Printf( "0x%x dma buffer\n", dma.buffer );
 }
 
+/*
+* SF_StopAllSounds_f
+*/
+static void SF_StopAllSounds_f( void )
+{
+	SF_StopAllSounds( qtrue, qtrue );
+}
+
 // =======================================================================
 // Load a sound
 // =======================================================================
@@ -274,7 +282,7 @@ qboolean SF_Init( void *hwnd, int maxEntities, qboolean verbose )
 	trap_Cmd_AddCommand( "play", SF_Play_f );
 #endif
 	trap_Cmd_AddCommand( "music", SF_Music_f );
-	trap_Cmd_AddCommand( "stopsound", SF_StopAllSounds );
+	trap_Cmd_AddCommand( "stopsound", SF_StopAllSounds_f );
 	trap_Cmd_AddCommand( "stopmusic", SF_StopBackgroundTrack );
 	trap_Cmd_AddCommand( "prevmusic", SF_PrevBackgroundTrack );
 	trap_Cmd_AddCommand( "nextmusic", SF_NextBackgroundTrack );
@@ -292,7 +300,7 @@ qboolean SF_Init( void *hwnd, int maxEntities, qboolean verbose )
 		return qfalse;
 	}
 
-	trap_Thread_Create( &s_backThread, S_BackgroundUpdateProc, s_cmdQueue );
+	s_backThread = trap_Thread_Create( S_BackgroundUpdateProc, s_cmdQueue );
 
 	S_IssueInitCmd( s_cmdQueue, hwnd, maxEntities, verbose );
 
@@ -388,9 +396,9 @@ void SF_LockBackgroundTrack( qboolean lock )
 /*
 * SF_StopAllSounds
 */
-void SF_StopAllSounds( void )
+void SF_StopAllSounds( qboolean clear, qboolean stopMusic )
 {
-	S_IssueStopAllSoundsCmd( s_cmdQueue );
+	S_IssueStopAllSoundsCmd( s_cmdQueue, clear, stopMusic );
 }
 
 /*

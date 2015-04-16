@@ -40,6 +40,7 @@ static model_t mod_known[MAX_MOD_KNOWN];
 static int mod_numknown;
 static int modfilelen;
 static qboolean mod_isworldmodel;
+static const dvis_t *mod_worldvis;
 static model_t *r_prevworldmodel;
 static mapconfig_t *mod_mapConfigs;
 
@@ -337,8 +338,11 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 	mbrushmodel_t *loadbmodel;
 	msurface_t *surf, *surf2, **mark;
 	msurface_t **surfmap;
+	msurface_t **surfaces;
+	unsigned numSurfaces;
 	drawSurfaceBSP_t *drawSurf;
 	int num_vbos;
+	vattribmask_t floatVattribs;
 
 	assert( mod );
 
@@ -352,10 +356,13 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 	if( !bm->numfaces )
 		return 0;
 
-	// PVS only exists for world submodel
-    if( !modnum && loadbmodel->pvs )
-    {
-	    mleaf_t *leaf, **pleaf;
+	surfmap = ( msurface_t ** )Mod_Malloc( mod, bm->numfaces * sizeof( *surfmap ) );
+	surfaces = ( msurface_t ** )Mod_Malloc( mod, bm->numfaces * sizeof( *surfaces ) );
+	numSurfaces = 0;
+
+	if( !modnum && loadbmodel->pvs )
+	{
+		mleaf_t	*leaf, **pleaf;
 
 		rowbytes = loadbmodel->pvs->rowsize;
 		rowlongs = (rowbytes + 3) / 4;
@@ -368,6 +375,7 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 		// this face belongs to (visible from)
 		visdata = ( qbyte * )Mod_Malloc( mod, rowlongs * 4 * loadbmodel->numsurfaces );
 		areadata = ( qbyte * )Mod_Malloc( mod, areabytes * loadbmodel->numsurfaces );
+
 		for( pleaf = loadbmodel->visleafs, leaf = *pleaf; leaf; leaf = *pleaf++ )
 		{
 			mark = leaf->firstVisSurface;
@@ -375,10 +383,17 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 			{
 				int surfnum;
 
-				surf = *mark;
-
+				surf = *mark++;
 				surfnum = surf - loadbmodel->surfaces;
-				longrow  = ( int * )( visdata + surfnum * rowbytes );
+
+				if( surfmap[surfnum] ) {
+					continue;
+				}
+				surfmap[surfnum] = surf;
+
+				surfaces[numSurfaces] = surf;
+
+				longrow  = ( int * )( visdata + numSurfaces * rowbytes );
 				longrow2 = ( int * )( Mod_ClusterPVS( leaf->cluster, mod ) );
 
 				// merge parent leaf cluster visibility into face visibility set
@@ -388,31 +403,49 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 					longrow[j] |= longrow2[j];
 
 				if( leaf->area >= 0 ) {
-					arearow = areadata + surfnum * areabytes;
+					arearow = areadata + numSurfaces * areabytes;
 					arearow[leaf->area>>3] |= (1<<(leaf->area&7));
 				}
-			} while( *++mark );
+
+				numSurfaces++;
+			} while( *mark );
 		}
-    }
-    else
-    {
-    	// either a submodel or an unvised map
+
+		memset( surfmap, 0, bm->numfaces * sizeof( *surfmap ) );
+	}
+	else
+	{
+		// either a submodel or an unvised map
 		rowbytes = 0;
 		rowlongs = 0;
 		visdata = NULL;
 		areabytes = 0;
 		areadata = NULL;
-    }
+
+		for( i = 0, surf = loadbmodel->surfaces + bm->firstface; i < bm->numfaces; i++, surf++ ) {
+			if( !R_SurfPotentiallyVisible( surf ) )
+				continue;
+
+			surfaces[numSurfaces] = surf;
+			numSurfaces++;
+		}
+	}
 
 	// now linearly scan all faces for this submodel, merging them into
 	// vertex buffer objects if they share shader, lightmap texture and we can render
 	// them in hardware (some Q3A shaders require GLSL for that)
 
-	surfmap = ( msurface_t ** )Mod_Malloc( mod, bm->numfaces * sizeof( *surfmap ) );
+	// don't use half-floats for XYZ due to precision issues
+	floatVattribs = VATTRIB_POSITION_BIT;
+	if( mapConfig.maxLightmapSize > 1024 )
+	{
+		// don't use half-floats for lightmaps if there's not enough precision (half mantissa is 10 bits)
+		floatVattribs |= VATTRIB_LMCOORDS_BITS;
+	}
 
 	num_vbos = 0;
 	*vbo_total_size = 0;
-	for( i = 0, surf = loadbmodel->surfaces + bm->firstface; i < bm->numfaces; i++, surf++ )
+	for( i = 0; i < numSurfaces; i++ )
 	{
 		mesh_vbo_t *vbo;
 		mesh_t *mesh, *mesh2;
@@ -420,15 +453,13 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 		int fcount;
 		int vcount, ecount;
 		vattribmask_t vattribs;
+		unsigned last_merged = i;
 
 		// ignore faces already merged
 		if( surfmap[i] )
 			continue;
 
-		// ignore invisible faces
-		if( !R_SurfPotentiallyVisible( surf ) )
-			continue;
-
+		surf = surfaces[i];
 		shader = surf->shader;
 		longrow  = ( int * )( visdata + i * rowbytes );
 		arearow = areadata + i * areabytes;
@@ -442,10 +473,9 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 		if( !(shader->flags & (SHADER_PORTAL_CAPTURE|SHADER_PORTAL_CAPTURE2)) && !surf->numInstances )
 		{
 			// scan remaining face checking whether we merge them with the current one
-			for( j = 0, surf2 = loadbmodel->surfaces + bm->firstface + j; j < bm->numfaces; j++, surf2++ )
+			for( j = i + 1; j < numSurfaces; j++ )
 			{
-				if( i == j )
-					continue;
+				surf2 = surfaces[j];
 
 				// already merged
 				if( surf2->drawSurf )
@@ -453,8 +483,6 @@ static int Mod_CreateSubmodelBufferObjects( model_t *mod, unsigned int modnum, s
 
 				// the following checks ensure the two faces are compatible can can be merged
 				// into a single vertex buffer object
-				if( !R_SurfPotentiallyVisible( surf2 ) )
-					continue;
 				if( surf2->shader != surf->shader || surf2->superLightStyle != surf->superLightStyle )
 					continue;
 				if( surf2->fog != surf->fog )
@@ -489,6 +517,7 @@ merge:
 					vcount += mesh2->numVerts;
 					ecount += mesh2->numElems;
 					surfmap[j] = surf;
+					last_merged = j;
 				}
 			}
 		}
@@ -501,7 +530,7 @@ merge:
 
 		// don't use half-floats for XYZ due to precision issues
 		vbo = R_CreateMeshVBO( ( void * )surf, vcount, ecount, surf->numInstances, vattribs, 
-			VBO_TAG_WORLD, vattribs & ~(VATTRIB_POSITION_BIT|VATTRIB_NORMAL_BIT|VATTRIB_LMCOORDS_BITS) );
+			VBO_TAG_WORLD, vattribs & ~floatVattribs );
 		if( vbo )
 		{
 			vattribmask_t errMask;
@@ -529,11 +558,12 @@ merge:
 			// now if there are any merged faces upload them to the same VBO
 			if( fcount > 1 )
 			{
-				for( j = 0, surf2 = loadbmodel->surfaces + bm->firstface + j; j < bm->numfaces; j++, surf2++ )
+				for( j = i + 1; j <= last_merged; j++ )
 				{
 					if( surfmap[j] != surf )
 						continue;
 
+					surf2 = surfaces[j];
 					mesh2 = surf2->mesh;
 
 					surf2->drawSurf = drawSurf;
@@ -561,6 +591,8 @@ merge:
 					VBO_Printf( " st" );
 				if( errMask & VATTRIB_LMCOORDS0_BIT )
 					VBO_Printf( " lmst" );
+				if( errMask & VATTRIB_LMLAYERS0123_BIT )
+					VBO_Printf( " lmlayers" );
 				if( errMask & VATTRIB_COLOR0_BIT )
 					VBO_Printf( " colors" );
 				VBO_Printf( "\n" );
@@ -572,6 +604,7 @@ merge:
 	}
 
 	R_Free( surfmap );
+	R_Free( surfaces );
 
 	if( visdata )
 		R_Free( visdata );
@@ -638,8 +671,10 @@ static void Mod_CreateSkydome( model_t *mod )
 /*
 * Mod_FinalizeBrushModel
 */
-static void Mod_FinalizeBrushModel( model_t *model )
+static void Mod_FinalizeBrushModel( model_t *model, const dvis_t *pvsData )
 {
+	(( mbrushmodel_t * )model->extradata)->pvs = ( dvis_t * )pvsData;
+
 	Mod_FinishFaces( model );
 
 	Mod_CreateVisLeafs( model );
@@ -732,6 +767,7 @@ void R_InitModels( void )
 	mod_mempool = R_AllocPool( r_mempool, "Models" );
 	memset( mod_novis, 0xff, sizeof( mod_novis ) );
 	mod_isworldmodel = qfalse;
+	mod_worldvis = NULL;
 	r_prevworldmodel = NULL;
 	mod_mapConfigs = R_MallocExt( mod_mempool, sizeof( *mod_mapConfigs ) * MAX_MOD_KNOWN, 0, 1 );
 }
@@ -958,7 +994,7 @@ model_t *Mod_ForName( const char *name, qboolean crash )
 
 	// do some common things
 	if( mod->type == mod_brush ) {
-		Mod_FinalizeBrushModel( mod );
+		Mod_FinalizeBrushModel( mod, mod_worldvis );
 		mod->touch = &Mod_TouchBrushModel;
 	}
 
@@ -1040,6 +1076,8 @@ static void R_InitMapConfig( const char *model )
 
 	mapConfig.pow2MapOvrbr = 0;
 	mapConfig.lightmapsPacking = qfalse;
+	mapConfig.lightmapArrays = qfalse;
+	mapConfig.maxLightmapSize = 0;
 	mapConfig.deluxeMaps = qfalse;
 	mapConfig.deluxeMappingEnabled = qfalse;
 	mapConfig.overbrightBits = max( 0, r_mapoverbrightbits->integer );
@@ -1119,7 +1157,10 @@ void R_RegisterWorldModel( const char *model, const dvis_t *pvsData )
 	rsh.worldModelSequence++;
 
 	mod_isworldmodel = qtrue;
+	mod_worldvis = pvsData;
+
 	rsh.worldModel = Mod_ForName( model, qtrue );
+
 	mod_isworldmodel = qfalse;
 
 	if( !rsh.worldModel ) {
@@ -1130,7 +1171,6 @@ void R_RegisterWorldModel( const char *model, const dvis_t *pvsData )
 	mapConfig = mod_mapConfigs[rsh.worldModel - mod_known];
 
 	R_TouchModel( rsh.worldModel );
-
 	rsh.worldBrushModel = ( mbrushmodel_t * )rsh.worldModel->extradata;
 	rsh.worldBrushModel->pvs = ( dvis_t * )pvsData;
 }

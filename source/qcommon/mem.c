@@ -20,7 +20,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Z_zone.c
 
 #include "qcommon.h"
-#include "sys_threads.h"
 
 //#define MEMTRASH
 
@@ -677,7 +676,6 @@ void Memory_InitCommands( void )
 {
 	assert( !commands_initialized );
 
-	
 	developerMemory = Cvar_Get( "developerMemory", "0", 0 );
 
 	Cmd_AddCommand( "memlist", MemList_f );

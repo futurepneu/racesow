@@ -35,7 +35,7 @@ class UI_WorldviewWidgetInstancer;
 
 class UI_WorldviewWidget : public Element, EventListener
 {
-public:
+private:
 	refdef_t refdef;
 	vec3_t baseAngles;
 	vec3_t aWaveAmplitude;
@@ -44,6 +44,7 @@ public:
 	String mapName;
 	bool Initialized;
 
+public:
 	UI_WorldviewWidget( const String &tag )
 		: Element( tag ), 
 		mapName( "" ), Initialized( false )
@@ -63,6 +64,8 @@ public:
 
 	virtual void OnRender()
 	{
+		bool firstRender = false;
+
 		Element::OnRender();
 
 		if( !Initialized ) {
@@ -70,6 +73,7 @@ public:
 			if( mapName.Empty() ) {
 				return;
 			}
+			firstRender = true;
 			Initialized = true;
 			trap::R_RegisterWorldModel( mapName.CString() );
 		}
@@ -105,6 +109,13 @@ public:
 		trap::R_ClearScene();
 
 		trap::R_RenderScene( &refdef );
+
+		trap::R_Scissor( scissor_x, scissor_y, scissor_w, scissor_h );
+
+		if( firstRender ) {
+			Rocket::Core::Dictionary parameters;		
+			this->DispatchEvent( "firstrender", parameters, true );
+		}
 	}
 
 	virtual void OnPropertyChange(const Rocket::Core::PropertyNameList& changed_properties)

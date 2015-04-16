@@ -188,7 +188,7 @@ void CIN_LoadLibrary( qboolean verbose )
 		}
 	}
 
-	Mem_CheckSentinelsGlobal();
+	Mem_DebugCheckSentinelsGlobal();
 }
 
 /*

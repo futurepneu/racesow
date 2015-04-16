@@ -53,13 +53,13 @@ public:
 
 //==================================================
 
-RocketModule::RocketModule( int vidWidth, int vidHeight )
+RocketModule::RocketModule( int vidWidth, int vidHeight, float pixelRatio )
 	: rocketInitialized(false),
 	// pointers
 	systemInterface(0), fsInterface(0), renderInterface(0), context(0)
 {
 
-	renderInterface = __new__( UI_RenderInterface )( vidWidth, vidHeight );
+	renderInterface = __new__( UI_RenderInterface )( vidWidth, vidHeight, pixelRatio );
 	Rocket::Core::SetRenderInterface( renderInterface );
 	systemInterface = __new__( UI_SystemInterface )();
 	Rocket::Core::SetSystemInterface( systemInterface );
@@ -96,12 +96,9 @@ RocketModule::~RocketModule()
 		context->RemoveReference();
 	context = 0;
 
-	if(rocketInitialized)
+	if( rocketInitialized )
 		Rocket::Core::Shutdown();
 	rocketInitialized = false;
-
-	// instancers bye bye
-	// std::for_each( elementInstancers.begin(), elementInstancers.end(), unref_object<Rocket::Core::ElementInstancer> );
 
 	__SAFE_DELETE_NULLIFY( fsInterface );
 	__SAFE_DELETE_NULLIFY( systemInterface );
@@ -186,14 +183,14 @@ void RocketModule::keyEvent( int key, bool pressed )
 
 //==================================================
 
-Rocket::Core::ElementDocument *RocketModule::loadDocument( const char *filename, bool show )
+Rocket::Core::ElementDocument *RocketModule::loadDocument( const char *filename, bool show, void *user_data )
 {
-	Rocket::Core::ElementDocument *document;
+	ASUI::UI_ScriptDocument *document = dynamic_cast<ASUI::UI_ScriptDocument *>(context->LoadDocument( filename ));
+	if( !document ) {
+		return NULL;
+	}
 
-	// YES I really had to make a function for this!
-	document = context->LoadDocument( filename );
-
-	if( show && document )
+	if( show )
 	{
 		// load documents with autofocus disabled
 		document->Show( Rocket::Core::ElementDocument::NONE );
@@ -215,7 +212,7 @@ Rocket::Core::ElementDocument *RocketModule::loadDocument( const char *filename,
 
 void RocketModule::closeDocument( Rocket::Core::ElementDocument *doc )
 {
-	context->UnloadDocument( doc );
+	doc->Close();
 }
 
 //==================================================
@@ -223,7 +220,6 @@ void RocketModule::closeDocument( Rocket::Core::ElementDocument *doc )
 void RocketModule::registerElementDefaults( Rocket::Core::Element *element )
 {
 	// add these as they pile up in BaseEventListener
-	element->AddEventListener( "keydown", GetBaseEventListener() );
 	element->AddEventListener( "mouseover", GetBaseEventListener() );
 	element->AddEventListener( "click", GetBaseEventListener() );
 }
@@ -281,6 +277,8 @@ void RocketModule::hideCursor( void )
 
 void RocketModule::update( void )
 {
+	ASUI::GarbageCollectEventListenersFunctions( scriptEventListenerInstancer );
+
 	context->Update();
 }
 
@@ -297,6 +295,11 @@ void RocketModule::registerCustoms()
 
 	// Main document that implements <script> tags
 	registerElement( "body", ASUI::GetScriptDocumentInstancer() );
+	// IME overrides
+	registerElement( "input",
+		__new__( GenericElementInstancerIME<Rocket::Controls::ElementFormControlInput> )() );
+	registerElement( "textarea",
+		__new__( GenericElementInstancerIME<Rocket::Controls::ElementFormControlTextArea> )() );
 	// other widgets
 	registerElement( "keyselect", GetKeySelectInstancer() );
 	registerElement( "a", GetAnchorWidgetInstancer() );
@@ -313,6 +316,7 @@ void RocketModule::registerCustoms()
 	registerElement( "field", GetElementFieldInstancer() );
 	registerElement( "video", GetVideoInstancer() );
 	registerElement( "irclog", GetIrcLogWidgetInstancer() );
+	registerElement( "iframe", GetIFrameWidgetInstancer() );
 
 	//
 	// EVENTS
@@ -333,6 +337,7 @@ void RocketModule::registerCustoms()
 	//
 	// DECORATORS
 	registerDecorator( "gradient", GetGradientDecoratorInstancer() );
+	registerDecorator( "ninepatch", GetNinePatchDecoratorInstancer() );
 
 	//
 	// GLOBAL CUSTOM PROPERTIES

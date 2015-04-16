@@ -202,7 +202,7 @@ void Com_ScriptModule_Init( void )
 	}
 
 	// check memory integrity
-	Mem_CheckSentinelsGlobal();
+	Mem_DebugCheckSentinelsGlobal();
 
 	Com_Printf( "------------------------------------\n" );
 }

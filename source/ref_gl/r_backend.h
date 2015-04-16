@@ -22,10 +22,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 enum
 {
-	RB_VBO_STREAM_QUAD	= -2,
-	RB_VBO_STREAM		= -1,
-	RB_VBO_NONE			= 0,
-	RB_VBO_NUM_STREAMS = -RB_VBO_STREAM_QUAD
+	RB_VBO_STREAM_QUAD_COMPACT	= -4, // bind RB_VBO_STREAM_QUAD instead
+	RB_VBO_STREAM_QUAD			= -3,
+	RB_VBO_STREAM_COMPACT		= -2, // bind RB_VBO_STREAM instead
+	RB_VBO_STREAM				= -1,
+	RB_VBO_NONE					= 0,
+	RB_VBO_NUM_STREAMS			= -RB_VBO_STREAM_QUAD_COMPACT
 };
 
 //===================================================================
@@ -44,17 +46,17 @@ void RB_EndFrame( void );
 void RB_BeginRegistration( void );
 void RB_EndRegistration( void );
 
+void RB_LoadCameraMatrix( const mat4_t m );
 void RB_LoadObjectMatrix( const mat4_t m );
-void RB_LoadModelviewMatrix( const mat4_t m );
 void RB_LoadProjectionMatrix( const mat4_t m );
 
 void RB_DepthRange( float depthmin, float depthmax );
 void RB_GetDepthRange( float* depthmin, float *depthmax );
+void RB_DepthOffset( qboolean enable );
 void RB_Cull( int cull );
 void RB_SetState( int state );
 void RB_FrontFace( qboolean front );
 void RB_FlipFrontFace( void );
-void RB_PolygonOffset( float factor, float offset );
 void RB_BindArrayBuffer( int buffer );
 void RB_BindElementArrayBuffer( int buffer );
 void RB_EnableScissor( qboolean enable );
@@ -75,8 +77,10 @@ void RB_UploadMesh( const mesh_t *mesh );
 void RB_BatchMesh( const mesh_t *mesh );
 void RB_EndBatch( void );
 
-void RB_DrawElements( int firstVert, int numVerts, int firstElem, int numElems );
-void RB_DrawElementsInstanced( int firstVert, int numVerts, int firstElem, int numElems, 
+void RB_DrawElements( int firstVert, int numVerts, int firstElem, int numElems,
+	int firstShadowVert, int numShadowVerts, int firstShadowElem, int numShadowElems );
+void RB_DrawElementsInstanced( int firstVert, int numVerts, int firstElem, int numElems,
+	int firstShadowVert, int numShadowVerts, int firstShadowElem, int numShadowElems,
 	int numInstances, instancePoint_t *instances );
 
 void RB_Finish( void );
@@ -92,7 +96,7 @@ void RB_SetPortalSurface( const struct portalSurface_s *portalSurface );
 void RB_SetSkyboxShader( const shader_t *shader );
 void RB_SetSkyboxSide( int side );
 void RB_SetRenderFlags( int flags );
-void RB_SetMinLight( float minLight );
+void RB_SetLightParams( float minLight, qboolean noWorldLight );
 void RB_SetShaderStateMask( int ANDmask, int ORmask );
 void RB_SetCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis );
 qboolean RB_EnableTriangleOutlines( qboolean enable );

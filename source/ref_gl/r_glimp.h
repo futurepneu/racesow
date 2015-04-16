@@ -136,9 +136,9 @@ enum
 
 // #define SHADERPASS_SRCBLEND_MASK (((GLSTATE_SRCBLEND_DST_ALPHA)<<1)-GLSTATE_SRCBLEND_ZERO)
 #define GLSTATE_SRCBLEND_MASK	0xF
-
 // #define SHADERPASS_DSTBLEND_MASK (((GLSTATE_DSTBLEND_DST_ALPHA)<<1)-GLSTATE_DSTBLEND_ZERO)
 #define GLSTATE_DSTBLEND_MASK	0xF0
+#define GLSTATE_BLEND_MASK		( GLSTATE_SRCBLEND_MASK|GLSTATE_DSTBLEND_MASK )
 
 #define GLSTATE_BLEND_ADD		( GLSTATE_SRCBLEND_ONE|GLSTATE_DSTBLEND_ONE )
 
@@ -184,6 +184,9 @@ typedef struct
 				,get_program_binary
 				,rgb8_rgba8
 				,ES3_compatibility
+				,blend_func_separate
+				,texture3D
+				,texture_array
 				;
 	union {
 		char	shadow, shadow_samplers;
@@ -223,7 +226,7 @@ typedef struct
 	int				maxTextureSize
 					,maxTextureUnits
 					,maxTextureCubemapSize
-					,maxTextureSize3D
+					,maxTextureLayers
 					,maxTextureFilterAnisotropic
 					,maxRenderbufferSize
 					,maxVaryingFloats
@@ -257,8 +260,8 @@ void	    GLimp_AppActivate( qboolean active, qboolean destroy );
 qboolean	GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp );
 void		GLimp_SetGammaRamp( size_t stride, unsigned short   size, unsigned short *ramp );
 
-void		*GLimp_SharedContext_Create( void );
-qboolean	GLimp_SharedContext_MakeCurrent( void *ctx );
-void		GLimp_SharedContext_Destroy( void *ctx );
+qboolean	GLimp_SharedContext_Create( void **context, void **surface );
+qboolean	GLimp_SharedContext_MakeCurrent( void *context, void *surface );
+void		GLimp_SharedContext_Destroy( void *context, void *surface );
 
 #endif // R_GLIMP_H

@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define SHADERS_HASH_SIZE	128
 #define SHADERCACHE_HASH_SIZE	128
 
-#define	Shader_Sortkey( shader, sort ) ( ( ( sort )<<26 )|( shader-r_shaders ) )
-
 typedef struct
 {
 	const char *keyword;
@@ -526,7 +524,7 @@ static int Shader_SetImageFlags( shader_t *shader )
 	return flags;
 }
 
-static image_t *Shader_FindImage( shader_t *shader, char *name, int flags )
+static image_t *Shader_FindImage( shader_t *shader, const char *name, int flags )
 {
 	image_t *image;
 
@@ -1140,11 +1138,18 @@ static void Shaderpass_Material( shader_t *shader, shaderpass_t *pass, const cha
 {
 	int i, flags;
 	char *token;
+	qboolean endl;
 
 	R_FreePassCinematics( pass );
 
 	flags = Shader_SetImageFlags( shader );
 	token = Shader_ParseString( ptr );
+
+	endl = token[0] == '\0';
+	if( endl ) {
+		// single-word syntax
+		token = shader->name;
+	}
 
 	pass->images[0] = Shader_FindImage( shader, token, flags );
 	if( !pass->images[0] )
@@ -1160,7 +1165,7 @@ static void Shaderpass_Material( shader_t *shader, shaderpass_t *pass, const cha
 	if( pass->rgbgen.type == RGB_GEN_UNKNOWN )
 		pass->rgbgen.type = RGB_GEN_IDENTITY;
 
-	while( 1 )
+	while( !endl )
 	{
 		token = Shader_ParseString( ptr );
 		if( !*token )
@@ -1473,7 +1478,7 @@ static void Shaderpass_BlendFunc( shader_t *shader, shaderpass_t *pass, const ch
 
 	token = Shader_ParseString( ptr );
 
-	pass->flags &= ~(GLSTATE_SRCBLEND_MASK|GLSTATE_DSTBLEND_MASK);
+	pass->flags &= ~GLSTATE_BLEND_MASK;
 	if( !strcmp( token, "blend" ) )
 		pass->flags |= GLSTATE_SRCBLEND_SRC_ALPHA|GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA;
 	else if( !strcmp( token, "filter" ) )
@@ -1821,21 +1826,25 @@ static unsigned int Shader_GetCache( const char *name, shadercache_t **cache )
 }
 
 /*
-* R_InitShadersCache
+* R_PrecacheShaders
 */
-static qboolean R_InitShadersCache( void )
+static void R_InitShadersCache( void )
 {
 	int i, j, k, numfiles;
 	const char *fileptr;
 	char shaderPaths[1024];
+
+	r_shaderTemplateBuf = NULL;
 
 	memset( shadercache_hash, 0, sizeof( shadercache_t * )*SHADERCACHE_HASH_SIZE );
 	
 	// enumerate shaders
 	numfiles = ri.FS_GetFileList( "scripts", ".shader", NULL, 0, 0, 0 );
 	if( !numfiles ) {
-		return qfalse;
+		ri.Com_Error( ERR_DROP, "Could not find any shaders!" );
 	}
+
+	Com_Printf( "Initializing Shaders:\n" );
 
 	// now load them all
 	for( i = 0; i < numfiles; i += k ) {
@@ -1855,7 +1864,7 @@ static qboolean R_InitShadersCache( void )
 		}
 	}
 
-	return qtrue;
+	Com_Printf( "--------------------------------------\n\n" );
 }
 
 /*
@@ -1865,13 +1874,7 @@ void R_InitShaders( void )
 {
 	int i;
 
-	Com_Printf( "Initializing Shaders:\n" );
-
-	r_shaderTemplateBuf = NULL;
-
-	if( !R_InitShadersCache() ) {
-		ri.Com_Error( ERR_DROP, "Could not find any shaders!" );
-	}
+	R_InitShadersCache();
 
 	memset( r_shaders, 0, sizeof( r_shaders ) );
 
@@ -1884,8 +1887,6 @@ void R_InitShaders( void )
 	for( i = 0; i < MAX_SHADERS - 1; i++ ) {
 		r_shaders[i].next = &r_shaders[i+1];
 	}
-
-	Com_Printf( "--------------------------------------\n\n" );
 }
 
 /*
@@ -2012,6 +2013,9 @@ void R_ShutdownShaders( void )
 		R_FreeShader( s );
 	}
 
+	R_Free( r_shaderTemplateBuf );
+	R_Free( r_shortShaderName );
+
 	r_shaderTemplateBuf = NULL;
 	r_shortShaderName = NULL;
 	r_shortShaderNameSize = 0;
@@ -2062,9 +2066,9 @@ static void Shader_Readpass( shader_t *shader, const char **ptr )
 			break;
 	}
 
-	blendmask = (pass->flags & (GLSTATE_SRCBLEND_MASK|GLSTATE_DSTBLEND_MASK));
+	blendmask = (pass->flags & GLSTATE_BLEND_MASK);
 
-	if( (pass->flags & (SHADERPASS_LIGHTMAP)) && r_lighting_vertexlight->integer )
+	if( (pass->flags & SHADERPASS_LIGHTMAP) && r_lighting_vertexlight->integer )
 		return;
 
 	// keep track of detail passes. if all passes are detail, the whole shader is also detail
@@ -2239,7 +2243,7 @@ static void Shader_Finish( shader_t *s )
 	{
 		for( i = 0, pass = r_currentPasses; i < s->numpasses; i++, pass++ )
 		{
-			blendmask = pass->flags & ( GLSTATE_SRCBLEND_MASK|GLSTATE_DSTBLEND_MASK );
+			blendmask = pass->flags & GLSTATE_BLEND_MASK;
 
 			if( !blendmask || blendmask == (GLSTATE_SRCBLEND_DST_COLOR|GLSTATE_DSTBLEND_ZERO) || s->numpasses == 1 )
 			{
@@ -2351,7 +2355,7 @@ static void Shader_Finish( shader_t *s )
 
 	for( i = 0, pass = s->passes; i < s->numpasses; i++, pass++ )
 	{
-		blendmask = pass->flags & ( GLSTATE_SRCBLEND_MASK|GLSTATE_DSTBLEND_MASK );
+		blendmask = pass->flags & GLSTATE_BLEND_MASK;
 
 		if( opaque == -1 && !blendmask )
 			opaque = i;
@@ -2361,7 +2365,7 @@ static void Shader_Finish( shader_t *s )
 		if( pass->cin )
 			s->cin = pass->cin;
 		if( ( pass->flags & SHADERPASS_LIGHTMAP || 
-			pass->program_type == GLSL_PROGRAM_TYPE_MATERIAL ) && ( s->type >= SHADER_TYPE_LIGHTMAP ) )
+			pass->program_type == GLSL_PROGRAM_TYPE_MATERIAL ) && ( s->type >= SHADER_TYPE_DELUXEMAP ) )
 			s->flags |= SHADER_LIGHTMAP;
 		if( pass->flags & GLSTATE_DEPTHWRITE )
 		{
@@ -2435,19 +2439,27 @@ static size_t R_ShaderCleanName( const char *name, char *shortname, size_t short
 	int i;
 	size_t length = 0;
 	size_t lastDot = 0;
+	size_t lastSlash = 0;
 
-	for( i = ( name[0] == '/' || name[0] == '\\' ), length = 0; name[i] && ( length < shortname_size-1 ); i++ )
+	for( i = 0; name[i] && (name[i] == '/' || name[i] == '\\'); i++ );
+
+	for( length = 0; name[i] && ( length < shortname_size-1 ); i++ )
 	{
 		if( name[i] == '.' )
 			lastDot = length;
 		if( name[i] == '\\' )
-			shortname[length++] = '/';
+			shortname[length] = '/';
 		else
-			shortname[length++] = tolower( name[i] );
+			shortname[length] = tolower( name[i] );
+		if( shortname[length] == '/' )
+			lastSlash = length;
+		length++;
 	}
 
 	if( !length )
 		return 0;
+	if( lastDot < lastSlash )
+		lastDot = 0;
 	if( lastDot )
 		length = lastDot;
 	shortname[length] = 0;
@@ -2458,15 +2470,15 @@ static size_t R_ShaderCleanName( const char *name, char *shortname, size_t short
 /*
 * R_LoadShaderReal
 */
-static void R_LoadShaderReal( shader_t *s, char *shortname, 
-	size_t shortname_length, shaderType_e type, qboolean forceDefault )
+static void R_LoadShaderReal( shader_t *s, const char *shortname, 
+	size_t shortname_length, const char *longname, shaderType_e type, qboolean forceDefault )
 {
 	void *data;
 	shadercache_t *cache;
 	shaderpass_t *pass;
 	image_t *materialImages[MAX_SHADER_IMAGES];
 
-	s->name = shortname;
+	s->name = ( char * )shortname; // HACK, will be copied over in Shader_Finish
 	s->type = type;
 
 	// set defaults
@@ -2539,11 +2551,11 @@ create_default:
 
 			s->numpasses = 0;
 			pass = &s->passes[s->numpasses++];
-			pass->flags = GLSTATE_DEPTHWRITE/*|GLSTATE_SRCBLEND_ONE|GLSTATE_DSTBLEND_ZERO*/;
+			pass->flags = GLSTATE_DEPTHWRITE;
 			pass->tcgen = TC_GEN_BASE;
 			pass->rgbgen.type = RGB_GEN_VERTEX;
 			pass->alphagen.type = ALPHA_GEN_IDENTITY;
-			pass->images[0] = Shader_FindImage( s, shortname, 0 );
+			pass->images[0] = Shader_FindImage( s, longname, 0 );
 			break;
 		case SHADER_TYPE_DELUXEMAP:
 			// deluxemapping
@@ -2564,35 +2576,10 @@ create_default:
 			pass->rgbgen.type = RGB_GEN_IDENTITY;
 			pass->alphagen.type = ALPHA_GEN_IDENTITY;
 			pass->program_type = GLSL_PROGRAM_TYPE_MATERIAL;
-			pass->images[0] = Shader_FindImage( s, shortname, 0 );
+			pass->images[0] = Shader_FindImage( s, longname, 0 );
 			pass->images[1] = materialImages[0]; // normalmap
 			pass->images[2] = materialImages[1]; // glossmap
 			pass->images[3] = materialImages[2]; // decalmap
-			break;
-		case SHADER_TYPE_LIGHTMAP:
-			// lightmapping
-			data = R_Malloc( shortname_length + 1 + sizeof( shaderpass_t ) * 2 );
-			s->flags = SHADER_DEPTHWRITE|SHADER_CULL_FRONT|SHADER_LIGHTMAP;
-			s->vattribs = VATTRIB_POSITION_BIT|VATTRIB_TEXCOORDS_BIT|VATTRIB_LMCOORDS0_BIT;
-			s->sort = SHADER_SORT_OPAQUE;
-			s->numpasses = 2;
-			s->passes = ( shaderpass_t * )data;
-			s->name = ( char * )( s->passes + 2 );
-			strcpy( s->name, shortname );
-			s->numpasses = 0;
-
-			pass = &s->passes[s->numpasses++];
-			pass->flags = SHADERPASS_LIGHTMAP|GLSTATE_DEPTHWRITE;
-			pass->tcgen = TC_GEN_LIGHTMAP;
-			pass->rgbgen.type = RGB_GEN_IDENTITY;
-			pass->alphagen.type = ALPHA_GEN_IDENTITY;
-
-			pass = &s->passes[s->numpasses++];
-			pass->flags = GLSTATE_SRCBLEND_ZERO|GLSTATE_DSTBLEND_SRC_COLOR;
-			pass->tcgen = TC_GEN_BASE;
-			pass->rgbgen.type = RGB_GEN_IDENTITY;
-			pass->alphagen.type = ALPHA_GEN_IDENTITY;
-			pass->images[0] = Shader_FindImage( s, shortname, 0 );
 			break;
 		case SHADER_TYPE_CORONA:
 			data = R_Malloc( shortname_length + 1 + sizeof( shaderpass_t ) * 1 );
@@ -2608,7 +2595,7 @@ create_default:
 			pass->rgbgen.type = RGB_GEN_VERTEX;
 			pass->alphagen.type = ALPHA_GEN_IDENTITY;
 			pass->tcgen = TC_GEN_BASE;
-			pass->images[0] = Shader_FindImage( s, shortname, IT_NOMIPMAP|IT_NOPICMIP|IT_NOCOMPRESS|IT_CLAMP );
+			pass->images[0] = Shader_FindImage( s, longname, IT_NOMIPMAP|IT_NOPICMIP|IT_NOCOMPRESS|IT_CLAMP );
 			break;
 		case SHADER_TYPE_DIFFUSE:
 			// load material images
@@ -2656,14 +2643,14 @@ create_default:
 			if( type == SHADER_TYPE_VIDEO )
 			{
 				// we don't want "video/" to be there since it's hardcoded into cinematics
-				if( !Q_strnicmp(shortname, "video/", 6 ) )
+				if( !Q_strnicmp( shortname, "video/", 6 ) )
 					pass->cin = R_StartCinematic( shortname+6 );
 				else
 					pass->cin = R_StartCinematic( shortname );
 				s->cin = pass->cin;
 				pass->images[0] = rsh.noTexture;
 			} else if( type != SHADER_TYPE_2D_RAW ) {
-				pass->images[0] = Shader_FindImage( s, shortname, 
+				pass->images[0] = Shader_FindImage( s, longname, 
 					IT_CLAMP|IT_NOPICMIP|IT_NOMIPMAP|IT_NOCOMPRESS|IT_SYNC );
 			}
 			break;
@@ -2712,8 +2699,6 @@ create_default:
 		}
 	}
 
-	// calculate sortkey
-	s->sortkey = Shader_Sortkey( s, s->sort );
 	s->registrationSequence = rsh.registrationSequence;
 }
 
@@ -2790,7 +2775,7 @@ shader_t *R_LoadShader( const char *name, shaderType_e type, qboolean forceDefau
 	s->next = next;
 	s->prev = prev;
 	s->id = s - r_shaders;
-	R_LoadShaderReal( s, shortname, nameLength, type, forceDefault );
+	R_LoadShaderReal( s, shortname, nameLength, name, type, forceDefault );
 
 	// add to linked lists
 	s->prev = hnode;

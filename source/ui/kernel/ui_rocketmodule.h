@@ -16,7 +16,7 @@ namespace WSWUI
 		typedef Rocket::Core::Event Event;
 
 	public:
-		RocketModule( int vidWidth, int vidHeight );
+		RocketModule( int vidWidth, int vidHeight, float pixelRatio );
 		~RocketModule();
 
 		// post-initialization
@@ -38,7 +38,7 @@ namespace WSWUI
 		void update( void );
 		void render( void );
 
-		Rocket::Core::ElementDocument *loadDocument( const char *filename, bool show=false );
+		Rocket::Core::ElementDocument *loadDocument( const char *filename, bool show=false, void *user_data = NULL );
 		void closeDocument( Rocket::Core::ElementDocument *doc );
 
 		// called from ElementInstancer after it instances an element, set up default

@@ -19,8 +19,16 @@ if (NOT QFUSION_TVSERVER_NAME)
     set(QFUSION_TVSERVER_NAME qfusiontv_server)
 endif()
 
+option(USE_SDL2 "Build using SDL2" OFF)
+
 # Windows specific settings
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    set(QFUSION_WINDOWS_ARCH "x86")
+
+    if (MINGW AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+        set(QFUSION_WINDOWS_ARCH "x64")
+    endif()
+
     set(CMAKE_INCLUDE_PATH
         "../libsrcs/libogg"
         "../libsrcs/libvorbis"
@@ -32,20 +40,37 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
         "../libsrcs/libpng"
         "../libsrcs/libjpeg"
         "../libsrcs/libRocket/libRocket/Include"
+        "../libsrcs/SDL2/include"
     )
 
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS -DCURL_STATICLIB)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS -DCURL_STATICLIB -DWIN32 -D_WINDOWS)
 
-    set(CMAKE_LIBRARY_PATH "win32/x86/lib/debug")
+    if (NOT MINGW)
+        set(CMAKE_LIBRARY_PATH "win32/${QFUSION_WINDOWS_ARCH}/lib/debug")
+    else()
+        set(CMAKE_LIBRARY_PATH "win32/${QFUSION_WINDOWS_ARCH}/lib/mingw")
+    endif()
 endif()
 
 # OS X specific settings
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT)") # Compile only 64-bit version
-    set(CMAKE_OSX_SYSROOT "macosx10.8")                     # With OS X 10.8 base SDK
+    set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT)")    # Compile only 64-bit version
+    set(CMAKE_OSX_SYSROOT "macosx")                            # Compile with latest available OS X sdk
+    set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "10.8") # Use 10.8 as deployment target
+    set(CMAKE_XCODE_ATTRIBUTE_GCC_C_LANGUAGE_STANDARD "c99")   # Use C99 standart for compiling C files    
+    set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")      # Use modern libc++ instead of libstdc++
     set(CMAKE_FRAMEWORK_PATH "mac/Frameworks")
     set(CMAKE_MACOSX_RPATH 1)
     set(JPEG_NAMES libjpeg) # libjpeg.framework should be renamed to jpeg.framework to remove this hack
+    set(USE_SDL2 1)
+endif()
+
+# Linux specific settings
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    if (CMAKE_CROSSCOMPILING)
+        set(CMAKE_LIBRARY_ARCHITECTURE "${CMAKE_SYSTEM_PROCESSOR}-linux-gnu")
+        link_directories("${CMAKE_FIND_ROOT_PATH}/usr/lib/${CMAKE_SYSTEM_PROCESSOR}-linux-gnu")
+    endif()
 endif()
 
 find_package(Ogg REQUIRED)
@@ -58,31 +83,40 @@ find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)
 
 # We need SDL only on non-Windows platforms
-if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    find_package(SDL REQUIRED)
+if (USE_SDL2)
+    find_package(SDL2 REQUIRED)
+    add_definitions(-DUSE_SDL2)
+else()
+    if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+        find_package(SDL REQUIRED)
+    endif()
 endif()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR MINGW)
     # On Linux we build angelscript from source
     set(ANGELSCRIPT_DIR ${CMAKE_HOME_DIRECTORY}/../libsrcs/angelscript/sdk/angelscript)
-    set(ANGELSCRIPT_PROJECT_DIR ${ANGELSCRIPT_DIR}/projects/gnuc)
+    if (MINGW)
+        set(ANGELSCRIPT_PROJECT_DIR ${ANGELSCRIPT_DIR}/projects/mingw)
+    else()
+        set(ANGELSCRIPT_PROJECT_DIR ${ANGELSCRIPT_DIR}/projects/gnuc)
+    endif()
     set(ANGELSCRIPT_INCLUDE_DIR ${ANGELSCRIPT_DIR}/include/)
     set(ANGELSCRIPT_LIBRARY ${ANGELSCRIPT_DIR}/lib/libangelscript.a)
 
     set(ANGELSCRIPT angelscript)
-    add_custom_target(angelscript make -C ${ANGELSCRIPT_PROJECT_DIR})
+    add_custom_target(angelscript CXX=${CMAKE_CXX_COMPILER} AR=${CMAKE_AR} RANLIB=${CMAKE_RANLIB} CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS} make -C ${ANGELSCRIPT_PROJECT_DIR})
 else()
     find_package(Angelscript REQUIRED)
 endif()
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR MINGW)
     # On Linux we build libRocket from source
     set(LIBROCKET_DIR ${CMAKE_HOME_DIRECTORY}/../libsrcs/libRocket/libRocket)
     set(LIBROCKET_INCLUDE_DIR ${LIBROCKET_DIR}/Include)
     set(LIBROCKET_LIBRARIES ${LIBROCKET_DIR}/lib/libRocketWSW.a)
 
     set(LIBROCKET libRocket)
-    add_custom_target(libRocket make -C ${LIBROCKET_DIR} -f Build/Makefile.qfusion)
+    add_custom_target(libRocket CXX=${CMAKE_CXX_COMPILER} AR=${CMAKE_AR} RANLIB=${CMAKE_RANLIB} CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS} make -C ${LIBROCKET_DIR} -f Build/Makefile.qfusion)
 else()
     find_package(Rocket REQUIRED)
 endif()
@@ -98,13 +132,20 @@ macro(find_windows_release_libs libs)
 endmacro()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+    set(CMAKE_EXECUTABLE_SUFFIX "_${QFUSION_WINDOWS_ARCH}${CMAKE_EXECUTABLE_SUFFIX}")
+    set(CMAKE_SHARED_LIBRARY_PREFIX "")
+    set(CMAKE_SHARED_LIBRARY_SUFFIX "_${QFUSION_WINDOWS_ARCH}${CMAKE_SHARED_LIBRARY_SUFFIX}")
 
-    set(CMAKE_EXECUTABLE_SUFFIX "_x86")
-    set(CMAKE_SHARED_LIBRARY_SUFFIX "_x86")
+    if (MINGW)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
+        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
+    else()
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+        set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+        set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+    endif()
 
     find_windows_release_libs(ZLIB_LIBRARY)
     find_windows_release_libs(JPEG_LIBRARIES)
@@ -116,6 +157,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     find_windows_release_libs(CURL_LIBRARY)
     find_windows_release_libs(ANGELSCRIPT_LIBRARY)
     find_windows_release_libs(LIBROCKET_LIBRARIES)
+    find_windows_release_libs(SDL2_LIBRARIES)
 endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -127,9 +169,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 
-    set(CMAKE_EXECUTABLE_SUFFIX ".x86_64${CMAKE_EXECUTABLE_SUFFIX}")
+    set(CMAKE_EXECUTABLE_SUFFIX ".${CMAKE_SYSTEM_PROCESSOR}${CMAKE_EXECUTABLE_SUFFIX}")
     set(CMAKE_SHARED_LIBRARY_PREFIX "")
-    set(CMAKE_SHARED_LIBRARY_SUFFIX "_x86_64${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set(CMAKE_SHARED_LIBRARY_SUFFIX "_${CMAKE_SYSTEM_PROCESSOR}${CMAKE_SHARED_LIBRARY_SUFFIX}")
 endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

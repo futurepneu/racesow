@@ -79,6 +79,9 @@ cvar_t *cl_downloads_from_web_timeout;
 cvar_t *cl_download_allow_modules;
 cvar_t *cl_checkForUpdate;
 
+static char cl_nextString[MAX_STRING_CHARS];
+static char cl_connectChain[MAX_STRING_CHARS];
+
 client_static_t	cls;
 client_state_t cl;
 
@@ -267,6 +270,11 @@ static void CL_CheckForResend( void )
 	{
 		if( realtime - cls.connect_time < 3000 )
 			return;
+		if( cls.connect_count > 3 )
+		{
+			CL_Disconnect( "Connection timed out" );
+			return;
+		}
 		cls.connect_count++;
 		cls.connect_time = realtime; // for retransmit requests
 
@@ -328,10 +336,13 @@ static void CL_CheckForResend( void )
 /*
 * CL_Connect
 */
-static void CL_Connect( const char *servername, socket_type_t type, netadr_t *address )
+static void CL_Connect( const char *servername, socket_type_t type, netadr_t *address, const char *serverchain )
 {
 	netadr_t socketaddress;
 	connstate_t newstate;
+
+	cl_connectChain[0] = '\0';
+	cl_nextString[0] = '\0';
 
 	CL_Disconnect( NULL );
 
@@ -393,6 +404,10 @@ static void CL_Connect( const char *servername, socket_type_t type, netadr_t *ad
 	}
 	CL_SetClientState( newstate );
 
+	if( serverchain[0] ) {
+		Q_strncpyz( cl_connectChain, serverchain, sizeof( cl_connectChain ) );
+	}
+
 	cls.connect_time = -99999; // CL_CheckForResend() will fire immediately
 	cls.connect_count = 0;
 	cls.rejected = qfalse;
@@ -410,8 +425,9 @@ static void CL_Connect_Cmd_f( socket_type_t socket )
 	const char *extension;
 	char *connectstring, *connectstring_base;
 	const char *tmp, *scheme = APP_URI_SCHEME, *proto_scheme = APP_URI_PROTO_SCHEME;
+	const char *serverchain;
 
-	if( Cmd_Argc() != 2 )
+	if( Cmd_Argc() < 2 )
 	{
 		Com_Printf( "Usage: %s <server>\n", Cmd_Argv(0) );
 		return;
@@ -419,7 +435,8 @@ static void CL_Connect_Cmd_f( socket_type_t socket )
 
 	connectstring_base = TempCopyString( Cmd_Argv( 1 ) );
 	connectstring = connectstring_base;
-
+	serverchain = Cmd_Argc() >= 3 ? Cmd_Argv( 2 ) : "";
+	
 	if( !Q_strnicmp( connectstring, proto_scheme, strlen( proto_scheme ) ) )
 		connectstring += strlen( proto_scheme );
 	else if( !Q_strnicmp( connectstring, scheme, strlen( scheme ) ) )
@@ -475,7 +492,8 @@ static void CL_Connect_Cmd_f( socket_type_t socket )
 	CL_MM_WaitForLogin();
 
 	servername = TempCopyString( connectstring );
-	CL_Connect( servername, ( serveraddress.type == NA_LOOPBACK ? SOCKET_LOOPBACK : socket ), &serveraddress );
+	CL_Connect( servername, ( serveraddress.type == NA_LOOPBACK ? SOCKET_LOOPBACK : socket ), 
+		&serveraddress, serverchain );
 
 	Mem_TempFree( servername );
 	Mem_TempFree( connectstring_base );
@@ -633,6 +651,8 @@ void CL_SetKeyDest( int key_dest )
 		Key_ClearStates();
 		cls.key_dest = key_dest;
 		Con_SetMessageModeCvar();
+		if( cl_zoom )
+			Cvar_SetValue( cl_zoom->name, 0 );
 	}
 }
 
@@ -671,6 +691,36 @@ size_t CL_GetBaseServerURL( char *buffer, size_t buffer_size )
 void CL_ResetServerCount( void )
 {
 	cl.servercount = -1;
+}
+
+/*
+* CL_BeginRegistration
+*/
+static void CL_BeginRegistration( void )
+{
+	if( cls.registrationOpen )
+		return;
+
+	cls.registrationOpen = qtrue;
+
+	re.BeginRegistration();
+	CL_SoundModule_BeginRegistration();
+}
+
+/*
+* CL_EndRegistration
+*/
+static void CL_EndRegistration( void )
+{
+	if( !cls.registrationOpen )
+		return;
+
+	cls.registrationOpen = qfalse;
+
+	FTLIB_TouchAllFonts();
+	CL_UIModule_TouchAllAssets();
+	re.EndRegistration();
+	CL_SoundModule_EndRegistration();
 }
 
 /*
@@ -734,6 +784,12 @@ void CL_ClearState( void )
 	cls.lastPacketReceivedTime = 0;
 
 	cls.sv_pure = qfalse;
+
+	if( cls.wakelock )
+	{
+		Sys_ReleaseWakeLock( cls.wakelock );
+		cls.wakelock = NULL;
+	}
 }
 
 
@@ -742,7 +798,6 @@ void CL_ClearState( void )
 * 
 * Next is used to set an action which is executed at disconnecting.
 */
-char cl_NextString[MAX_STRING_CHARS];
 static void CL_SetNext_f( void )
 {
 	if( Cmd_Argc() < 2 )
@@ -753,8 +808,8 @@ static void CL_SetNext_f( void )
 
 	// jalfixme: I'm afraid of this being too powerful, since it basically
 	// is allowed to execute everything. Shall we check for something?
-	Q_strncpyz( cl_NextString, Cmd_Args(), sizeof( cl_NextString ) );
-	Com_Printf( "NEXT: %s\n", cl_NextString );
+	Q_strncpyz( cl_nextString, Cmd_Args(), sizeof( cl_nextString ) );
+	Com_Printf( "NEXT: %s\n", cl_nextString );
 }
 
 
@@ -763,11 +818,11 @@ static void CL_SetNext_f( void )
 */
 static void CL_ExecuteNext( void )
 {
-	if( !strlen( cl_NextString ) )
+	if( !strlen( cl_nextString ) )
 		return;
 
-	Cbuf_ExecuteText( EXEC_APPEND, cl_NextString );
-	memset( cl_NextString, 0, sizeof( cl_NextString ) );
+	Cbuf_ExecuteText( EXEC_APPEND, cl_nextString );
+	memset( cl_nextString, 0, sizeof( cl_nextString ) );
 }
 
 /*
@@ -872,6 +927,8 @@ void CL_Disconnect( const char *message )
 		cls.httpbaseurl = NULL;
 	}
 
+	CL_EndRegistration();
+
 	CL_RestartMedia();
 
 	CL_Mumble_Unlink();
@@ -891,12 +948,24 @@ void CL_Disconnect( const char *message )
 		CL_DownloadDone();
 	}
 
-	if( message != NULL )
-	{
-		Q_snprintfz( menuparms, sizeof( menuparms ), "menu_open connfailed dropreason %i servername \"%s\" droptype %i rejectmessage \"%s\"",
-			( wasconnecting ? DROP_REASON_CONNFAILED : DROP_REASON_CONNERROR ), cls.servername, DROP_TYPE_GENERAL, message );
+	if( cl_connectChain[0] == '\0' ) {
+		if( message != NULL )
+		{
+			Q_snprintfz( menuparms, sizeof( menuparms ), "menu_open connfailed dropreason %i servername \"%s\" droptype %i rejectmessage \"%s\"",
+				( wasconnecting ? DROP_REASON_CONNFAILED : DROP_REASON_CONNERROR ), cls.servername, DROP_TYPE_GENERAL, message );
 
-		Cbuf_ExecuteText( EXEC_NOW, menuparms );
+			Cbuf_ExecuteText( EXEC_NOW, menuparms );
+		}
+	}
+	else {
+		const char *s = strchr( cl_connectChain, ',' );
+		if( s ) {
+			cl_connectChain[s - cl_connectChain] = '\0';
+		}
+		else {
+			s = cl_connectChain + strlen( cl_connectChain ) - 1;
+		}
+		Q_snprintfz( cl_nextString, sizeof( cl_nextString ), "connect \"%s\" \"%s\"", cl_connectChain, s + 1 );
 	}
 
 done:
@@ -910,6 +979,9 @@ done:
 
 void CL_Disconnect_f( void )
 {
+	cl_connectChain[0] = '\0';
+	cl_nextString[0] = '\0';
+
 	// We have to shut down webdownloading first
 	if( cls.download.web )
 	{
@@ -976,7 +1048,7 @@ void CL_ServerReconnect_f( void )
 	cls.rejected = qfalse;
 
 	CL_GameModule_Shutdown();
-	CL_SoundModule_StopAllSounds();
+	CL_SoundModule_StopAllSounds( qtrue, qtrue );
 
 	Com_Printf( "Reconnecting...\n" );
 
@@ -1008,11 +1080,14 @@ void CL_Reconnect_f( void )
 		return;
 	}
 
+	cl_connectChain[0] = '\0';
+	cl_nextString[0] = '\0';
+
 	servername = TempCopyString( cls.servername );
 	servertype = cls.servertype;
 	serveraddress = cls.serveraddress;
 	CL_Disconnect( NULL );
-	CL_Connect( servername, servertype, &serveraddress );
+	CL_Connect( servername, servertype, &serveraddress, "" );
 	Mem_TempFree( servername );
 }
 
@@ -1448,7 +1523,7 @@ static unsigned int CL_LoadMap( const char *name )
 	}
 
 	// check memory integrity
-	Mem_CheckSentinelsGlobal();
+	Mem_DebugCheckSentinelsGlobal();
 
 	return map_checksum;
 }
@@ -1609,8 +1684,7 @@ void CL_RequestNextDownload( void )
 			restart_msg = "Files downloaded. Restarting media...";
 		}
 
-		re.BeginRegistration();
-		CL_SoundModule_BeginRegistration();
+		CL_BeginRegistration();
 
 		if( restart ) {
 			Com_Printf( "%s\n", restart_msg );
@@ -1621,13 +1695,8 @@ void CL_RequestNextDownload( void )
 			}
 			else {
 				// make sure all media assets will be freed
-				FTLIB_TouchAllFonts();
-				CL_UIModule_TouchAllAssets();
-				re.EndRegistration();
-				CL_SoundModule_EndRegistration();
-
-				re.BeginRegistration();
-				CL_SoundModule_BeginRegistration();
+				CL_EndRegistration();
+				CL_BeginRegistration();
 			}
 		}
 
@@ -1686,6 +1755,7 @@ void CL_Precache_f( void )
 		else
 		{
 			CL_GameModule_Reset();
+			CL_SoundModule_StopAllSounds( qfalse, qfalse );
 		}
 
 		cls.demo.play_ignore_next_frametime = qtrue;
@@ -1780,7 +1850,7 @@ void CL_SetClientState( int state )
 	{
 	case CA_DISCONNECTED:
 		Con_Close();
-		CL_UIModule_Refresh( qtrue, qtrue );
+		CL_UIModule_Refresh( qtrue, IN_ShowUICursor() );
 		CL_UIModule_ForceMenuOn();
 		//CL_UIModule_MenuMain ();
 		CL_SetKeyDest( key_menu );
@@ -1802,9 +1872,8 @@ void CL_SetClientState( int state )
 		break;
 	case CA_ACTIVE:
 	case CA_CINEMATIC:
-		FTLIB_TouchAllFonts();
-		re.EndRegistration();
-		CL_SoundModule_EndRegistration();
+		cl_connectChain[0] = '\0';
+		CL_EndRegistration();
 		Con_Close();
 		CL_UIModule_Refresh( qfalse, qfalse );
 		CL_UIModule_ForceMenuOff();
@@ -1848,6 +1917,8 @@ void CL_InitMedia( void )
 
 	cls.mediaInitialized = qtrue;
 
+	CL_SoundModule_StopAllSounds( qtrue, qtrue );
+
 	// register console font and background
 	SCR_RegisterConsoleMedia();
 
@@ -1855,9 +1926,7 @@ void CL_InitMedia( void )
 	CL_UIModule_Init();
 
 	// check memory integrity
-	Mem_CheckSentinelsGlobal();
-
-	CL_SoundModule_StopAllSounds();
+	Mem_DebugCheckSentinelsGlobal();
 }
 
 /*
@@ -1871,6 +1940,8 @@ void CL_ShutdownMedia( void )
 		return;
 
 	cls.mediaInitialized = qfalse;
+	
+	CL_SoundModule_StopAllSounds( qtrue, qtrue );
 
 	// shutdown cgame
 	CL_GameModule_Shutdown();
@@ -1881,8 +1952,6 @@ void CL_ShutdownMedia( void )
 	SCR_ShutDownConsoleMedia();
 
 	SCR_StopCinematic();
-
-	CL_SoundModule_StopAllSounds();
 }
 
 /*
@@ -1901,7 +1970,7 @@ void CL_RestartMedia( void )
 		cls.mediaInitialized = qfalse;
 	}
 
-	CL_SoundModule_StopAllSounds();
+	CL_SoundModule_StopAllSounds( qtrue, qtrue );
 
 	// random seed to be shared among game modules so pseudo-random stuff is in sync
 	if ( cls.state != CA_CONNECTED )
@@ -1922,7 +1991,7 @@ void CL_RestartMedia( void )
 	CL_UIModule_TouchAllAssets();
 
 	// check memory integrity
-	Mem_CheckSentinelsGlobal();
+	Mem_DebugCheckSentinelsGlobal();
 }
 
 /*
@@ -2024,6 +2093,8 @@ static void CL_InitLocal( void )
 	m_pitch =		Cvar_Get( "m_pitch", "0.022", CVAR_ARCHIVE );
 	m_yaw =			Cvar_Get( "m_yaw", "0.022", CVAR_ARCHIVE );
 	m_sensCap =		Cvar_Get( "m_sensCap", "0", CVAR_ARCHIVE );
+
+	cl_zoom =		Cvar_Get( "zoom", "0", 0 );
 
 	cl_masterservers =	Cvar_Get( "masterservers", DEFAULT_MASTER_SERVERS_IPS, 0 );
 
@@ -2648,7 +2719,7 @@ void CL_Frame( int realmsec, int gamemsec )
 	}
 
 	// update audio
-	if( cls.state != CA_ACTIVE || cls.state == CA_CINEMATIC )
+	if( cls.state != CA_ACTIVE )
 	{
 		// if the loading plaque is up, clear everything out to make sure we aren't looping a dirty
 		// dma buffer while loading
@@ -3050,7 +3121,7 @@ void CL_Shutdown( void )
 	if( !cl_initialized )
 		return;
 
-	CL_SoundModule_StopAllSounds();
+	CL_SoundModule_StopAllSounds( qtrue, qtrue );
 
 	ML_Shutdown();
 	CL_MM_Shutdown( qtrue );

@@ -27,6 +27,7 @@ public:
 	bool drawBackground;
 	int backgroundNum;
 	int width, height;
+	float pixelRatio;
 };
 
 class ServerBrowserDataSource;
@@ -54,6 +55,8 @@ class EmptyFormatter;
 class UI_Main
 {
 public:
+	typedef std::list<NavigationStack *> UI_Navigation;
+
 	virtual ~UI_Main();
 
 	void refreshScreen( unsigned int time, int clientState, int serverState, 
@@ -85,8 +88,8 @@ public:
 	static void PrintDocuments_Cmd( void );
 	
 	// Other static functions
-	static UI_Main *Instance( int vidWidth, int vidHeight, int protocol,
-		const char *demoExtension, const char *basePath );
+	static UI_Main *Instance( int vidWidth, int vidHeight, float pixelRatio,
+		int protocol, const char *demoExtension, const char *basePath );
 	static UI_Main *Get( void );
 	static void Destroy( void );
 
@@ -96,7 +99,7 @@ public:
 
 	ASUI::ASInterface *getAS( void ) { return asmodule; };
 	RocketModule *getRocket( void ) { return rocketModule; }
-	NavigationStack *getNavigator( void ) { return navigator; }
+	//NavigationStack *getNavigator( void ) { return navigator; }
 	ServerBrowserDataSource *getServerBrowser( void ) { return serverBrowser; }
 	DemoInfo *getDemoInfo( void ) { return &demoInfo; }
 
@@ -104,10 +107,6 @@ public:
 	Rocket::Core::Context *getRocketContext( void );
 
 	StreamCache *getStreamCache( void ) { return streamCache; }
-
-	// backwards development compatibility
-	DocumentLoader *getDocumentLoader() { return currentLoader; }
-	void setDocumentLoader( DocumentLoader *loader ) { currentLoader = loader; }
 
 	const RefreshState &getRefreshState( void ) { return refreshState; }
 
@@ -124,9 +123,11 @@ public:
 
 	unsigned int getConnectCount( void ) const { return connectCount; }
 
+	NavigationStack *createStack( void );
+
 private:
-	UI_Main( int vidWidth, int vidHeight, int protocol,
-		const char *demoExtension, const char *basePath );
+	UI_Main( int vidWidth, int vidHeight, float pixelRatio,
+		int protocol, const char *demoExtension, const char *basePath );
 
 	//// METHODS
 	bool initAS( void );
@@ -179,9 +180,7 @@ private:
 	IrcChannelsDataSource *ircchannels;
 	GameAjaxDataSource *gameajax;
 
-	NavigationStack *navigator;
-
-	DocumentLoader *currentLoader;
+	UI_Navigation navigation;
 
 	StreamCache *streamCache;
 

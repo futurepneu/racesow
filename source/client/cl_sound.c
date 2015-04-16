@@ -18,7 +18,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "client.h"
-#include "../qcommon/sys_threads.h"
 
 static sound_export_t *se;
 static mempool_t *cl_soundmodulepool;
@@ -276,19 +275,19 @@ void CL_SoundModule_Init( qboolean verbose )
 	import.LoadLibrary = Com_LoadLibrary;
 	import.UnloadLibrary = Com_UnloadLibrary;
 
-	import.Thread_Create = Sys_Thread_Create;
-	import.Thread_Join = Sys_Thread_Join;
-	import.Thread_Yield = Sys_Thread_Yield;
-	import.Mutex_Create = Sys_Mutex_Create;
-	import.Mutex_Destroy = Sys_Mutex_Destroy;
-	import.Mutex_Lock = Sys_Mutex_Lock;
-	import.Mutex_Unlock = Sys_Mutex_Unlock;
+	import.Thread_Create = QThread_Create;
+	import.Thread_Join = QThread_Join;
+	import.Thread_Yield = QThread_Yield;
+	import.Mutex_Create = QMutex_Create;
+	import.Mutex_Destroy = QMutex_Destroy;
+	import.Mutex_Lock = QMutex_Lock;
+	import.Mutex_Unlock = QMutex_Unlock;
 
-	import.BufQueue_Create = Sys_BufQueue_Create;
-	import.BufQueue_Destroy = Sys_BufQueue_Destroy;
-	import.BufQueue_Finish = Sys_BufQueue_Finish;
-	import.BufQueue_EnqueueCmd = Sys_BufQueue_EnqueueCmd;
-	import.BufQueue_ReadCmds = Sys_BufQueue_ReadCmds;
+	import.BufQueue_Create = QBufQueue_Create;
+	import.BufQueue_Destroy = QBufQueue_Destroy;
+	import.BufQueue_Finish = QBufQueue_Finish;
+	import.BufQueue_EnqueueCmd = QBufQueue_EnqueueCmd;
+	import.BufQueue_ReadCmds = QBufQueue_ReadCmds;
 
 	if( !CL_SoundModule_Load( sound_modules[s_module->integer-1], &import, verbose ) )
 	{
@@ -310,7 +309,8 @@ void CL_SoundModule_Init( qboolean verbose )
 	CL_SoundModule_SetAttenuationModel();
 
 	// check memory integrity
-	Mem_CheckSentinelsGlobal();
+	Mem_DebugCheckSentinelsGlobal();
+
 	if( verbose )
 		Com_Printf( "------------------------------------\n" );
 }
@@ -356,11 +356,11 @@ void CL_SoundModule_EndRegistration( void )
 /*
 * CL_SoundModule_StopAllSounds
 */
-void CL_SoundModule_StopAllSounds( void )
+void CL_SoundModule_StopAllSounds( qboolean clear, qboolean stopMusic )
 {
 	max_spatialization_num = 0;
 	if( se )
-		se->StopAllSounds();
+		se->StopAllSounds( clear, stopMusic );
 }
 
 /*

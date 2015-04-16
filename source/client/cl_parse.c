@@ -803,7 +803,7 @@ static void CL_ParseServerData( msg_t *msg )
 	// parse protocol version number
 	i = MSG_ReadLong( msg );
 
-	if( i != APP_PROTOCOL_VERSION )
+	if( i != APP_PROTOCOL_VERSION && !(cls.demo.playing && i == APP_DEMO_PROTOCOL_VERSION) )
 		Com_Error( ERR_DROP, "Server returned version %i, not %i", i, APP_PROTOCOL_VERSION );
 
 	cl.servercount = MSG_ReadLong( msg );
@@ -920,6 +920,8 @@ static void CL_ParseServerData( msg_t *msg )
 #ifdef PURE_CHEAT
 	cls.sv_pure = qfalse;
 #endif
+
+	cls.wakelock = Sys_AcquireWakeLock();
 
 	// separate the printfs so the server message can have a color
 	Com_Printf( S_COLOR_WHITE "\n" "=====================================\n" );

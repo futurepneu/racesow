@@ -319,6 +319,7 @@ static podict_t *L10n_LoadPODict( const char *filepath )
 	podict->buffer = ( char * )( ( qbyte * )podict + sizeof( *podict ) );
 	FS_Read( podict->buffer, length, file );
 	podict->buffer[length] = '\0'; // safeguard
+	FS_FCloseFile( file );
 
 	podict->trie = L10n_ParsePOFile( filepath, podict->buffer, length );
 	return podict;
@@ -492,6 +493,7 @@ void L10n_LoadLangPOFile( const char *domainname, const char *filepath )
 	podomain_t *podomain;
 	pofile_t *pofile;
 	podict_t *pofile_dict;
+	char lang[MAX_STRING_CHARS];
 	char *tempfilename;
 	const char *sep;
 	size_t tempfilename_size;
@@ -515,11 +517,13 @@ void L10n_LoadLangPOFile( const char *domainname, const char *filepath )
 		}
 	}
 
-	tempfilename_size = strlen( filepath ) + strlen( "/" ) + strlen( cl_lang->string ) + strlen( ".po" ) + 1;
+	Q_strncpyz( lang, cl_lang->string, sizeof( lang ) );
+
+	tempfilename_size = strlen( filepath ) + 1 + strlen( lang ) + ( sizeof( ".po" ) - 1 ) + 1;
 	tempfilename = ( char * )L10n_Malloc( tempfilename_size );
 
 	sep = ( filepath[strlen( filepath ) - 1] == '/' ? "" : "/" );
-	Q_snprintfz( tempfilename, tempfilename_size, "%s%s%s.po", filepath, sep, cl_lang->string );
+	Q_snprintfz( tempfilename, tempfilename_size, "%s%s%s.po", filepath, sep, lang );
 
 	if( !COM_ValidateFilename( tempfilename ) ) {
 		Com_Printf( S_COLOR_YELLOW "LoadLangPOFile failed: invalid filename '%s'\n", filepath );
@@ -533,6 +537,17 @@ void L10n_LoadLangPOFile( const char *domainname, const char *filepath )
 	}
 
 	pofile_dict = L10n_LoadPODict( tempfilename );
+	if( !pofile_dict ) {
+		// try to load country-independent file
+		char *underscore = strchr( lang, '_' );
+		if( underscore ) {
+			char *tempfilename2 = L10n_Malloc( tempfilename_size );
+			*underscore = '\0';
+			Q_snprintfz( tempfilename2, tempfilename_size, "%s%s%s.po", filepath, sep, lang );
+			pofile_dict = L10n_LoadPODict( tempfilename2 );
+			L10n_Free( tempfilename2 );
+		}
+	}
 	if( pofile_dict ) {
 		pofile = L10n_CreatePOFile( tempfilename );
 		pofile->dict = pofile_dict;

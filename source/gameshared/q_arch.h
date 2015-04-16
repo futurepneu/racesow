@@ -38,6 +38,8 @@ extern "C" {
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 //==============================================
 
@@ -133,21 +135,11 @@ extern "C" {
 #define HAVE___CDECL
 #endif
 
-#if defined ( __GNUC__ )
-#include <alloca.h>
-#elif defined ( _MSC_VER )
 #include <malloc.h>
 #define HAVE__ALLOCA
-#endif
 
 // wsw : aiwa : 64bit integers and integer-pointer types
 #include <basetsd.h>
-#include <stdint.h>
-typedef int64_t qint64;
-typedef uint64_t quint64;
-typedef intptr_t qintptr;
-typedef uintptr_t quintptr;
-
 
 typedef int socklen_t;
 typedef unsigned long ioctl_param_t;
@@ -239,12 +231,6 @@ typedef UINT_PTR socket_handle_t;
 #include <alloca.h>
 
 // wsw : aiwa : 64bit integers and integer-pointer types
-#include <stdint.h>
-typedef int64_t qint64;
-typedef uint64_t quint64;
-typedef intptr_t qintptr;
-typedef uintptr_t quintptr;
-
 typedef int ioctl_param_t;
 
 typedef int socket_handle_t;
@@ -285,12 +271,6 @@ typedef int socket_handle_t;
 
 #include <alloca.h>
 
-#include <stdint.h>
-typedef int64_t qint64;
-typedef uint64_t quint64;
-typedef intptr_t qintptr;
-typedef uintptr_t quintptr;
-
 typedef int ioctl_param_t;
 
 typedef int socket_handle_t;
@@ -310,6 +290,8 @@ typedef int socket_handle_t;
 
 //==============================================
 
+#if !defined(__cplusplus)
+
 #ifdef HAVE___INLINE
 #ifndef inline
 #define inline __inline
@@ -318,6 +300,8 @@ typedef int socket_handle_t;
 #ifndef inline
 #define inline
 #endif
+#endif
+
 #endif
 
 #ifdef HAVE__SNPRINTF
@@ -426,8 +410,16 @@ typedef int socket_handle_t;
 
 //==============================================
 
-typedef unsigned char qbyte;
-typedef enum { qfalse, qtrue }	  qboolean;
+typedef uint8_t qbyte;
+typedef int64_t qint64;
+typedef uint64_t quint64;
+typedef intptr_t qintptr;
+typedef uintptr_t quintptr;
+
+typedef bool qboolean;
+#define qtrue true
+#define qfalse false
+
 typedef unsigned int qwchar;	// Unicode character
 
 #ifndef NULL

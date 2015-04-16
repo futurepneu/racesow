@@ -238,6 +238,7 @@ static edict_t *CopyToBodyQue( edict_t *ent, edict_t *attacker, int damage )
 	VectorCopy( ent->r.absmin, body->r.absmin );
 	VectorCopy( ent->r.absmax, body->r.absmax );
 	VectorCopy( ent->r.size, body->r.size );
+	VectorCopy( ent->velocity, body->velocity );
 	body->r.maxs[2] = body->r.mins[2] + 8;
 
 	body->r.solid = SOLID_YES;
@@ -251,7 +252,11 @@ static edict_t *CopyToBodyQue( edict_t *ent, edict_t *attacker, int damage )
 		|| meansOfDeath == MOD_ELECTROBOLT_S /* electrobolt always gibs */ )
 	{
 		ThrowSmallPileOfGibs( body, damage );
+
+		// reset gib impulse
+		VectorClear( body->velocity );
 		ThrowClientHead( body, damage ); // sets ET_GIB
+
 		body->s.frame = 0;
 		body->nextThink = level.time + 3000 + random() * 3000;
 		body->deadflag = DEAD_DEAD;
@@ -264,9 +269,6 @@ static edict_t *CopyToBodyQue( edict_t *ent, edict_t *attacker, int damage )
 		body->s.bodyOwner = ent->s.number; // bodyOwner is the same as modelindex2
 		body->s.skinnum = ent->s.skinnum;
 		body->s.teleported = qtrue;
-
-		// when it's not a gib (they get their own impulse) copy player's velocity (knockback deads)
-		VectorCopy( ent->velocity, body->velocity );
 
 		// launch the death animation on the body
 		{
@@ -295,6 +297,7 @@ static edict_t *CopyToBodyQue( edict_t *ent, edict_t *attacker, int damage )
 	}
 	else // wasn't a player, just copy it's model
 	{
+		VectorClear( body->velocity );
 		body->s.modelindex = ent->s.modelindex;
 		body->s.frame = ent->s.frame;
 		body->nextThink = level.time + 5000 + random()*10000;
@@ -309,7 +312,8 @@ static edict_t *CopyToBodyQue( edict_t *ent, edict_t *attacker, int damage )
 */
 void player_die( edict_t *ent, edict_t *inflictor, edict_t *attacker, int damage, const vec3_t point )
 {
-	edict_t	*body;
+	snap_edict_t snap_backup = ent->snap;
+	client_snapreset_t resp_snap_backup = ent->r.client->resp.snap;
 
 	VectorClear( ent->avelocity );
 
@@ -326,33 +330,38 @@ void player_die( edict_t *ent, edict_t *inflictor, edict_t *attacker, int damage
 	ClientObituary( ent, inflictor, attacker );
 
 	// create a body
-	body = CopyToBodyQue( ent, attacker, damage );
+	CopyToBodyQue( ent, attacker, damage );
 	ent->enemy = NULL;
 
 	// clear his combo stats
 	G_AwardResetPlayerComboStats( ent );
 
-	// go ghost
+	// go ghost (also resets snap)
 	G_GhostClient( ent );
 
 	ent->deathTimeStamp = level.time;
 
 	VectorClear( ent->velocity );
 	VectorClear( ent->avelocity );
+	ent->snap = snap_backup;
+	ent->r.client->resp.snap = resp_snap_backup;
 	ent->r.client->resp.snap.buttons = 0;
 	GClip_LinkEntity( ent );
 }
 
+/*
+* G_Client_UpdateActivity
+*/
 void G_Client_UpdateActivity( gclient_t *client )
 {
 	if( !client )
 		return;
-
-	//G_Printf( "Activity updated\n" );
-
 	client->level.last_activity = level.time;
 }
 
+/*
+* G_Client_InactivityRemove
+*/
 void G_Client_InactivityRemove( gclient_t *client )
 {
 	if( !client )
@@ -577,9 +586,9 @@ void G_ClientRespawn( edict_t *self, bool ghost )
 	client->ps.POVnum = ENTNUM( self );
 
 	// set movement info
-	client->ps.pmove.stats[PM_STAT_MAXSPEED] = DEFAULT_PLAYERSPEED;
-	client->ps.pmove.stats[PM_STAT_JUMPSPEED] = DEFAULT_JUMPSPEED;
-	client->ps.pmove.stats[PM_STAT_DASHSPEED] = DEFAULT_DASHSPEED;
+	client->ps.pmove.stats[PM_STAT_MAXSPEED] = (short)DEFAULT_PLAYERSPEED;
+	client->ps.pmove.stats[PM_STAT_JUMPSPEED] = (short)DEFAULT_JUMPSPEED;
+	client->ps.pmove.stats[PM_STAT_DASHSPEED] = (short)DEFAULT_DASHSPEED;
 
 	if( ghost )
 	{
@@ -652,6 +661,86 @@ void G_ClientRespawn( edict_t *self, bool ghost )
 		GT_asCallPlayerRespawn( self, old_team, self->s.team );
 	else
 		G_Gametype_GENERIC_ClientRespawn( self, old_team, self->s.team );
+}
+
+/*
+* G_PlayerCanTeleport
+*
+* Checks if the player can be teleported.
+*/
+bool G_PlayerCanTeleport( edict_t *player )
+{
+	if ( !player->r.client )
+		return false;
+	if ( player->r.client->ps.pmove.pm_type > PM_SPECTATOR )
+		return false;
+	if ( GS_MatchState( ) == MATCH_STATE_COUNTDOWN ) // match countdown
+		return false;
+	return true;
+}
+
+/*
+* G_TeleportPlayer
+*/
+void G_TeleportPlayer( edict_t *player, edict_t *dest )
+{
+	int i;
+	vec3_t velocity;
+	mat3_t axis;
+	float speed;
+	gclient_t *client = player->r.client;
+
+	if( !dest ) {
+		return;
+	}
+	if( !client ) {
+		return;
+	}
+
+	// draw the teleport entering effect
+	G_TeleportEffect( player, false );
+
+	//
+	// teleport the player
+	//
+
+	// from racesow - use old pmove velocity
+	VectorCopy( client->old_pmove.velocity, velocity );
+
+	velocity[2] = 0; // ignore vertical velocity
+	speed = VectorLengthFast( velocity );
+
+	AnglesToAxis( dest->s.angles, axis );
+	VectorScale( &axis[AXIS_FORWARD], speed, client->ps.pmove.velocity );
+
+	VectorCopy( dest->s.angles, client->ps.viewangles );
+	VectorCopy( dest->s.origin, client->ps.pmove.origin );
+
+	// set the delta angle
+	for ( i = 0; i < 3; i++ )
+		client->ps.pmove.delta_angles[i] = ANGLE2SHORT( client->ps.viewangles[i] ) - client->ucmd.angles[i];
+
+	client->ps.pmove.pm_flags |= PMF_TIME_TELEPORT;
+	client->ps.pmove.pm_time = 1; // force the minimum no control delay
+	player->s.teleported = qtrue;
+
+	// update the entity from the pmove
+	VectorCopy( client->ps.viewangles, player->s.angles );
+	VectorCopy( client->ps.pmove.origin, player->s.origin );
+	VectorCopy( client->ps.pmove.origin, player->s.old_origin );
+	VectorCopy( client->ps.pmove.origin, player->olds.origin );
+	VectorCopy( client->ps.pmove.velocity, player->velocity );
+
+	// unlink to make sure it can't possibly interfere with KillBox
+	GClip_UnlinkEntity( player );
+
+	// kill anything at the destination
+	KillBox( player );
+
+	GClip_LinkEntity( player );
+
+	// add the teleport effect at the destination
+	G_TeleportEffect( player, true );
 }
 
 //==============================================================
@@ -1282,8 +1371,9 @@ void ClientDisconnect( edict_t *ent, const char *reason )
 		return;
 
 	// always report in RACE mode
-	if( GS_RaceGametype() || ( ent->r.client->team != TEAM_SPECTATOR && GS_MatchState() == MATCH_STATE_PLAYTIME ) )
-		G_AddPlayerReport( ent, false );
+	if( GS_RaceGametype() 
+		|| ( ent->r.client->team != TEAM_SPECTATOR && ( GS_MatchState() == MATCH_STATE_PLAYTIME || GS_MatchState() == MATCH_STATE_POSTMATCH ) ) )
+		G_AddPlayerReport( ent, GS_MatchState() == MATCH_STATE_POSTMATCH );
 
 	for( team = TEAM_PLAYERS; team < GS_MAX_TEAMS; team++ )
 		G_Teams_UnInvitePlayer( team, ent );

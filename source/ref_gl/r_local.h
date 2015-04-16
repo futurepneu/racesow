@@ -36,12 +36,13 @@ typedef unsigned short elem_t;
 
 typedef vec_t instancePoint_t[8]; // quaternion for rotation + xyz pos + uniform scale
 
+#define NUM_LOADER_THREADS		2
+
 enum
 {
 	QGL_CONTEXT_MAIN,
 	QGL_CONTEXT_LOADER,
-
-	NUM_QGL_CONTEXTS
+	NUM_QGL_CONTEXTS = QGL_CONTEXT_LOADER + NUM_LOADER_THREADS
 };
 
 #include "r_math.h"
@@ -118,6 +119,8 @@ typedef struct superLightStyle_s
 
 #define RF_CUBEMAPVIEW			( RF_ENVVIEW )
 #define RF_NONVIEWERREF			( RF_PORTALVIEW|RF_MIRRORVIEW|RF_ENVVIEW|RF_SKYPORTALVIEW|RF_SHADOWMAPVIEW )
+
+#define MAX_REF_ENTITIES		( MAX_ENTITIES + 48 ) // must not exceed 2048 because of sort key packing
 
 //===================================================================
 
@@ -240,8 +243,10 @@ typedef struct
 	unsigned int	frameCount;
 
 	unsigned int	numEntities;
-	entity_t		entities[MAX_ENTITIES];
+	unsigned int	numLocalEntities;
+	entity_t		entities[MAX_REF_ENTITIES];
 	entity_t		*worldent;
+	entity_t		*polyent;
 
 	unsigned int	numDlights;
 	dlight_t		dlights[MAX_DLIGHTS];
@@ -252,12 +257,12 @@ typedef struct
 	lightstyle_t	lightStyles[MAX_LIGHTSTYLES];
 
 	unsigned int	numBmodelEntities;
-	entity_t		*bmodelEntities[MAX_ENTITIES];
+	entity_t		*bmodelEntities[MAX_REF_ENTITIES];
 
 	unsigned int	numShadowGroups;
 	shadowGroup_t	shadowGroups[MAX_SHADOWGROUPS];
-	unsigned int	entShadowGroups[MAX_ENTITIES];
-	unsigned int	entShadowBits[MAX_ENTITIES];
+	unsigned int	entShadowGroups[MAX_REF_ENTITIES];
+	unsigned int	entShadowBits[MAX_REF_ENTITIES];
 
 	float			farClipMin, farClipBias;
 
@@ -289,6 +294,8 @@ typedef struct
 
 	struct {
 		unsigned int	c_brush_polys, c_world_leafs;
+		unsigned int	c_slices_verts, c_slices_verts_real;
+		unsigned int	c_slices_elems, c_slices_elems_real;
 		unsigned int	t_mark_leaves, t_world_node;
 		unsigned int	t_add_polys, t_add_entities;
 		unsigned int	t_draw_meshes;
@@ -347,9 +354,6 @@ extern cvar_t *r_offsetmapping;
 extern cvar_t *r_offsetmapping_scale;
 extern cvar_t *r_offsetmapping_reliefmapping;
 
-extern cvar_t *r_polygon_offset_factor;
-extern cvar_t *r_polygon_offset_units;
-
 extern cvar_t *r_shadows;
 extern cvar_t *r_shadows_alpha;
 extern cvar_t *r_shadows_nudge;
@@ -358,8 +362,6 @@ extern cvar_t *r_shadows_maxtexsize;
 extern cvar_t *r_shadows_pcf;
 extern cvar_t *r_shadows_self_shadow;
 extern cvar_t *r_shadows_dither;
-extern cvar_t *r_shadows_polygon_offset_factor;
-extern cvar_t *r_shadows_polygon_offset_units;
 
 extern cvar_t *r_outlines_world;
 extern cvar_t *r_outlines_scale;
@@ -389,6 +391,7 @@ extern cvar_t *r_screenshot_fmtstr;
 extern cvar_t *r_screenshot_jpeg;
 extern cvar_t *r_screenshot_jpeg_quality;
 extern cvar_t *r_swapinterval;
+extern cvar_t *r_fragment_highp;
 
 extern cvar_t *r_temp1;
 
@@ -494,7 +497,8 @@ void		RFB_Shutdown( void );
 
 unsigned int R_AddSurfaceDlighbits( const msurface_t *surf, unsigned int checkDlightBits );
 void		R_AddDynamicLights( unsigned int dlightbits, int state );
-void		R_LightForOrigin( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t diffuse, float radius );
+void		R_LightForOrigin( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t diffuse, float radius, qboolean noWorldLight );
+void		R_LightForOrigin2( const vec3_t origin, vec3_t dir, vec4_t ambient, vec4_t diffuse, float radius );
 void		R_BuildLightmaps( model_t *mod, int numLightmaps, int w, int h, const qbyte *data, mlightmapRect_t *rects );
 void		R_InitLightStyles( model_t *mod );
 superLightStyle_t	*R_AddSuperLightStyle( model_t *mod, const int *lightmaps, 
@@ -593,6 +597,7 @@ void		R_BindFrameBufferObject( int object );
 
 void		R_Scissor( int x, int y, int w, int h );
 void		R_GetScissor( int *x, int *y, int *w, int *h );
+void		R_ResetScissor( void );
 void		R_EnableScissor( qboolean enable );
 
 shader_t	*R_GetShaderForOrigin( const vec3_t origin );
@@ -639,14 +644,14 @@ qboolean	R_BeginPolySurf( const entity_t *e, const shader_t *shader, const mfog_
 void		R_BatchPolySurf( const entity_t *e, const shader_t *shader, const mfog_t *fog, drawSurfacePoly_t *poly );
 void		R_DrawPolys( void );
 void		R_DrawStretchPoly( const poly_t *poly, float x_offset, float y_offset );
-qboolean	R_SurfPotentiallyFragmented( msurface_t *surf );
+qboolean	R_SurfPotentiallyFragmented( const msurface_t *surf );
 int			R_GetClippedFragments( const vec3_t origin, float radius, vec3_t axis[3], int maxfverts,
 								  vec4_t *fverts, int maxfragments, fragment_t *fragments );
 
 //
 // r_register.c
 //
-rserr_t		R_Init( const char *applicationName, const char *screenshotPrefix,
+rserr_t		R_Init( const char *applicationName, const char *screenshotPrefix, int startupColor,
 				void *hinstance, void *wndproc, void *parenthWnd, 
 				int x, int y, int width, int height, int displayFrequency,
 				qboolean fullscreen, qboolean wideScreen, qboolean verbose );
@@ -752,8 +757,9 @@ typedef struct mesh_vbo_s
 	size_t 				normalsOffset;
 	size_t 				sVectorsOffset;
 	size_t 				stOffset;
-	size_t 				lmstOffset[MAX_LIGHTMAPS/2];
-	size_t 				lmstSize[MAX_LIGHTMAPS/2];
+	size_t 				lmstOffset[( MAX_LIGHTMAPS + 1 ) / 2];
+	size_t 				lmstSize[( MAX_LIGHTMAPS + 1 ) / 2];
+	size_t				lmlayersOffset[( MAX_LIGHTMAPS + 3 ) / 4];
 	size_t 				colorsOffset[MAX_LIGHTMAPS];
 	size_t				bonesIndicesOffset;
 	size_t				bonesWeightsOffset;
@@ -815,6 +821,8 @@ typedef struct
 	float			lightingIntensity;
 
 	qboolean		lightmapsPacking;
+	qboolean		lightmapArrays;			// true if using array textures for lightmaps
+	int				maxLightmapSize;		// biggest dimension of the largest lightmap
 	qboolean		deluxeMaps;				// true if there are valid deluxemaps in the .bsp
 	qboolean		deluxeMappingEnabled;	// true if deluxeMaps is true and r_lighting_deluxemaps->integer != 0
 

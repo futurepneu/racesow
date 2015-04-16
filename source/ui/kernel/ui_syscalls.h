@@ -50,6 +50,10 @@ namespace trap
 			UI_IMPORT.R_GetScissor( x, y, w, h );
 		}
 
+		inline void R_ResetScissor( void ) {
+			UI_IMPORT.R_ResetScissor();
+		}
+
 		inline void R_AddEntityToScene( entity_t *ent ) {
 			UI_IMPORT.R_AddEntityToScene( ent );
 		}
@@ -254,6 +258,10 @@ namespace trap
 
 		inline qboolean Key_IsDown( int keynum ) {
 			return UI_IMPORT.Key_IsDown( keynum );
+		}
+
+		inline void IN_ShowIME( qboolean show ) {
+			UI_IMPORT.IN_ShowIME( show );
 		}
 
 		inline qboolean VID_GetModeInfo( int *width, int *height, qboolean *wideScreen, int mode ) {

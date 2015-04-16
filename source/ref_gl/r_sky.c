@@ -272,7 +272,7 @@ static void R_DrawSkyBoxSide( const skydome_t *skydome, const visSkySide_t *visS
 
 	RB_SetSkyboxSide( imageIndex );
 
-	RB_DrawElements( visSide->firstVert, visSide->numVerts, visSide->firstElem, visSide->numElems );
+	RB_DrawElements( visSide->firstVert, visSide->numVerts, visSide->firstElem, visSide->numElems, 0, 0, 0, 0 );
 }
 
 /*
@@ -305,7 +305,7 @@ static void R_DrawBlackBottom( const skydome_t *skydome, const visSkySide_t *vis
 
 	RB_BindVBO( skydome->linearVbos[side]->index, GL_TRIANGLES );
 
-	RB_DrawElements( visSide->firstVert, visSide->numVerts, visSide->firstElem, visSide->numElems );
+	RB_DrawElements( visSide->firstVert, visSide->numVerts, visSide->firstElem, visSide->numElems, 0, 0, 0, 0 );
 }
 
 /*
@@ -392,8 +392,6 @@ qboolean R_DrawSkySurf( const entity_t *e, const shader_t *shader, const mfog_t 
 
 	if( shader->numpasses )
 	{
-		RB_BindShader( rsc.worldent, shader, rn.skyFog );
-
 		for( i = 0; i < 5; i++ )
 		{
 			const visSkySide_t *visSide = visSkySides + i;
@@ -402,9 +400,11 @@ qboolean R_DrawSkySurf( const entity_t *e, const shader_t *shader, const mfog_t 
 				rn.skyMins[1][i] >= rn.skyMaxs[1][i] )
 				continue;
 
+			RB_BindShader( rsc.worldent, shader, rn.skyFog ); // must be called for every side to reset backend state
+
 			RB_BindVBO( skydome->sphereVbos[i]->index, GL_TRIANGLES );
 
-			RB_DrawElements( visSide->firstVert, visSide->numVerts, visSide->firstElem, visSide->numElems );
+			RB_DrawElements( visSide->firstVert, visSide->numVerts, visSide->firstElem, visSide->numElems, 0, 0, 0, 0 );
 		}
 	}
 

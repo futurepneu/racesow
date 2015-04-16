@@ -85,6 +85,11 @@ static void CL_FTLibModule_GetScissor( int *x, int *y, int *w, int *h )
 	re.GetScissor( x, y, w, h );
 }
 
+static void CL_FTLibModule_ResetScissor( void )
+{
+	re.ResetScissor();
+}
+
 /*
 * FTLIB_LoadLibrary
 */
@@ -134,6 +139,7 @@ void FTLIB_LoadLibrary( qboolean verbose )
 	import.R_DrawStretchPic = &CL_FTLibModule_DrawStretchPic;
 	import.R_Scissor = &CL_FTLibModule_Scissor;
 	import.R_GetScissor = &CL_FTLibModule_GetScissor;
+	import.R_ResetScissor = &CL_FTLibModule_ResetScissor;
 
 	import.Milliseconds = &Sys_Milliseconds;
 	import.Microseconds = &Sys_Microseconds;
@@ -198,7 +204,7 @@ void FTLIB_LoadLibrary( qboolean verbose )
 		}
 	}
 
-	Mem_CheckSentinelsGlobal();
+	Mem_DebugCheckSentinelsGlobal();
 }
 
 /*
@@ -307,6 +313,16 @@ void FTLIB_DrawRawChar( int x, int y, qwchar num, struct qfontface_s *font, vec4
 {
 	if( ftlib_export ) {
 		ftlib_export->DrawRawChar( x, y, num, font, color );
+	}
+}
+
+/*
+* FTLIB_DrawClampChar
+*/
+void FTLIB_DrawClampChar( int x, int y, qwchar num, int xmin, int ymin, int xmax, int ymax, struct qfontface_s *font, vec4_t color )
+{
+	if( ftlib_export ) {
+		ftlib_export->DrawClampChar( x, y, num, xmin, ymin, xmax, ymax, font, color );
 	}
 }
 

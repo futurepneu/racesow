@@ -50,7 +50,8 @@ enum
 	TOUCHAREA_HUD_CROUCH,
 	TOUCHAREA_HUD_ATTACK,
 	TOUCHAREA_HUD_SPECIAL,
-	TOUCHAREA_HUD_WEAPON = TOUCHAREA_HUD + 0x80
+	TOUCHAREA_HUD_CLASSACTION,
+	TOUCHAREA_HUD_WEAPON
 };
 
 //=============================================================================
@@ -194,7 +195,7 @@ static int CG_GetFPS( const void *parameter )
 
 	frameTimes[cg.frameCount & FPSSAMPLESMASK] = cg.realFrameTime;
 
-	if( cg_showFPS->integer != 2 )
+	if( cg_showFPS->integer != 1 )
 	{
 		for( avFrameTime = 0.0f, i = 0; i < FPSSAMPLESCOUNT; i++ )
 		{
@@ -809,6 +810,15 @@ void CG_SC_PrintObituary( const char *format, ... )
 }
 
 /*
+* CG_SC_ResetObituaries
+*/
+void CG_SC_ResetObituaries( void )
+{
+	memset( cg_obituaries, 0, sizeof( cg_obituaries ) );
+	cg_obituaries_current = -1;
+}
+
+/*
 * CG_SC_Obituary
 */
 void CG_SC_Obituary( void )
@@ -868,7 +878,7 @@ void CG_SC_Obituary( void )
 				current->type = OBITUARY_TEAM;
 				if( cg_showObituaries->integer & CG_OBITUARY_CONSOLE )
 				{
-					CG_LocalPrint( false, "%s%s%s %s %s%s %s%s%s\n", S_COLOR_RED, "TEAMKILL:", S_COLOR_WHITE, victim->name,
+					CG_LocalPrint( "%s%s%s %s %s%s %s%s%s\n", S_COLOR_RED, "TEAMKILL:", S_COLOR_WHITE, victim->name,
 					           S_COLOR_WHITE, message, attacker->name, S_COLOR_WHITE, message2 );
 				}
 
@@ -881,7 +891,7 @@ void CG_SC_Obituary( void )
 			{
 				current->type = OBITUARY_NORMAL;
 				if( cg_showObituaries->integer & CG_OBITUARY_CONSOLE )
-					CG_LocalPrint( false, "%s %s%s %s%s%s\n", victim->name, S_COLOR_WHITE, message, attacker->name, S_COLOR_WHITE,
+					CG_LocalPrint( "%s %s%s %s%s%s\n", victim->name, S_COLOR_WHITE, message, attacker->name, S_COLOR_WHITE,
 					           message2 );
 
 				if( ISVIEWERENTITY( attackerNum ) && ( cg_showObituaries->integer & CG_OBITUARY_CENTER ) )
@@ -894,14 +904,14 @@ void CG_SC_Obituary( void )
 		{
 			current->type = OBITUARY_SUICIDE;
 			if( cg_showObituaries->integer & CG_OBITUARY_CONSOLE )
-				CG_LocalPrint( false, "%s %s%s\n", victim->name, S_COLOR_WHITE, message );
+				CG_LocalPrint( "%s %s%s\n", victim->name, S_COLOR_WHITE, message );
 		}
 	}
 	else // world accidents
 	{
 		current->type = OBITUARY_ACCIDENT;
 		if( cg_showObituaries->integer & CG_OBITUARY_CONSOLE )
-			CG_LocalPrint( false, "%s %s%s\n", victim->name, S_COLOR_WHITE, message );
+			CG_LocalPrint( "%s %s%s\n", victim->name, S_COLOR_WHITE, message );
 	}
 }
 
@@ -909,7 +919,7 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
                                int internal_align, unsigned int icon_size )
 {
 	int i, num, skip, next, w, num_max;
-	size_t line_height;
+	int line_height;
 	int xoffset, yoffset;
 	obituary_t *obr;
 	struct shader_s *pic;
@@ -1022,9 +1032,9 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
 
 		w = 0;
 		if( obr->type != OBITUARY_ACCIDENT )
-			w += min( trap_SCR_strWidth( obr->attacker, font, 0 ), ( width - icon_size * cgs.vidWidth/800 ) / 2 );
-		w += icon_size * cgs.vidWidth/800;
-		w += min( trap_SCR_strWidth( obr->victim, font, 0 ), ( width - icon_size * cgs.vidWidth/800 ) / 2 );
+			w += min( trap_SCR_strWidth( obr->attacker, font, 0 ), ( width - icon_size ) / 2 );
+		w += icon_size;
+		w += min( trap_SCR_strWidth( obr->victim, font, 0 ), ( width - icon_size ) / 2 );
 
 		if( internal_align == 1 )
 		{
@@ -1053,13 +1063,13 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
 				Vector4Set( teamcolor, 255, 255, 255, 255 );
 			}
 			trap_SCR_DrawStringWidth( x + xoffset, y + yoffset + ( line_height - trap_SCR_strHeight( font ) ) / 2,
-			                          ALIGN_LEFT_TOP, COM_RemoveColorTokensExt( obr->attacker, qtrue ), ( width - icon_size * cgs.vidWidth/800 ) / 2,
+			                          ALIGN_LEFT_TOP, COM_RemoveColorTokensExt( obr->attacker, qtrue ), ( width - icon_size ) / 2,
 			                          font, teamcolor );
-			xoffset += min( trap_SCR_strWidth( obr->attacker, font, 0 ), ( width - icon_size * cgs.vidWidth/800 ) / 2 );
+			xoffset += min( trap_SCR_strWidth( obr->attacker, font, 0 ), ( width - icon_size ) / 2 );
 		}
-		trap_R_DrawStretchPic( x + xoffset, y + yoffset + ( line_height - icon_size ) / 2, icon_size * cgs.vidWidth/800,
-		                       icon_size * cgs.vidHeight/600, 0, 0, 1, 1, colorWhite, pic );
-		xoffset += icon_size * cgs.vidWidth/800;
+		trap_R_DrawStretchPic( x + xoffset, y + yoffset + ( line_height - icon_size ) / 2, icon_size,
+		                       icon_size, 0, 0, 1, 1, colorWhite, pic );
+		xoffset += icon_size;
 		if( GS_TeamBasedGametype() )
 		{
 			CG_TeamColor( obr->victim_team, teamcolor );
@@ -1068,9 +1078,9 @@ static void CG_DrawObituaries( int x, int y, int align, struct qfontface_s *font
 		{
 			Vector4Set( teamcolor, 255, 255, 255, 255 );
 		}
-		trap_SCR_DrawStringWidth( x + xoffset, y + yoffset + ( (int) line_height ) / 2, ALIGN_LEFT_MIDDLE,
-		                          COM_RemoveColorTokensExt( obr->victim, qtrue ), ( width - icon_size * cgs.vidWidth/800 ) / 2, font, teamcolor );
-		xoffset += min( trap_SCR_strWidth( obr->victim, font, 0 ), ( width - icon_size * cgs.vidWidth/800 ) / 2 );
+		trap_SCR_DrawStringWidth( x + xoffset, y + yoffset + line_height / 2, ALIGN_LEFT_MIDDLE,
+		                          COM_RemoveColorTokensExt( obr->victim, qtrue ), ( width - icon_size ) / 2, font, teamcolor );
+		xoffset += min( trap_SCR_strWidth( obr->victim, font, 0 ), ( width - icon_size ) / 2 );
 
 		yoffset += line_height;
 	}
@@ -1205,7 +1215,7 @@ static void CG_DrawWeaponIcons( int x, int y, int offx, int offy, int iw, int ih
 		{
 			if( cg.predictedPlayerState.inventory[WEAP_GUNBLADE+i] && !selected_weapon )
 			{
-				if( CG_TouchArea( TOUCHAREA_HUD_WEAPON + j, curx, cury, curw, curh, false, NULL ) >= 0 )
+				if( CG_TouchArea( TOUCHAREA_HUD_WEAPON | ( i << TOUCHAREA_SUB_SHIFT ), curx, cury, curw, curh, NULL ) >= 0 )
 				{
 					gsitem_t *item = GS_FindItemByTag( WEAP_GUNBLADE+i );
 					if( item )
@@ -1748,6 +1758,28 @@ static bool CG_LFuncCursor( struct cg_layoutnode_s *commandnode, struct cg_layou
 	return true;
 }
 
+static bool CG_LFuncCursorX( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	float x;
+
+	x = CG_GetNumericArg( &argumentnode );
+	x = SCALE_X( x );
+
+	layout_cursor_x = Q_rint( x );
+	return true;
+}
+
+static bool CG_LFuncCursorY( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	float y;
+
+	y = CG_GetNumericArg( &argumentnode );
+	y = SCALE_Y( y );
+
+	layout_cursor_y = Q_rint( y );
+	return true;
+}
+
 static bool CG_LFuncMoveCursor( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	float x, y;
@@ -1772,6 +1804,28 @@ static bool CG_LFuncSize( struct cg_layoutnode_s *commandnode, struct cg_layoutn
 	y = SCALE_Y( y );
 
 	layout_cursor_width = Q_rint( x );
+	layout_cursor_height = Q_rint( y );
+	return true;
+}
+
+static bool CG_LFuncSizeWidth( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	float x;
+
+	x = CG_GetNumericArg( &argumentnode );
+	x = SCALE_X( x );
+
+	layout_cursor_width = Q_rint( x );
+	return true;
+}
+
+static bool CG_LFuncSizeHeight( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	float y;
+
+	y = CG_GetNumericArg( &argumentnode );
+	y = SCALE_Y( y );
+
 	layout_cursor_height = Q_rint( y );
 	return true;
 }
@@ -1863,24 +1917,17 @@ static bool CG_LFuncSpecialFontFamily( struct cg_layoutnode_s *commandnode, stru
 static bool CG_LFuncFontSize( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	struct qfontface_s *font;
-	const char *fontsize = CG_GetStringArg( &argumentnode );
+	struct cg_layoutnode_s *charnode = argumentnode;
+	const char *fontsize = CG_GetStringArg( &charnode );
 
 	if( !Q_stricmp( fontsize, "con_fontsystemsmall" ) )
-	{
 		layout_cursor_font_size = cgs.fontSystemSmallSize;
-	}
 	else if( !Q_stricmp( fontsize, "con_fontsystemmedium" ) )
-	{
 		layout_cursor_font_size = cgs.fontSystemMediumSize;
-	}
 	else if( !Q_stricmp( fontsize, "con_fontsystembig" ) )
-	{
 		layout_cursor_font_size = cgs.fontSystemBigSize;
-	}
 	else
-	{
-		layout_cursor_font_size = atoi( fontsize );
-	}
+		layout_cursor_font_size = (int)ceilf( CG_GetNumericArg( &argumentnode ) );
 
 	font = trap_SCR_RegisterFont( layout_cursor_font_name, layout_cursor_font_style, layout_cursor_font_size );
 	if( font )
@@ -1934,7 +1981,7 @@ static bool CG_LFuncDrawObituaries( struct cg_layoutnode_s *commandnode, struct 
 	int icon_size = (int)CG_GetNumericArg( &argumentnode );
 
 	CG_DrawObituaries( layout_cursor_x, layout_cursor_y, layout_cursor_align, layout_cursor_font, layout_cursor_color,
-	                   layout_cursor_width, layout_cursor_height, internal_align, icon_size );
+	                   layout_cursor_width, layout_cursor_height, internal_align, icon_size * cgs.vidHeight / 600 );
 	return true;
 }
 
@@ -2334,7 +2381,7 @@ static bool CG_LFuncDrawChat( struct cg_layoutnode_s *commandnode, struct cg_lay
 	padding_y = (int)( CG_GetNumericArg( &argumentnode ) )*cgs.vidHeight/600;
 	shader = trap_R_RegisterPic( CG_GetStringArg( &argumentnode ) );
 
-	CG_DrawChat( &cg.chat, layout_cursor_x, layout_cursor_y, layout_cursor_font_name, layout_cursor_font, 
+	CG_DrawChat( &cg.chat, layout_cursor_x, layout_cursor_y, layout_cursor_font_name, layout_cursor_font, layout_cursor_font_size,
 		layout_cursor_width, layout_cursor_height, padding_x, padding_y, layout_cursor_color, shader );
 	return true;
 }
@@ -2347,7 +2394,9 @@ static void CG_MoveUpFunc( int id )
 static bool CG_LFuncTouchMove( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	int touch = CG_TouchArea( TOUCHAREA_HUD_MOVE,
-		layout_cursor_x, layout_cursor_y, layout_cursor_width, layout_cursor_height, true, CG_MoveUpFunc );
+		CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width ),
+		CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height ),
+		layout_cursor_width, layout_cursor_height, CG_MoveUpFunc );
 	if( touch >= 0 )
 		CG_SetTouchpad( TOUCHPAD_MOVE, touch );
 	return true;
@@ -2361,7 +2410,9 @@ static void CG_ViewUpFunc( int id )
 static bool CG_LFuncTouchView( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	int touch = CG_TouchArea( TOUCHAREA_HUD_VIEW,
-		layout_cursor_x, layout_cursor_y, layout_cursor_width, layout_cursor_height, true, CG_ViewUpFunc );
+		CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width ),
+		CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height ),
+		layout_cursor_width, layout_cursor_height, CG_ViewUpFunc );
 	if( touch >= 0 )
 		CG_SetTouchpad( TOUCHPAD_VIEW, touch );
 	return true;
@@ -2375,16 +2426,24 @@ static void CG_UpmoveUpFunc( int id )
 static bool CG_LFuncTouchJump( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	if( CG_TouchArea( TOUCHAREA_HUD_JUMP,
-		layout_cursor_x, layout_cursor_y, layout_cursor_width, layout_cursor_height, true, CG_UpmoveUpFunc ) >= 0 )
+		CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width ),
+		CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height ),
+		layout_cursor_width, layout_cursor_height, CG_UpmoveUpFunc ) >= 0 )
+	{
 		cg_hud_touch_upmove = 1;
+	}
 	return true;
 }
 
 static bool CG_LFuncTouchCrouch( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	if( CG_TouchArea( TOUCHAREA_HUD_CROUCH,
-		layout_cursor_x, layout_cursor_y, layout_cursor_width, layout_cursor_height, true, CG_UpmoveUpFunc ) >= 0 )
+		CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width ),
+		CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height ),
+		layout_cursor_width, layout_cursor_height, CG_UpmoveUpFunc ) >= 0 )
+	{
 		cg_hud_touch_upmove = -1;
+	}
 	return true;
 }
 
@@ -2396,8 +2455,12 @@ static void CG_AttackUpFunc( int id )
 static bool CG_LFuncTouchAttack( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	if( CG_TouchArea( TOUCHAREA_HUD_ATTACK,
-		layout_cursor_x, layout_cursor_y, layout_cursor_width, layout_cursor_height, true, CG_AttackUpFunc ) >= 0 )
+		CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width ),
+		CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height ),
+		layout_cursor_width, layout_cursor_height, CG_AttackUpFunc ) >= 0 )
+	{
 		cg_hud_touch_buttons |= BUTTON_ATTACK;
+	}
 	return true;
 }
 
@@ -2409,8 +2472,24 @@ static void CG_SpecialUpFunc( int id )
 static bool CG_LFuncTouchSpecial( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
 {
 	if( CG_TouchArea( TOUCHAREA_HUD_SPECIAL,
-		layout_cursor_x, layout_cursor_y, layout_cursor_width, layout_cursor_height, true, CG_SpecialUpFunc ) >= 0 )
+		CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width ),
+		CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height ),
+		layout_cursor_width, layout_cursor_height, CG_SpecialUpFunc ) >= 0 )
+	{
 		cg_hud_touch_buttons |= BUTTON_SPECIAL;
+	}
+	return true;
+}
+
+static bool CG_LFuncTouchClassAction( struct cg_layoutnode_s *commandnode, struct cg_layoutnode_s *argumentnode, int numArguments )
+{
+	if( CG_TouchArea( TOUCHAREA_HUD_CLASSACTION,
+		CG_HorizontalAlignForWidth( layout_cursor_x, layout_cursor_align, layout_cursor_width ),
+		CG_VerticalAlignForHeight( layout_cursor_y, layout_cursor_align, layout_cursor_height ),
+		layout_cursor_width, layout_cursor_height, NULL ) >= 0 )
+	{
+		trap_Cmd_ExecuteText( EXEC_NOW, va( "classAction%i", ( int )CG_GetNumericArg( &argumentnode ) ) );
+	}
 	return true;
 }
 
@@ -2489,7 +2568,25 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 	},
 
 	{
-		"MoveCursor",
+		"setCursorX",
+		CG_LFuncCursorX,
+		CG_LFuncCursorX,
+		1,
+		"Sets the cursor x position.",
+		false
+	},
+
+	{
+		"setCursorY",
+		CG_LFuncCursorY,
+		CG_LFuncCursorY,
+		1,
+		"Sets the cursor y position.",
+		false
+	},
+
+	{
+		"moveCursor",
 		CG_LFuncMoveCursor,
 		CG_LFuncMoveCursor,
 		2,
@@ -2512,6 +2609,24 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 		CG_LFuncSize,
 		2,
 		"Sets width and height. Used for pictures and models.",
+		false
+	},
+
+	{
+		"setWidth",
+		CG_LFuncSizeWidth,
+		CG_LFuncSizeWidth,
+		1,
+		"Sets width. Used for pictures and models.",
+		false
+	},
+
+	{
+		"setHeight",
+		CG_LFuncSizeHeight,
+		CG_LFuncSizeHeight,
+		1,
+		"Sets height. Used for pictures and models.",
 		false
 	},
 
@@ -3007,6 +3122,15 @@ static const cg_layoutcommand_t cg_LayoutCommands[] =
 		CG_LFuncTouchSpecial,
 		0,
 		"Places special button",
+		false
+	},
+
+	{
+		"touchClassAction",
+		NULL,
+		CG_LFuncTouchClassAction,
+		1,
+		"Places class action button",
 		false
 	},
 

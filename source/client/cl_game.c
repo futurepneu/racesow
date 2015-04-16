@@ -382,7 +382,7 @@ void CL_GameModule_Init( void )
 #endif
 
 	// stop all playing sounds
-	CL_SoundModule_StopAllSounds();
+	CL_SoundModule_StopAllSounds( qtrue, qtrue );
 
 	CL_GameModule_Shutdown();
 
@@ -479,6 +479,7 @@ void CL_GameModule_Init( void )
 	import.R_DrawRotatedStretchPic = re.DrawRotatedStretchPic;
 	import.R_Scissor = re.Scissor;
 	import.R_GetScissor = re.GetScissor;
+	import.R_ResetScissor = re.ResetScissor;
 	import.R_GetShaderDimensions = re.GetShaderDimensions;
 	import.R_TransformVectorToScreen = re.TransformVectorToScreen;
 	import.R_SkeletalGetNumBones = re.SkeletalGetNumBones;
@@ -561,7 +562,8 @@ void CL_GameModule_Init( void )
 	CL_GameModule_AsyncStream_Init();
 
 	start = Sys_Milliseconds();
-	cge->Init( cls.servername, cl.playernum, viddef.width, viddef.height, 
+	cge->Init( cls.servername, cl.playernum,
+		viddef.width, viddef.height, VID_GetPixelRatio(),
 		cls.demo.playing, cls.demo.playing ? cls.demo.filename : "",
 		cls.sv_pure, cl.snapFrameTime, APP_PROTOCOL_VERSION, cls.mediaRandomSeed );
 
@@ -571,7 +573,7 @@ void CL_GameModule_Init( void )
 	cls.cgameActive = qtrue;
 
 	// check memory integrity
-	Mem_CheckSentinelsGlobal();
+	Mem_DebugCheckSentinelsGlobal();
 
 	Sys_SendKeyEvents(); // pump message loop
 }
@@ -673,6 +675,15 @@ void CL_GameModule_RenderView( float stereo_separation )
 }
 
 /*
+* CL_GameModule_AddMovement
+*/
+void CL_GameModule_AddMovement( usercmd_t *cmd, vec3_t viewangles, int frametime )
+{
+	if( cge )
+		cge->AddMovement( cmd, viewangles, frametime );
+}
+
+/*
 * CL_GameModule_TouchEvent
 */
 void CL_GameModule_TouchEvent( int id, touchevent_t type, int x, int y )
@@ -684,17 +695,17 @@ void CL_GameModule_TouchEvent( int id, touchevent_t type, int x, int y )
 /*
 * CL_GameModule_TouchFrame
 */
-void CL_GameModule_TouchFrame( qboolean active )
+void CL_GameModule_TouchFrame( void )
 {
 	if( cge )
-		cge->TouchFrame( active );
+		cge->TouchFrame();
 }
 
 /*
-* CL_GameModule_TouchMove
+* CL_GameModule_CancelTouches
 */
-void CL_GameModule_TouchMove( usercmd_t *cmd, vec3_t viewangles, int frametime )
+void CL_GameModule_CancelTouches( void )
 {
 	if( cge )
-		cge->TouchMove( cmd, viewangles, frametime );
+		cge->CancelTouches();
 }

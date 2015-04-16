@@ -165,6 +165,9 @@
     <ClCompile Include="..\win32\win_sys.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\null\sys_vfs_null.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\qcommon\wswcurl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -223,6 +226,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\qcommon\steam.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\win32\win_time.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\win32\win_console.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\null\clipboard_null.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

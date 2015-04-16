@@ -1,6 +1,12 @@
 project(snd_qf)
 
-include_directories(${VORBIS_INCLUDE_DIR} ${OGG_INCLUDE_DIR} ${SDL_INCLUDE_DIR} "../snd_common" ".")
+include_directories(${VORBIS_INCLUDE_DIR} ${OGG_INCLUDE_DIR} "../snd_common" ".")
+
+if (USE_SDL2)
+    include_directories(${SDL2_INCLUDE_DIR})
+else()
+    include_directories(${SDL_INCLUDE_DIR})
+endif()
 
 file(GLOB SND_QF_HEADERS
     "*.h"
@@ -21,10 +27,14 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(SND_QF_PLATFORM_LIBRARIES "winmm.lib")
 else()
     file(GLOB SND_QF_PLATFORM_SOURCES
-        "../unix/unix_snd.c"
+        "../sdl/sdl_snd.c"
     )
 
-    set(SND_QF_PLATFORM_LIBRARIES ${SDL_LIBRARY})
+    if (USE_SDL2)
+        set(SND_QF_PLATFORM_LIBRARIES ${SDL2_LIBRARY})
+    else()  
+        set(SND_QF_PLATFORM_LIBRARIES ${SDL_LIBRARY})
+    endif()
 endif()
 
 add_library(snd_qf SHARED ${SND_QF_HEADERS} ${SND_QF_SOURCES} ${SND_QF_PLATFORM_SOURCES})

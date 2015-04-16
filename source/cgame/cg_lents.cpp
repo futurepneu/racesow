@@ -59,6 +59,8 @@ typedef struct lentity_s
 	vec3_t lightcolor;
 
 	vec3_t velocity;
+	vec3_t avelocity;
+	vec3_t angles;
 	vec3_t accel;
 
 	int bounce;     //is activator and bounceability value at once
@@ -194,6 +196,7 @@ static lentity_t *CG_AllocModel( letype_t type, const vec3_t origin, const vec3_
 	le->ent.shaderTime = cg.time;
 	le->ent.scale = 1.0f;
 
+	VectorCopy( angles, le->angles );
 	AnglesToAxis( angles, le->ent.axis );
 	VectorCopy( origin, le->ent.origin );
 
@@ -484,30 +487,37 @@ void CG_BoltExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, int surfFlags 
 		CG_MediaModel( cgs.media.modElectroBoltWallHit ), NULL );
 
 	le->ent.rotation = rand() % 360;
+	le->ent.scale = ( fire_mode == FIRE_MODE_STRONG ) ? 1.5f : 1.0f;
 
-	if( fire_mode == FIRE_MODE_STRONG )
-	{
-		le->ent.scale = 1.5f;
-		// add white energy particles on the impact
-		CG_ImpactPuffParticles( pos, dir, 12, 1.25f, 1, 1, 1, 1, CG_MediaShader( cgs.media.shaderAdditiveParticleShine ) );
-	}
-	else
-	{
-		le->ent.scale = 1.0f;
-		CG_ImpactPuffParticles( pos, dir, 12, 1.0f, 1, 1, 1, 1, NULL );
-	}
+	CG_ImpactPuffParticles( pos, dir, 15, 1.25f, 1, 1, 1, 1, NULL );
+	
+	trap_S_StartFixedSound( CG_MediaSfx( cgs.media.sfxElectroboltHit ), pos, CHAN_AUTO, 
+		cg_volume_effects->value, ATTN_STATIC );
 }
 
 /*
 * CG_InstaExplosionMode
 */
-void CG_InstaExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, int surfFlags )
+void CG_InstaExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, int surfFlags, int owner )
 {
+	int team = -1;
+	vec4_t tcolor = { 0.65f, 0.0f, 0.26f, 1.0f };
 	lentity_t *le;
 	vec3_t angles;
 
+	if( cg_teamColoredBeams->integer && owner && ( owner < gs.maxclients + 1 ) )
+		team = cg_entities[owner].current.team;
+	if( ( team == TEAM_ALPHA ) || ( team == TEAM_BETA ) )
+	{
+		CG_TeamColor( team, tcolor );
+		tcolor[0] *= 0.65f;
+		tcolor[1] *= 0.65f;
+		tcolor[2] *= 0.65f;
+	}
+
 	if( !CG_SpawnDecal( pos, dir, random()*360, 12, 
-		1, 1, 1, 1, 10, 1, true, CG_MediaShader( cgs.media.shaderInstagunMark ) ) ) {
+		tcolor[0], tcolor[1], tcolor[2], 1.0f,
+		10, 1, true, CG_MediaShader( cgs.media.shaderInstagunMark ) ) ) {
 		if( surfFlags & (SURF_SKY|SURF_NOMARKS|SURF_NOIMPACT) ) {
 			return;
 		}
@@ -516,7 +526,7 @@ void CG_InstaExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, int surfFlags
 	VecToAngles( dir, angles );
 
 	le = CG_AllocModel( LE_ALPHA_FADE, pos, angles, 6, // 6 is time
-		1, 1, 1, 1, //full white no inducted alpha
+		tcolor[0], tcolor[1], tcolor[2], 1,
 		250, 0.65, 0.65, 0.65, //white dlight
 		CG_MediaModel( cgs.media.modInstagunWallHit ), NULL );
 
@@ -533,6 +543,9 @@ void CG_InstaExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, int surfFlags
 		le->ent.scale = 1.0f;
 		CG_ImpactPuffParticles( pos, dir, 12, 1.0f, 1, 1, 1, 1, NULL );
 	}
+	
+	trap_S_StartFixedSound( CG_MediaSfx( cgs.media.sfxElectroboltHit ), pos, CHAN_AUTO, 
+		cg_volume_effects->value, ATTN_STATIC );
 }
 
 /*
@@ -1203,7 +1216,7 @@ void CG_FlagTrail( vec3_t origin, vec3_t start, vec3_t end, float r, float g, fl
 
 	//friction and gravity
 	VectorSet( le->accel, -0.2f, -0.2f, -9.8f * mass );
-	le->bounce = 20;
+	le->bounce = 50;
 }
 
 /*
@@ -1244,7 +1257,7 @@ void CG_SpawnTracer( vec3_t origin, vec3_t dir, vec3_t dir_per1, vec3_t dir_per2
 	tracer = CG_AllocSprite( LE_EXPLOSION_TRACER, origin, 30, 7, 1, 1, 1, 1, 0, 0, 0, 0, CG_MediaShader( cgs.media.shaderSmokePuff3 ) );
 	VectorCopy( dir_temp, tracer->velocity );
 	VectorSet( tracer->accel, -0.2f, -0.2f, -9.8f*170 );
-	tracer->bounce = 500;
+	tracer->bounce = 50;
 	tracer->ent.rotation = cg.time;
 }
 
@@ -1411,10 +1424,10 @@ void CG_ExplosionsDust( vec3_t pos, vec3_t dir, float radius )
 	}       
 }
 
-void CG_SmallPileOfGibs( vec3_t origin, int damage, const vec3_t initialVelocity )
+void CG_SmallPileOfGibs( vec3_t origin, int damage, const vec3_t initialVelocity, int team )
 {
 	lentity_t *le;
-	int i, count;
+	int i, j, count;
 	vec3_t angles, velocity;
 	int time;
 
@@ -1424,45 +1437,73 @@ void CG_SmallPileOfGibs( vec3_t origin, int damage, const vec3_t initialVelocity
 	if( cg_gibs->integer > 1 )
 	{
 		time = 50;
-		count = cg_gibs->integer;
-		clamp( count, 2, 128 );
+		count = 13 + cg_gibs->integer; // 30 models minimum
+		clamp( count, 14, 128 );
 
 		for( i = 0; i < count; i++ )
 		{
-			le = CG_AllocModel( LE_NO_FADE, origin, vec3_origin, time + time * random(),
-				1, 1, 1, 1,
+			vec4_t color;
+
+			// coloring
+			switch ( rand( ) % 3 ) {
+			case 0:
+				// orange
+				Vector4Set( color, 1, 0.5, 0, 1 );
+				break;
+			case 1:
+				// purple
+				Vector4Set( color, 1, 0, 1, 1 );
+				break;
+			case 2:
+			default:
+				// team
+				CG_TeamColor( team, color );
+				for( j = 0; j < 3; j++ ) {
+					color[j] = bound( 60.0f / 255.0f, color[j], 1.0f );
+				}
+				break;
+			}
+
+			le = CG_AllocModel( LE_ALPHA_FADE, origin, vec3_origin, time + time * random( ),
+				color[0], color[1], color[2], color[3],
 				0, 0, 0, 0,
-				CG_MediaModel( cgs.media.modMeatyGibs[((int)brandom( 0, MAX_MEATY_GIBS )) % (MAX_MEATY_GIBS)] ),
+				CG_MediaModel( cgs.media.modIlluminatiGibs ),
 				NULL );
 
 			// random rotation and scale variations
 			VectorSet( angles, crandom() * 360, crandom() * 360, crandom() * 360 );
 			AnglesToAxis( angles, le->ent.axis );
-			le->ent.scale = 0.75f - ( random() * 0.25 );
+			le->ent.scale = 0.8f - ( random() * 0.25 );
 			le->ent.renderfx = RF_FULLBRIGHT|RF_NOSHADOW;
 
-			velocity[0] = 20.0 * crandom();
-			velocity[1] = 20.0 * crandom();
-			velocity[2] = 20.0 + 20.0 * random();
-			VectorScale( velocity, damage * 0.1, velocity );
+			velocity[0] = crandom() * damage * 100;
+			velocity[1] = crandom() * damage * 100;
+			velocity[2] = random() * damage * 300;
+
+			clamp( velocity[0], -100, 100 );
+			clamp( velocity[1], -100, 100 );
+			clamp( velocity[2], 150, 300 );  // always have upwards
+
+			velocity[0] += crandom() * bound( 0, damage, 150 );
+			velocity[1] += crandom() * bound( 0, damage, 150 );
+			velocity[2] += random() * bound( 0, damage, 250 );
 
 			VectorAdd( initialVelocity, velocity, le->velocity );
-			clamp( le->velocity[0], -200, 200 );
-			clamp( le->velocity[1], -200, 200 );
-			clamp( le->velocity[2], 100, 400 );  // always have upwards
 
-			// velocity brought by game + random variations
-			le->velocity[0] += crandom() * 75;
-			le->velocity[1] += crandom() * 75;
-			le->velocity[2] += random() * 75;
+			le->avelocity[0] = random() * 1200;
+			le->avelocity[1] = random() * 1200;
+			le->avelocity[2] = random() * 1200;
 
 			//friction and gravity
-			VectorSet( le->accel, -0.2f, -0.2f, -500 );
+			VectorSet( le->accel, -0.2f, -0.2f, -900 );
 
-			le->bounce = 35;
+			le->bounce = 75;
 		}
 
-		CG_ImpactPuffParticles( origin, vec3_origin, 16, 2.5f, 1, 0, 0, 1, NULL );
+		CG_ImpactPuffParticles( origin, vec3_origin, 16, 2.5f, 1, 1, 0.6, 1, NULL );
+		trap_S_StartFixedSound( CG_MediaSfx( cgs.media.sfxGibsExplosion ), origin, CHAN_AUTO,
+			cg_volume_effects->value, ATTN_STATIC );
+
 	}
 	else
 	{
@@ -1499,7 +1540,7 @@ void CG_SmallPileOfGibs( vec3_t origin, int damage, const vec3_t initialVelocity
 			le->velocity[2] = velocity[2] + 125 + crandom() * radialspeed;
 
 			VectorSet( le->accel, -0.2f, -0.2f, -900 );
-			le->bounce = 35;
+			le->bounce = 50;
 		}
 
 		CG_ImpactPuffParticles( origin, vec3_origin, 16, 2.5f, 1, 0.5, 0, 1, NULL );
@@ -1683,6 +1724,32 @@ void CG_AddLocalEntities( void )
 
 		ent->backlerp = backlerp;
 
+		if ( le->avelocity[0] || le->avelocity[1] || le->avelocity[2] ) {
+			VectorMA( le->angles, time, le->avelocity, le->angles );
+			AnglesToAxis( le->angles, le->ent.axis );
+		}
+
+		// apply rotational friction
+		if( le->bounce ) { // FIXME?
+			int i;
+			const float adj = 100 * 6 * time; // magic constants here
+
+			for( i = 0; i < 3; i++ ) {
+				if( le->avelocity[i] > 0.0f ) {
+					le->avelocity[i] -= adj;
+					if( le->avelocity[i] < 0.0f ) {
+						le->avelocity[i] = 0.0f;
+					}
+				}
+				else if ( le->avelocity[i] < 0.0f ) {
+					le->avelocity[i] += adj;
+					if ( le->avelocity[i] > 0.0f ) {
+						le->avelocity[i] = 0.0f;
+					}
+				}
+			}
+		}
+
 		if( le->bounce )
 		{
 			trace_t	trace;
@@ -1700,19 +1767,28 @@ void CG_AddLocalEntities( void )
 			else if( trace.fraction != 1.0 ) // found solid
 			{
 				float dot;
-				vec3_t vel;
-				float xzyspeed;
+				float xyzspeed, orig_xyzspeed;
+				float bounce;
+				
+				orig_xyzspeed = VectorLength( le->velocity );
 
 				// Reflect velocity
-				VectorSubtract( next_origin, ent->origin, vel );
-				dot = -2 *DotProduct( vel, trace.plane.normal );
-				VectorMA( vel, dot, trace.plane.normal, le->velocity );
+				dot = DotProduct( le->velocity, trace.plane.normal );
+				VectorMA( le->velocity, -2.0f * dot, trace.plane.normal, le->velocity );
 				//put new origin in the impact point, but move it out a bit along the normal
 				VectorMA( trace.endpos, 1, trace.plane.normal, ent->origin );
 
+				// make sure we don't gain speed from bouncing off
+				bounce = 2.0f * le->bounce * 0.01f;
+				if( bounce < 1.5f )
+					bounce = 1.5f;
+				xyzspeed = orig_xyzspeed / bounce;
+
+				VectorNormalize( le->velocity );
+				VectorScale( le->velocity, xyzspeed, le->velocity );
+	
 				//the entity has not speed enough. Stop checks
-				xzyspeed = sqrt( le->velocity[0]*le->velocity[0] + le->velocity[1]*le->velocity[1] + le->velocity[2]*le->velocity[2] );
-				if( xzyspeed * time < 1.0f )
+				if( xyzspeed * time < 1.0f )
 				{
 					trace_t traceground;
 					vec3_t ground_origin;
@@ -1722,18 +1798,19 @@ void CG_AddLocalEntities( void )
 					CG_Trace( &traceground, ent->origin, debris_mins, debris_maxs, ground_origin, 0, MASK_SOLID );
 					if( traceground.fraction != 1.0 )
 					{
-						le->bounce = false;
+						le->bounce = 0;
 						VectorClear( le->velocity );
 						VectorClear( le->accel );
+						VectorClear( le->avelocity );
 						if( le->type == LE_EXPLOSION_TRACER )
-						{               // blx
+						{
+							// blx
 							le->type = LE_FREE;
 							CG_FreeLocalEntity( le );
 						}
 					}
 				}
-				else
-					VectorScale( le->velocity, le->bounce * time, le->velocity );
+
 			}
 			else
 			{

@@ -30,7 +30,7 @@ typedef unsigned int (*cg_get_raw_samples_cb_t)(void*);
 
 // cg_public.h -- client game dll information visible to engine
 
-#define	CGAME_API_VERSION   67
+#define	CGAME_API_VERSION   71
 
 //
 // structs and variables shared with the main engine
@@ -57,7 +57,7 @@ typedef struct snapshot_s
 	game_state_t gameState;
 	int numgamecommands;
 	gcommand_t gamecommands[MAX_PARSE_GAMECOMMANDS];
-	char gamecommandsData[MAX_STRING_CHARS * ( MAX_PARSE_GAMECOMMANDS / 4 )];
+	char gamecommandsData[(MAX_STRING_CHARS / 16) * MAX_PARSE_GAMECOMMANDS];
 	size_t gamecommandsDataHead;
 } snapshot_t;
 
@@ -189,6 +189,7 @@ typedef struct
 	void ( *R_DrawRotatedStretchPic )( int x, int y, int w, int h, float s1, float t1, float s2, float t2, float angle, const vec4_t color, const struct shader_s *shader );
 	void ( *R_Scissor )( int x, int y, int w, int h );
 	void ( *R_GetScissor )( int *x, int *y, int *w, int *h );
+	void ( *R_ResetScissor )( void );
 	void ( *R_GetShaderDimensions )( const struct shader_s *shader, int *width, int *height );
 	void ( *R_TransformVectorToScreen )( const struct refdef_s *rd, const vec3_t in, vec2_t out );
 	int ( *R_SkeletalGetNumBones )( const struct model_s *mod, int *numFrames );
@@ -257,7 +258,8 @@ typedef struct
 	int ( *API )( void );
 
 	// the init function will be called at each restart
-	void ( *Init )( const char *serverName, unsigned int playerNum, int vidWidth, int vidHeight, 
+	void ( *Init )( const char *serverName, unsigned int playerNum,
+		int vidWidth, int vidHeight, float pixelRatio,
 		qboolean demoplaying, const char *demoName, qboolean pure, unsigned int snapFrameTime, 
 		int protocol, int sharedSeed );
 
@@ -280,11 +282,13 @@ typedef struct
 
 	void ( *NewFrameSnapshot )( snapshot_t *newSnapshot, snapshot_t *currentSnapshot );
 
+	void ( *AddMovement )( usercmd_t *cmd, vec3_t viewangles, int frametime );
+
 	void ( *TouchEvent )( int id, touchevent_t type, int x, int y );
 
-	void ( *TouchFrame )( qboolean active );
+	void ( *TouchFrame )( void );
 
-	void ( *TouchMove )( usercmd_t *cmd, vec3_t viewangles, int frametime );
+	void ( *CancelTouches )( void );
 } cgame_export_t;
 
 #endif

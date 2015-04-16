@@ -28,7 +28,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../qalgo/glob.h"
 #include "../qalgo/md5.h"
 #include "../matchmaker/mm_common.h"
-#include "sys_threads.h"
 
 #define MAX_NUM_ARGVS	50
 
@@ -666,12 +665,12 @@ done:
 	return has_CPUID;
 }
 
-static inline int CPU_getCPUIDFeatures()
+static inline unsigned CPU_getCPUIDFeatures()
 {
-	int features = 0;
+	unsigned features = 0;
 #if defined(__GNUC__) && defined(i386)
 	if( __get_cpuid_max( 0, NULL ) >= 1 ) {
-		int temp, temp2, temp3;
+		unsigned temp, temp2, temp3;
 		__get_cpuid( 1, &temp, &temp2, &temp3, &features );
 	}
 #elif defined(_MSC_VER) && defined(_M_IX86)
@@ -690,12 +689,12 @@ done:
 	return features;
 }
 
-static inline int CPU_getCPUIDFeaturesExt()
+static inline unsigned CPU_getCPUIDFeaturesExt( )
 {
-	int features = 0;
+	unsigned features = 0;
 #if defined(__GNUC__) && defined(i386)
 	if( __get_cpuid_max( 0x80000000, NULL ) >= 0x80000001 ) {
-		int temp, temp2, temp3;
+		unsigned temp, temp2, temp3;
 		__get_cpuid( 0x80000001, &temp, &temp2, &temp3, &features );
 	}
 #elif defined(_MSC_VER) && defined(_M_IX86)
@@ -1052,7 +1051,7 @@ void Qcommon_Init( int argc, char **argv )
 			if( !com_introPlayed3->integer )
 			{
 				Cvar_ForceSet( com_introPlayed3->name, "1" );
-#ifndef __MACOSX__
+#if !defined(__MACOSX__) && (!defined(__ANDROID__) || defined (__i386__) || defined (__x86_64__))
 				Cbuf_AddText( "cinematic intro.roq\n" );
 #endif
 			}

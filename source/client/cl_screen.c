@@ -17,7 +17,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-// cl_scrn.c -- master for refresh, status bar, console, chat, notify, etc
+// cl_screen.c -- master for refresh, status bar, console, chat, notify, etc
 
 /*
 
@@ -39,9 +39,9 @@ float scr_con_current;    // aproaches scr_conlines at scr_conspeed
 float scr_con_previous;
 float scr_conlines;       // 0.0 to 1.0 lines of console to display
 
-qboolean scr_initialized;    // ready to draw
+static qboolean scr_initialized;    // ready to draw
 
-int scr_draw_loading;
+static int scr_draw_loading;
 
 static qboolean scr_cjk;
 static int scr_fontSystemLastChar;
@@ -94,6 +94,8 @@ static void SCR_RegisterSystemFonts( void )
 {
 	const char *con_fontSystemFamilyName;
 	const int con_fontSystemStyle = DEFAULT_SYSTEM_FONT_STYLE;
+	int size;
+	float pixelRatio = VID_GetPixelRatio();
 
 	// register system fonts
 	con_fontSystemFamilyName = con_fontSystemFamily->string;
@@ -114,37 +116,28 @@ static void SCR_RegisterSystemFonts( void )
 	}
 
 	if( !con_fontSystemBigSize->integer ) {
-		Cvar_SetValue( con_fontSystemBigSize->name,DEFAULT_SYSTEM_FONT_BIG_SIZE );
+		Cvar_SetValue( con_fontSystemBigSize->name, DEFAULT_SYSTEM_FONT_BIG_SIZE );
 	} else if( con_fontSystemBigSize->integer > DEFAULT_SYSTEM_FONT_BIG_SIZE * 2 ) {
 		Cvar_SetValue( con_fontSystemBigSize->name, DEFAULT_SYSTEM_FONT_BIG_SIZE * 2 );
 	} else if( con_fontSystemBigSize->integer < DEFAULT_SYSTEM_FONT_BIG_SIZE / 2 ) {
 		Cvar_SetValue( con_fontSystemBigSize->name, DEFAULT_SYSTEM_FONT_BIG_SIZE / 2 );
 	}
 
-	cls.fontSystemSmall = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, 
-		con_fontSystemSmallSize->integer );
-	if( !cls.fontSystemSmall )
+	if( pixelRatio < 0.5f )
+		pixelRatio = 0.5f;
+
+	size = ceil( con_fontSystemSmallSize->integer * pixelRatio );
+	cls.consoleFont = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, size );
+	if( !cls.consoleFont )
 	{
 		Cvar_ForceSet( con_fontSystemFamily->name, con_fontSystemFamily->dvalue );
 		con_fontSystemFamilyName = con_fontSystemFamily->dvalue;
 
-		cls.fontSystemSmall = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, 
-			DEFAULT_SYSTEM_FONT_SMALL_SIZE );
-		if( !cls.fontSystemSmall )
+		size = DEFAULT_SYSTEM_FONT_SMALL_SIZE;
+		cls.consoleFont = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, size );
+		if( !cls.consoleFont )
 			Com_Error( ERR_FATAL, "Couldn't load default font \"%s\"", con_fontSystemFamily->dvalue );
 	}
-
-	cls.fontSystemMedium = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, 
-		con_fontSystemMediumSize->integer );
-	if( !cls.fontSystemMedium )
-		cls.fontSystemMedium = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, 
-			DEFAULT_SYSTEM_FONT_MEDIUM_SIZE );
-
-	cls.fontSystemBig = SCR_RegisterFont( con_fontSystemFamily->string, con_fontSystemStyle, 
-		con_fontSystemBigSize->integer );
-	if( !cls.fontSystemBig )
-		cls.fontSystemBig = SCR_RegisterFont( con_fontSystemFamilyName, con_fontSystemStyle, 
-		DEFAULT_SYSTEM_FONT_BIG_SIZE );
 }
 
 
@@ -153,8 +146,15 @@ static void SCR_RegisterSystemFonts( void )
 */
 static void SCR_CheckFontLastChar( void )
 {
-	const char *lang = L10n_GetUserLanguage();
+	char lang[MAX_STRING_CHARS];
+	char *underscore;
 	int lastChar = 0;
+
+	Q_strncpyz( lang, L10n_GetUserLanguage(), sizeof( lang ) );
+	underscore = strchr( lang, '_' );
+	if( underscore ) {
+		*underscore = '\0';
+	}
 
 	if( !strcmp( lang, "ja" ) || !strcmp( lang, "zh" ) || !strcmp( lang, "ko" ) ) {
 		// CJK_Unified_Ideographs
@@ -192,9 +192,7 @@ static void SCR_InitFonts( void )
 */
 static void SCR_ShutdownFonts( void )
 {
-	cls.fontSystemSmall = NULL;
-	cls.fontSystemMedium = NULL;
-	cls.fontSystemBig = NULL;
+	cls.consoleFont = NULL;
 
 	con_fontSystemFamily = NULL;
 	con_fontSystemSmallSize = con_fontSystemMediumSize = con_fontSystemBigSize = NULL;
@@ -298,6 +296,11 @@ void SCR_DrawRawChar( int x, int y, qwchar num, qfontface_t *font, vec4_t color 
 	FTLIB_DrawRawChar( x, y, num, font, color );
 }
 
+void SCR_DrawClampChar( int x, int y, qwchar num, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, vec4_t color )
+{
+	FTLIB_DrawClampChar( x, y, num, xmin, ymin, xmax, ymax, font, color );
+}
+
 void SCR_DrawClampString( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, vec4_t color )
 {
 	FTLIB_DrawClampString( x, y, str, xmin, ymin, xmax, ymax, font, color );
@@ -315,7 +318,7 @@ void SCR_DrawString( int x, int y, int align, const char *str, qfontface_t *font
 		return;
 
 	if( !font )
-		font = cls.fontSystemSmall;
+		font = cls.consoleFont;
 	fontHeight = FTLIB_FontHeight( font );
 
 	width = FTLIB_StringWidth( str, font, 0 );
@@ -348,7 +351,7 @@ size_t SCR_DrawStringWidth( int x, int y, int align, const char *str, size_t max
 		return 0;
 
 	if( !font )
-		font = cls.fontSystemSmall;
+		font = cls.consoleFont;
 	fontHeight = FTLIB_FontHeight( font );
 
 	width = FTLIB_StringWidth( str, font, 0 );
@@ -493,7 +496,7 @@ static void SCR_DrawDebugGraph( void )
 */
 void SCR_InitScreen( void )
 {
-	scr_consize = Cvar_Get( "scr_consize", "0.5", CVAR_ARCHIVE );
+	scr_consize = Cvar_Get( "scr_consize", "0.4", CVAR_ARCHIVE );
 	scr_conspeed = Cvar_Get( "scr_conspeed", "3", CVAR_ARCHIVE );
 	scr_netgraph = Cvar_Get( "netgraph", "0", 0 );
 	scr_timegraph = Cvar_Get( "timegraph", "0", 0 );
@@ -560,7 +563,7 @@ static void SCR_DrawConsole( void )
 {
 	if( scr_con_current )
 	{
-		Con_DrawConsole( scr_con_current );
+		Con_DrawConsole();
 		return;
 	}
 
@@ -575,7 +578,7 @@ static void SCR_DrawConsole( void )
 */
 void SCR_BeginLoadingPlaque( void )
 {
-	CL_SoundModule_StopAllSounds();
+	CL_SoundModule_StopAllSounds( qtrue, qtrue );
 
 	memset( cl.configstrings, 0, sizeof( cl.configstrings ) );
 
@@ -712,7 +715,7 @@ void SCR_UpdateScreen( void )
 
 		if( scr_draw_loading == 2 )
 		{ 
-			// loading plaque over black screen
+			// loading plaque over APP_STARTUP_COLOR screen
 			scr_draw_loading = 0;
 			CL_UIModule_UpdateConnectScreen( qtrue );
 		}
@@ -725,7 +728,7 @@ void SCR_UpdateScreen( void )
 		}
 		else if( cls.state == CA_DISCONNECTED )
 		{
-			CL_UIModule_Refresh( qtrue, qtrue );
+			CL_UIModule_Refresh( qtrue, IN_ShowUICursor() );
 			SCR_DrawConsole();
 		}
 		else if( cls.state == CA_GETTING_TICKET || cls.state == CA_CONNECTING || cls.state == CA_CONNECTED || cls.state == CA_HANDSHAKE )
@@ -741,7 +744,7 @@ void SCR_UpdateScreen( void )
 		{
 			SCR_RenderView( separation[i] );
 
-			CL_UIModule_Refresh( qfalse, qtrue );
+			CL_UIModule_Refresh( qfalse, IN_ShowUICursor() );
 
 			if( scr_timegraph->integer )
 				SCR_DebugGraph( cls.frametime*300, 1, 1, 1 );

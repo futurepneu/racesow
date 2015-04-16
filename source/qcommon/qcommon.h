@@ -730,6 +730,8 @@ int			FS_GetExplicitPurePakList( char ***paknames );
 // handling of absolute filenames
 // only to be used if necessary (library not supporting custom file handling functions etc.)
 const char *FS_WriteDirectory( void );
+const char *FS_CacheDirectory( void );
+const char *FS_SecureDirectory( void );
 void	    FS_CreateAbsolutePath( const char *path );
 const char *FS_AbsoluteNameForFile( const char *filename );
 const char *FS_AbsoluteNameForBaseFile( const char *filename );
@@ -900,6 +902,11 @@ size_t Mem_PoolTotalSize( mempool_t *pool );
 
 #define Mem_CheckSentinels( data ) _Mem_CheckSentinels( data, __FILE__, __LINE__ )
 #define Mem_CheckSentinelsGlobal() _Mem_CheckSentinelsGlobal( __FILE__, __LINE__ )
+#ifdef NDEBUG
+#define Mem_DebugCheckSentinelsGlobal()
+#else
+#define Mem_DebugCheckSentinelsGlobal() _Mem_CheckSentinelsGlobal( __FILE__, __LINE__ )
+#endif
 
 // used for temporary allocations
 extern mempool_t *tempMemPool;
@@ -956,6 +963,9 @@ void	Sys_FreeClipboardData( char *data );
 const char *Sys_GetPreferredLanguage( void );
 
 void	Sys_OpenURLInBrowser( const char *url );
+
+void	*Sys_AcquireWakeLock( void );
+void	Sys_ReleaseWakeLock( void *wl );
 
 // wsw : aiwa : get symbol address in executable
 #ifdef SYS_SYMBOL

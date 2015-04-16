@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // snd_public.h -- sound dll information visible to engine
 
-#define	SOUND_API_VERSION   36
+#define	SOUND_API_VERSION   38
 
 #define	ATTN_NONE 0
 
@@ -95,11 +95,11 @@ typedef struct
 	void ( *UnloadLibrary )( void **lib );
 
 	// multithreading
-	int ( *Thread_Create )( struct qthread_s **pthread, void *(*routine) (void*), void *param );
+	struct qthread_s *( *Thread_Create )( void *(*routine) (void*), void *param );
 	void ( *Thread_Join )( struct qthread_s *thread );
 	void ( *Thread_Yield )( void );
-	int ( *Mutex_Create )( struct qmutex_s **pmutex );
-	void ( *Mutex_Destroy )( struct qmutex_s *mutex );
+	struct qmutex_s *( *Mutex_Create )( void );
+	void ( *Mutex_Destroy )( struct qmutex_s **mutex );
 	void ( *Mutex_Lock )( struct qmutex_s *mutex );
 	void ( *Mutex_Unlock )( struct qmutex_s *mutex );
 
@@ -125,7 +125,7 @@ typedef struct
 	void ( *BeginRegistration )( void );
 	void ( *EndRegistration )( void );
 
-	void ( *StopAllSounds )( void );
+	void ( *StopAllSounds )( qboolean clear, qboolean stopMusic );
 
 	void ( *Clear )( void );
 	void ( *Update )( const vec3_t origin, const vec3_t velocity, const mat3_t axis, qboolean avidump );

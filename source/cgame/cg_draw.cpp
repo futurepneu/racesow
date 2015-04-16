@@ -72,6 +72,7 @@ void CG_DrawHUDNumeric( int x, int y, int align, float *color, int charwidth, in
 	char num[16], *ptr;
 	int length;
 	int frame;
+	float u, v;
 
 	// draw number string
 	Q_snprintfz( num, sizeof( num ), "%i", value );
@@ -88,7 +89,9 @@ void CG_DrawHUDNumeric( int x, int y, int align, float *color, int charwidth, in
 			frame = STAT_MINUS;
 		else
 			frame = *ptr - '0';
-		trap_R_DrawStretchPic( x, y, charwidth, charheight, 0, 0, 1, 1, color, CG_MediaShader( cgs.media.sbNums[frame] ) );
+		u = ( frame & 3 ) * 0.25f;
+		v = ( frame >> 2 ) * 0.25f;
+		trap_R_DrawStretchPic( x, y, charwidth, charheight, u, v, u + 0.25f, v + 0.25f, color, CG_MediaShader( cgs.media.shaderSbNums ) );
 		x += charwidth;
 		ptr++;
 		length--;
@@ -103,6 +106,7 @@ void CG_DrawHUDField( int x, int y, int align, float *color, int size, int width
 	char num[16], *ptr;
 	int length, maxwidth, w, h;
 	int frame;
+	float u, v;
 
 	if( width < 0 )
 		return;
@@ -134,7 +138,9 @@ void CG_DrawHUDField( int x, int y, int align, float *color, int size, int width
 			frame = STAT_MINUS;
 		else
 			frame = *ptr -'0';
-		trap_R_DrawStretchPic( x, y, w, h, 0, 0, 1, 1, color, CG_MediaShader( cgs.media.sbNums[frame] ) );
+		u = ( frame & 3 ) * 0.25f;
+		v = ( frame >> 2 ) * 0.25f;
+		trap_R_DrawStretchPic( x, y, w, h, u, v, u + 0.25f, v + 0.25f, color, CG_MediaShader( cgs.media.shaderSbNums ) );
 		x += w;
 		ptr++;
 		length--;
@@ -346,7 +352,7 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 			{
 				int thisX, thisY, thisSize;
 
-				thisSize = max( box_size, 8 );
+				thisSize = max( box_size, 8 ) * cgs.vidHeight / 600;
 				thisX = CG_VerticalAlignForHeight( x + (int)coords[0], ALIGN_CENTER_MIDDLE, thisSize );
 				thisY = CG_VerticalAlignForHeight( y + (int)coords[1] - thisSize, ALIGN_CENTER_MIDDLE, thisSize );
 				trap_R_DrawStretchPic( thisX, thisY, thisSize, thisSize, 0, 0, 1, 1, tmp_yellow_alpha, CG_MediaShader( cgs.media.shaderDownArrow ) );
@@ -354,9 +360,9 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 
 			// do we want names too?
 			if( draw_playernames == true )
-				trap_SCR_DrawString( x + (int)coords[0] + 8,
-				y + (int)coords[1] - 4,	ALIGN_LEFT_TOP,	COM_RemoveColorTokensExt( cgs.clientInfo[cent->current.number-1].name, qtrue ),
-				cgs.fontSystemSmall, tmp_yellow_alpha );
+				trap_SCR_DrawString( x + (int)coords[0] + 8 * cgs.vidHeight / 600, y + (int)coords[1] - 4 * cgs.vidHeight / 600,
+					ALIGN_LEFT_TOP,	COM_RemoveColorTokensExt( cgs.clientInfo[cent->current.number-1].name, qtrue ),
+					cgs.fontSystemSmall, tmp_yellow_alpha );
 		}
 		else if( cent->current.type == ET_MINIMAP_ICON )
 		{
@@ -368,6 +374,7 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 				thisSize = (float)cent->prev.frame + (float)( cent->current.frame - cent->prev.frame ) * cg.lerpfrac;
 				if( thisSize <= 0 )
 					thisSize = 18;
+				thisSize = thisSize * cgs.vidHeight / 600;
 
 				tmp_this_color[0] = (float)cent->ent.shaderRGBA[0] / 255.0f;
 				tmp_this_color[1] = (float)cent->ent.shaderRGBA[1] / 255.0f;
@@ -381,11 +388,17 @@ void CG_DrawMiniMap( int x, int y, int iw, int ih, bool draw_playernames, bool d
 		}
 		else if( cent->item && cent->item->icon )
 		{
+			int thisOffset = 8 * cgs.vidHeight / 600;
+			int thisSize = 15 * cgs.vidHeight / 600;
 			// if ALIGN_CENTER_MIDDLE or something is used, images are fucked
 			// so thats why they are set manually at the correct pos with -n
-			CG_DrawHUDRect( x+(int)coords[0]-8, y+(int)coords[1]-8, ALIGN_LEFT_TOP, 15, 15, 1, 1, tmp_white_alpha, trap_R_RegisterPic( cent->item->icon ) );
+			CG_DrawHUDRect( x + (int)coords[0] - thisOffset, y + (int)coords[1] - thisOffset,
+				ALIGN_LEFT_TOP, thisSize, thisSize, 1, 1, tmp_white_alpha, trap_R_RegisterPic( cent->item->icon ) );
 			if( draw_itemnames == true )
-				trap_SCR_DrawString( x + (int)coords[0] + 16, y + (int)coords[1] - 8, ALIGN_LEFT_TOP, cent->item->shortname, cgs.fontSystemSmall, tmp_yellow_alpha );
+			{
+				trap_SCR_DrawString( x + (int)coords[0] + 2 * thisOffset, y + (int)coords[1] - thisOffset,
+					ALIGN_LEFT_TOP, cent->item->shortname, cgs.fontSystemSmall, tmp_yellow_alpha );
+			}
 		}
 	}
 }

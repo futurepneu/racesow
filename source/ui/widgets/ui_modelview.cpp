@@ -24,7 +24,7 @@ class UI_ModelviewWidgetInstancer;
 
 class UI_ModelviewWidget : public Element, EventListener
 {
-public:
+private:
 	entity_t entity;
 	refdef_t refdef;
 	vec3_t baseangles;
@@ -38,11 +38,14 @@ public:
 	cgs_skeleton_t *skel;
 	String modelName;
 	String skinName;
+	float fov_x, fov_y;
 
+public:
 	UI_ModelviewWidget( const String &tag )
 		: Element( tag ), 
 		time( 0 ), AutoRotationCenter( false), Initialized( false ), RecomputePosition( false ), 
-		BonePoses( NULL ), skel( NULL ), modelName( "" ), skinName( "" )
+		BonePoses( NULL ), skel( NULL ), modelName( "" ), skinName( "" ),
+		fov_x( 30.0f ), fov_y( 0.0f )
 	{
 		memset( &entity, 0, sizeof( entity ) );
 		memset( &refdef, 0, sizeof( refdef ) );
@@ -55,7 +58,6 @@ public:
 		// Some default values
 		VectorSet(baseangles, 0, 0, 0);
 		VectorSet(anglespeed, 0, 0, 0);
-		refdef.fov_x = 30.0f;
 		entity.scale = 1.0f;
 		entity.outlineHeight = 0.3f;
 		Vector4Set(entity.outlineRGBA, 64, 64, 64, 255);
@@ -133,6 +135,8 @@ public:
 
 		trap::R_RenderScene( &refdef );
 
+		trap::R_Scissor( scissor_x, scissor_y, scissor_w, scissor_h );
+
 		// TODO: Should this be done here or in ComputePosition?
 		BonePoses->ResetTemporaryBoneposesCache();
 		time = curtime;
@@ -175,8 +179,30 @@ public:
 			}
 			else if (*it == "model-fov-x")
 			{
-				refdef.fov_x = GetProperty(*it)->Get<float>();
-				clamp(refdef.fov_x, 1, 179);
+				const Property *prop = GetProperty(*it);
+				if (prop->unit == Property::KEYWORD)
+				{
+					fov_x = 0.0f;
+				}
+				else
+				{
+					fov_x = prop->Get<float>();
+					clamp(fov_x, 1.0f, 179.0f);
+				}
+				RecomputePosition = true;
+			}
+			else if (*it == "model-fov-y")
+			{
+				const Property *prop = GetProperty(*it);
+				if (prop->unit == Property::KEYWORD)
+				{
+					fov_y = 0.0f;
+				}
+				else
+				{
+					fov_y = prop->Get<float>();
+					clamp(fov_y, 1.0f, 179.0f);
+				}
 				RecomputePosition = true;
 			}
 			else if (*it == "model-rotation-pitch")
@@ -290,7 +316,15 @@ private:
 		refdef.y = 0;
 		refdef.width = box.x;
 		refdef.height = box.y;
-		refdef.fov_y = CalcFov( refdef.fov_x, refdef.width, refdef.height );
+
+		refdef.fov_x = fov_x;
+		refdef.fov_y = fov_y;
+		if (!refdef.fov_x && !refdef.fov_y)
+			refdef.fov_x = 30.0f;
+		if (!refdef.fov_x)
+			refdef.fov_x = CalcFov( refdef.fov_y, refdef.height, refdef.width );
+		else if (!refdef.fov_y)
+			refdef.fov_y = CalcFov( refdef.fov_x, refdef.width, refdef.height );
 
 		skel = NULL;
 		if (trap::R_SkeletalGetNumBones( entity.model, NULL ))
@@ -324,7 +358,8 @@ public:
 	{
 		StyleSheetSpecification::RegisterProperty("model-modelpath", "", false).AddParser("string");
 		StyleSheetSpecification::RegisterProperty("model-skinpath", "", false).AddParser("string");
-		StyleSheetSpecification::RegisterProperty("model-fov-x", "30", false).AddParser("number");
+		StyleSheetSpecification::RegisterProperty("model-fov-x", "30", false).AddParser( "keyword", "auto" ).AddParser("number");
+		StyleSheetSpecification::RegisterProperty("model-fov-y", "auto", false).AddParser( "keyword", "auto" ).AddParser("number");
 		StyleSheetSpecification::RegisterProperty("model-scale", "1", false).AddParser("number");
 		StyleSheetSpecification::RegisterProperty("model-outline-height", "0.3", false).AddParser("number"); // DEFAULT_OUTLINE_HEIGHT
 		StyleSheetSpecification::RegisterProperty("model-outline-color", "#404040FF", false).AddParser("color");

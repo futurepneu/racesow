@@ -78,6 +78,8 @@ typedef struct
 typedef struct
 {
 	int id;
+	int clear;
+	int stopMusic;
 } sndCmdStop_t;
 
 typedef struct
@@ -239,7 +241,7 @@ void S_FinishSoundQueue( sndQueue_t *queue );
 void S_IssueInitCmd( sndQueue_t *queue, void *hwnd, int maxents, qboolean verbose );
 void S_IssueShutdownCmd( sndQueue_t *queue, qboolean verbose );
 void S_IssueClearCmd( sndQueue_t *queue );
-void S_IssueStopAllSoundsCmd( sndQueue_t *queue );
+void S_IssueStopAllSoundsCmd( sndQueue_t *queue, qboolean clear, qboolean stopMusic );
 void S_IssueFreeSfxCmd( sndQueue_t *queue, int sfx );
 void S_IssueLoadSfxCmd( sndQueue_t *queue, int sfx );
 void S_IssueSetAttenuationCmd( sndQueue_t *queue, int model, 

@@ -136,7 +136,7 @@ LIBROCKET_MAKEFILE=Build/Makefile.qfusion
 LIBROCKET_INC=$(LIBROCKET_DIR)/Include
 LIBROCKET_LIB=$(LIBROCKET_DIR)/lib/libRocketWSW.a
 
-CFLAGS_ROCKET=-DSTATIC_LIB -I$(LIBROCKET_INC) -I$(ANGELSCRIPT_INC)
+CFLAGS_ROCKET=-DROCKET_STATIC_LIB -I$(LIBROCKET_INC) -I$(ANGELSCRIPT_INC)
 # add the base of ui to inclusions
 CFLAGS_ROCKET+=-Iui
 
@@ -224,9 +224,9 @@ endif
 LDFLAGS_IRC=-lwsock32 -lws2_32
 LDFLAGS_ANGELWRAP=$(ANGELSCRIPT_LIB)
 
-CLIENT_EXE=warsow_$(ARCH).exe
-SERVER_EXE=wsw_server_$(ARCH).exe
-TV_SERVER_EXE=wswtv_server_$(ARCH).exe
+CLIENT_EXE=qfusion_$(ARCH).exe
+SERVER_EXE=qfusion_server_$(ARCH).exe
+TV_SERVER_EXE=qfusiontv_server_$(ARCH).exe
 else # USE_MINGW
 ####################### NORMAL *NIX? ######################
 LOCALBASE?=/usr/local
@@ -285,7 +285,7 @@ endif
 ifeq ($(BUILD_SND_QF),YES)
 SDL_CONFIG?=sdl-config
 
-CFLAGS_QF=$(shell $(SDL_CONFIG) --cflags) -I./snd_openal -I./snd_common 
+CFLAGS_QF=$(shell $(SDL_CONFIG) --cflags) -I./snd_qf -I./snd_common 
 LDFLAGS_QF=$(shell $(SDL_CONFIG) --libs) -lvorbisfile
 endif # BUILD_SND_QF
 
@@ -312,9 +312,9 @@ endif
 LDFLAGS_IRC=
 LDFLAGS_ANGELWRAP=$(ANGELSCRIPT_LIB) -lpthread
 
-CLIENT_EXE=warsow.$(ARCH)
-SERVER_EXE=wsw_server.$(ARCH)
-TV_SERVER_EXE=wswtv_server.$(ARCH)
+CLIENT_EXE=qfusion.$(ARCH)
+SERVER_EXE=qfusion_server.$(ARCH)
+TV_SERVER_EXE=qfusiontv_server.$(ARCH)
 endif # USE_MINGW
 
 ####################### MAC support ######################
@@ -388,14 +388,14 @@ CFILES_CLIENT += $(wildcard server/*.c)
 endif
 CFILES_CLIENT += $(wildcard client/*.c)
 ifeq ($(USE_MINGW),YES)
-CFILES_CLIENT += win32/win_vid.c win32/win_fs.c win32/win_net.c win32/conproc.c win32/win_input.c win32/win_sys.c win32/win_lib.c win32/win_threads.c
+CFILES_CLIENT += win32/win_vid.c win32/win_fs.c win32/win_net.c win32/conproc.c win32/win_input.c win32/win_sys.c win32/win_clipboard.c win32/win_time.c win32/win_console.c win32/win_lib.c win32/win_threads.c null/sys_vfs_null.c
 RESFILES_CLIENT += win32/qfusion.rc
 else
 ifeq ($(OS),Darwin)
 else
 CFILES_CLIENT += unix/unix_input.c unix/keysym2ucs.c
 endif
-CFILES_CLIENT += unix/unix_fs.c unix/unix_lib.c unix/unix_net.c unix/unix_sys.c unix/unix_vid.c unix/unix_threads.c
+CFILES_CLIENT += unix/unix_fs.c unix/unix_lib.c unix/unix_net.c unix/unix_sys.c unix/unix_clipboard.c unix/unix_time.c unix/unix_console.c unix/unix_vid.c unix/unix_threads.c null/sys_vfs_null.c
 endif
 CFILES_CLIENT += $(wildcard gameshared/q_*.c)
 CFILES_CLIENT += $(wildcard qalgo/*.c)
@@ -428,7 +428,7 @@ CFILES_QF += $(wildcard snd_common/*.c)
 ifeq ($(USE_MINGW),YES)
 CFILES_QF += win32/win_snd.c
 else
-CFILES_QF += unix/unix_snd.c
+CFILES_QF += sdl/sdl_snd.c
 endif
 CFILES_QF += $(wildcard gameshared/q_*.c)
 CFILES_QF += $(wildcard qalgo/*.c)
@@ -444,9 +444,9 @@ CFILES_DED  = qcommon/cm_main.c qcommon/cm_q3bsp.c qcommon/cm_trace.c qcommon/bs
 CFILES_DED += $(wildcard server/*.c)
 CFILES_DED += null/cl_null.c
 ifeq ($(USE_MINGW),YES)
-CFILES_DED += win32/win_fs.c win32/win_net.c win32/conproc.c win32/win_sys.c win32/win_lib.c win32/win_threads.c
+CFILES_DED += win32/win_fs.c win32/win_net.c win32/conproc.c win32/win_sys.c win32/win_time.c win32/win_console.c win32/win_lib.c win32/win_threads.c null/sys_vfs_null.c null/clipboard_null.c
 else
-CFILES_DED += unix/unix_fs.c unix/unix_net.c unix/unix_lib.c unix/unix_sys.c unix/unix_threads.c
+CFILES_DED += unix/unix_fs.c unix/unix_net.c unix/unix_lib.c unix/unix_sys.c unix/unix_time.c unix/unix_console.c unix/unix_time.c unix/unix_threads.c null/sys_vfs_null.c null/clipboard_null.c
 endif
 CFILES_DED += $(wildcard gameshared/q_*.c)
 CFILES_DED += $(wildcard qalgo/*.c)
@@ -477,7 +477,6 @@ CPPFILES_GAME += $(wildcard game/ai/*.cpp)
 CFILES_GAME = $(wildcard gameshared/*.c)
 CFILES_GAME += $(wildcard qalgo/*.c)
 CFILES_GAME += matchmaker/mm_rating.c
-CFILES_GAME += qcommon/cjson.c
 
 CFILES_GAME_WITHOUT_PATH= $(notdir  $(CFILES_GAME))
 OFILES_GAME=$(CFILES_GAME_WITHOUT_PATH:.c=.o)
@@ -592,9 +591,9 @@ CFILES_TV_SERVER = qcommon/cm_main.c qcommon/cm_q3bsp.c qcommon/cm_trace.c qcomm
 CFILES_TV_SERVER += $(wildcard tv_server/*.c)
 CFILES_TV_SERVER += null/cl_null.c null/ascript_null.c null/mm_null.c
 ifeq ($(USE_MINGW),YES)
-CFILES_TV_SERVER += win32/win_fs.c win32/win_net.c win32/conproc.c win32/win_sys.c win32/win_lib.c win32/win_threads.c
+CFILES_TV_SERVER += win32/win_fs.c win32/win_net.c win32/conproc.c win32/win_time.c win32/win_console.c win32/win_sys.c win32/win_lib.c win32/win_threads.c null/sys_vfs_null.c null/clipboard_null.c
 else
-CFILES_TV_SERVER += unix/unix_fs.c unix/unix_net.c unix/unix_sys.c unix/unix_lib.c unix/unix_threads.c
+CFILES_TV_SERVER += unix/unix_fs.c unix/unix_net.c unix/unix_sys.c unix/unix_time.c unix/unix_console.c unix/unix_lib.c unix/unix_threads.c null/sys_vfs_null.c null/clipboard_null.c
 endif
 CFILES_TV_SERVER += $(wildcard gameshared/q_*.c)
 CFILES_TV_SERVER += $(wildcard qalgo/*.c)
@@ -653,7 +652,7 @@ clean-depend:
 	@echo "  > Removing depend files" && \
 	$(RM) $(DEPENDFILE_CLIENT) $(DEPENDFILE_DED) $(DEPENDFILE_CGAME) $(DEPENDFILE_GAME) $(DEPENDFILE_UI_ROCKET) $(DEPENDFILE_OPENAL) $(DEPENDFILE_TV_SERVER) $(DEPENDFILE_QF) $(DEPENDFILE_IRC) $(DEPENDFILE_CIN) $(DEPENDFILE_FTLIB) $(DEPENDFILE_STEAMLIB) $(DEPENDFILE_REF_GL) $(DEPENDFILE_ANGELWRAP)
 
-$(BUILDDIRS) $(BINDIR) $(BINDIR)/racesow $(BINDIR)/libs:
+$(BUILDDIRS) $(BINDIR) $(BINDIR)/base $(BINDIR)/libs:
 	@mkdir -p $@
 
 ifeq ($(BUILD_CLIENT),YES)
@@ -663,7 +662,7 @@ message-client:
 	@echo "> *********************************************************"
 compile-client: $(OBJS_CLIENT)
 link-client: $(BINDIR) $(BINDIR)/$(CLIENT_EXE)
-start-script-client: $(BINDIR) $(BINDIR)/warsow
+start-script-client: $(BINDIR) $(BINDIR)/qfusion
 clean-client:
 	@echo "  > Removing client objects" && \
 	$(RM) $(OBJS_CLIENT)
@@ -712,7 +711,7 @@ message-cgame:
 	@echo "> * Building cgame"
 	@echo "> *********************************************************"
 compile-cgame: $(OBJS_CGAME)
-link-cgame: $(BINDIR)/racesow $(BINDIR)/racesow/cgame_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
+link-cgame: $(BINDIR)/base $(BINDIR)/base/cgame_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
 clean-cgame:
 	@echo "  > Removing cgame objects" && \
 	$(RM) $(OBJS_CGAME)
@@ -724,7 +723,7 @@ message-game:
 	@echo "> * Building game"
 	@echo "> *********************************************************"
 compile-game: $(OBJS_GAME)
-link-game: $(BINDIR)/racesow $(BINDIR)/racesow/game_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
+link-game: $(BINDIR)/base $(BINDIR)/base/game_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
 clean-game:
 	@echo "  > Removing game objects" && \
 	$(RM) $(OBJS_GAME)
@@ -736,7 +735,7 @@ message-ui:
 	@echo "> * Building ui"
 	@echo "> *********************************************************"
 compile-ui: $(PCH_UI_ROCKET) $(OBJS_UI_ROCKET) $(LIBROCKET_LIB)
-link-ui: $(BINDIR)/racesow $(BINDIR)/racesow/ui_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
+link-ui: $(BINDIR)/base $(BINDIR)/base/ui_$(ARCH).$(SHARED_LIBRARY_EXTENSION)
 clean-ui:
 	@echo "  > Removing ui objects" && \
 	$(RM) $(PCH_UI_ROCKET) $(OBJS_UI_ROCKET)
@@ -896,15 +895,15 @@ $(BINDIR)/libs/snd_qf_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_QF)
 ########
 # .SO
 ########
-$(BINDIR)/racesow/cgame_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_CGAME)
+$(BINDIR)/base/cgame_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_CGAME)
 	@echo "  > Linking $@" && \
 	$(LXX) -o $@ $^ $(LXXFLAGS_COMMON) $(LDFLAGS_MODULE)
 
-$(BINDIR)/racesow/game_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_GAME)
+$(BINDIR)/base/game_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_GAME)
 	@echo "  > Linking $@" && \
 	$(LXX) -o $@ $^ $(LXXFLAGS_COMMON) $(LDFLAGS_MODULE)
 
-$(BINDIR)/racesow/ui_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_UI_ROCKET) $(LIBROCKET_LIB)
+$(BINDIR)/base/ui_$(ARCH).$(SHARED_LIBRARY_EXTENSION): $(OBJS_UI_ROCKET) $(LIBROCKET_LIB)
 	@echo "  > Linking $@" && \
 	$(LXX) -o $@ $^ $(LXXFLAGS_COMMON) $(LDFLAGS_MODULE) $(LDFLAGS_ROCKET)
 
@@ -986,7 +985,7 @@ $(BUILDDIR)/client/%.o: gameshared/%.c
 $(BUILDDIR)/client/%.o: qalgo/%.c
 	@$(DO_CC_CLIENT)
 
-$(BINDIR)/warsow: unix/start_script.sh
+$(BINDIR)/qfusion: unix/start_script.sh
 	@echo "  > Installing client start script" && \
 	cp $< $@ && \
 	chmod a+x $@
@@ -1016,7 +1015,7 @@ ifeq ($(USE_MINGW),YES)
 $(BUILDDIR)/qf/win_snd.o: win32/win_snd.c
 	@$(DO_CC_MODULE) $(CFLAGS_DSOUND)
 else
-$(BUILDDIR)/qf/unix_snd.o: unix/unix_snd.c
+$(BUILDDIR)/qf/sdl_snd.o: sdl/sdl_snd.c
 	@$(DO_CC_MODULE) $(CFLAGS_QF)
 endif
 
@@ -1091,11 +1090,6 @@ $(BUILDDIR)/game/%.o: qalgo/%.c
 	
 $(BUILDDIR)/game/%.o: matchmaker/%.c
 	@$(DO_CC_MODULE) $(CFLAGS_GAME)
-
-# racesow
-$(BUILDDIR)/game/%.o: qcommon/%.c
-	@$(DO_CC_MODULE) $(CFLAGS_GAME)
-# !racesow
 
 ########
 # UI.ROCKET

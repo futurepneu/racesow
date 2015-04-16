@@ -143,6 +143,8 @@ spawn_t	spawns[] = {
 	{ "target_changelevel", SP_target_changelevel },
 	{ "target_relay", SP_target_relay },
 	{ "target_delay", SP_target_delay },
+	{ "target_teleporter", SP_target_teleporter },
+	{ "target_kill", SP_target_kill },
 
 	{ "worldspawn", SP_worldspawn },
 
@@ -546,7 +548,7 @@ void G_PrecacheMedia( void )
 	trap_SkinIndex( "models/players/bigvic/default" );
 
 	// FIXME: Temporarily use normal gib until the head is fixed
-	trap_ModelIndex( "models/objects/gibs/gib1/gib1.md3" );
+	trap_ModelIndex( "models/objects/gibs/illuminati1/illuminati1.md3" );
 
 	//
 	// SOUNDS

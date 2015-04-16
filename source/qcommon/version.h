@@ -50,6 +50,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define APP_PROTOCOL_VERSION 6096
 #endif
 
+#ifdef PUBLIC_BUILD
+#define APP_DEMO_PROTOCOL_VERSION		20
+#else
+#define APP_DEMO_PROTOCOL_VERSION		6096
+#endif
+
 #ifndef APP_URL
 #define	APP_URL	"http://www.warsow.net/"
 #endif
@@ -69,7 +75,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define STR_TOSTR( x )					STR_HELPER( x )
 
 #define APP_PROTOCOL_VERSION_STR		STR_TOSTR( APP_PROTOCOL_VERSION )
-#define APP_DEMO_EXTENSION_STR			".wd" APP_PROTOCOL_VERSION_STR
+#define APP_DEMO_PROTOCOL_VERSION_STR	STR_TOSTR( APP_DEMO_PROTOCOL_VERSION )
+#define APP_DEMO_EXTENSION_STR			".wdz" APP_PROTOCOL_VERSION_STR
 
 #define APP_URI_SCHEME					APPLICATION "://"
 #define APP_URI_PROTO_SCHEME			APPLICATION STR_TOSTR( APP_PROTOCOL_VERSION ) "://"
@@ -99,6 +106,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef APP_UI_BASEPATH
 #define APP_UI_BASEPATH					"/ui/baseui"
+#endif
+
+#ifndef APP_STARTUP_COLOR
+#define APP_STARTUP_COLOR				0x1c1416
 #endif
 
 //

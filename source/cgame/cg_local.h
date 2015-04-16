@@ -150,7 +150,7 @@ typedef struct
 	cgs_media_handle_t *sfxTimerBipBip;
 	cgs_media_handle_t *sfxTimerPloink;
 
-	cgs_media_handle_t *sfxRic[3];
+	cgs_media_handle_t *sfxRic[2];
 
 	cgs_media_handle_t *sfxWeaponUp;
 	cgs_media_handle_t *sfxWeaponUpNoAmmo;
@@ -162,6 +162,7 @@ typedef struct
 	cgs_media_handle_t *sfxWeaponHit[4];
 	cgs_media_handle_t *sfxWeaponKill;
 	cgs_media_handle_t *sfxWeaponHitTeam;
+	cgs_media_handle_t *sfxGibsExplosion;
 
 	cgs_media_handle_t *sfxItemRespawn;
 	cgs_media_handle_t *sfxTeleportIn;
@@ -198,6 +199,9 @@ typedef struct
 	cgs_media_handle_t *sfxLasergunWeakQuadHum;
 	cgs_media_handle_t *sfxLasergunStrongHum;
 	cgs_media_handle_t *sfxLasergunStrongQuadHum;
+	cgs_media_handle_t *sfxLasergunHit[3];
+	
+	cgs_media_handle_t *sfxElectroboltHit;
 
 	cgs_media_handle_t *sfxQuadFireSound;
 
@@ -211,6 +215,7 @@ typedef struct
 	cgs_media_handle_t *modDash;
 	cgs_media_handle_t *modHeadStun;
 
+	cgs_media_handle_t *modIlluminatiGibs;
 	cgs_media_handle_t *modTechyGibs[MAX_TECHY_GIBS];
 	cgs_media_handle_t *modMeatyGibs[MAX_MEATY_GIBS];
 
@@ -288,17 +293,17 @@ typedef struct
 	//wsw
 	cgs_media_handle_t *shaderPlayerShadow;
 	cgs_media_handle_t *shaderFlagFlare;
+	cgs_media_handle_t *shaderFlagNums[10];
 
 	// hud icons
 	cgs_media_handle_t *shaderWeaponIcon[WEAP_TOTAL];
 	cgs_media_handle_t *shaderNoGunWeaponIcon[WEAP_TOTAL];
 
-	cgs_media_handle_t *shaderKeyIconOn[KEYICON_TOTAL];
-	cgs_media_handle_t *shaderKeyIconOff[KEYICON_TOTAL];
+	cgs_media_handle_t *shaderKeyIcon[KEYICON_TOTAL];
 
 	//no wsw
 
-	cgs_media_handle_t *sbNums[11];
+	cgs_media_handle_t *shaderSbNums;
 	cgs_media_handle_t *shaderCrosshair[NUM_CROSSHAIRS];
 
 	// VSAY icons
@@ -438,13 +443,12 @@ typedef struct
 	struct qfontface_s *fontSystemMedium;
 	struct qfontface_s *fontSystemBig;
 
-	int initialSharedSeed;
-
 	cgs_media_t media;
 
 	bool precacheDone;
 
 	int vidWidth, vidHeight;
+	float pixelRatio;
 
 	bool demoPlaying;
 	bool demoTutorial;
@@ -515,8 +519,6 @@ typedef struct
 	unsigned int firstViewRealTime;
 	int viewFrameCount;
 	bool startedMusic;
-
-	int sharedSeed;
 
 	snapshot_t frame, oldFrame;
 	bool frameSequenceRunning;
@@ -622,7 +624,6 @@ extern centity_t cg_entities[MAX_EDICTS];
 // cg_ents.c
 //
 extern cvar_t *cg_gun;
-extern cvar_t *cg_damage_kick;
 extern cvar_t *cg_gun_alpha;
 
 void CG_NewFrameSnap( snapshot_t *frame, snapshot_t *lerpframe );
@@ -749,10 +750,14 @@ enum
 	TOUCHAREA_HUD = 0x101
 };
 
-int CG_TouchArea( int area, int x, int y, int w, int h, bool sticky, void ( *upfunc )( int id ) );
+#define TOUCHAREA_SUB_SHIFT 16
+#define TOUCHAREA_MASK ( ( 1 << TOUCHAREA_SUB_SHIFT ) - 1 )
+
+int CG_TouchArea( int area, int x, int y, int w, int h, void ( *upfunc )( int id ) );
 void CG_TouchEvent( int id, touchevent_t type, int x, int y );
-void CG_TouchFrame( qboolean active );
+void CG_TouchFrame( void );
 void CG_TouchMove( usercmd_t *cmd, vec3_t viewangles, int frametime );
+void CG_CancelTouches( void );
 
 enum
 {
@@ -774,6 +779,7 @@ extern cvar_t *cg_strafeHUD;
 extern cvar_t *cg_touch_flip;
 extern cvar_t *cg_touch_scale;
 
+void CG_SC_ResetObituaries( void );
 void CG_SC_Obituary( void );
 void Cmd_CG_PrintHudHelp_f( void );
 void CG_ExecuteLayoutProgram( struct cg_layoutnode_s *rootnode, bool touch );
@@ -886,7 +892,10 @@ extern cvar_t *cg_flashWindowCount;
 #define CG_Free( data ) trap_MemFree( data, __FILE__, __LINE__ )
 
 int CG_API( void );
-void CG_Init( const char *serverName, unsigned int playerNum, int vidWidth, int vidHeight, qboolean demoplaying, const char *demoName, qboolean pure, unsigned int snapFrameTime, int protocol, int sharedSeed );
+void CG_Init(	const char *serverName, unsigned int playerNum,
+				int vidWidth, int vidHeight, float pixelRatio,
+				qboolean demoplaying, const char *demoName, qboolean pure, unsigned int snapFrameTime,
+				int protocol, int sharedSeed );
 void CG_Shutdown( void );
 void CG_ValidateItemDef( int tag, char *name );
 void CG_Printf( const char *format, ... );
@@ -905,11 +914,13 @@ void CG_AddAward( const char *str );
 void CG_OverrideWeapondef( int index, const char *cstring );
 
 void CG_StartBackgroundTrack( void );
-void CG_LocalPrint( bool team, const char *format, ... );
+void CG_LocalPrint( const char *format, ... );
 
 int CG_AsyncGetRequest( const char *resource, void (*done_cb)(int status, const char *resp), void *privatep );
 
 const char *CG_TranslateString( const char *string );
+
+void CG_AddMovement( usercmd_t *cmd, vec3_t viewangles, int frametime );
 
 //
 // cg_svcmds.c
@@ -967,7 +978,7 @@ void CG_CartoonHitEffect( vec3_t origin, vec3_t dir, int damage );
 void CG_NewElectroBeamPuff( centity_t *cent, vec3_t origin, vec3_t dir );
 void CG_FlagTrail( vec3_t origin, vec3_t start, vec3_t end, float r, float g, float b );
 void CG_GreenLaser( vec3_t start, vec3_t end );
-void CG_SmallPileOfGibs( vec3_t origin, int damage, const vec3_t initialVelocity );
+void CG_SmallPileOfGibs( vec3_t origin, int damage, const vec3_t initialVelocity, int team );
 void CG_PlasmaExplosion( vec3_t pos, vec3_t dir, int fire_mode, float radius );
 void CG_GrenadeExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, float radius );
 void CG_GenericExplosion( vec3_t pos, vec3_t dir, int fire_mode, float radius );
@@ -975,7 +986,7 @@ void CG_RocketExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, float radius
 void CG_ElectroTrail2( vec3_t start, vec3_t end, int team );
 void CG_ImpactSmokePuff( vec3_t origin, vec3_t dir, float radius, float alpha, int time, int speed );
 void CG_BoltExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, int surfFlags );
-void CG_InstaExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, int surfFlags );
+void CG_InstaExplosionMode( vec3_t pos, vec3_t dir, int fire_mode, int surfFlags, int owner );
 void CG_BladeImpact( vec3_t pos, vec3_t dir );
 void CG_GunBladeBlastImpact( vec3_t pos, vec3_t dir, float radius );
 void CG_PModel_SpawnTeleportEffect( centity_t *cent );
@@ -1113,7 +1124,7 @@ extern bool *rs_chatBlocked; // racesow
 void CG_InitChat( cg_gamechat_t *chat );
 void CG_ChatShutdown( void ); // racesow
 void CG_StackChatString( cg_gamechat_t *chat, const char *str );
-void CG_DrawChat( cg_gamechat_t *chat, int x, int y, char *fontName, struct qfontface_s *font, 
+void CG_DrawChat( cg_gamechat_t *chat, int x, int y, char *fontName, struct qfontface_s *font, int fontSize,
 				 int width, int height, int padding_x, int padding_y, vec4_t backColor, struct shader_s *backShader );
 
 //=================================================

@@ -659,7 +659,7 @@ static void CG_DrawEntityNumbers( void )
 	float dist;
 	trace_t	trace;
 	vec3_t eorigin;
-	int xoffset = 0, yoffset = 0;
+	int shadowOffset = max( 1, cgs.vidHeight / 600 );
 
 	for( i = 0; i < cg.frame.numEntities; i++ )
 	{
@@ -691,11 +691,9 @@ static void CG_DrawEntityNumbers( void )
 			if( ( coords[0] < 0 || coords[0] > cgs.vidWidth ) || ( coords[1] < 0 || coords[1] > cgs.vidHeight ) )
 				return;
 
-			trap_SCR_DrawString( coords[0]+xoffset+1,
-				coords[1]+yoffset+1,
+			trap_SCR_DrawString( coords[0] + shadowOffset, coords[1] + shadowOffset,
 				ALIGN_LEFT_MIDDLE, va( "%i", cent->current.number ), cgs.fontSystemSmall, colorBlack );
-			trap_SCR_DrawString( coords[0]+xoffset,
-				coords[1]+yoffset,
+			trap_SCR_DrawString( coords[0], coords[1],
 				ALIGN_LEFT_MIDDLE, va( "%i", cent->current.number ), cgs.fontSystemSmall, colorWhite );
 		}
 	}
@@ -709,9 +707,13 @@ void CG_Democam_DrawCenterSubtitle( int y, unsigned int maxwidth, struct qfontfa
 	if( !text || !text[0] )
 		return;
 
+	int shadowOffset = 2 * cgs.vidHeight / 600;
+	if( !shadowOffset )
+		shadowOffset = 1;
+
 	if( !maxwidth || trap_SCR_strWidth( text, font, 0 ) <= maxwidth )
 	{
-		trap_SCR_DrawStringWidth( x + 2, y + 2, ALIGN_CENTER_TOP, COM_RemoveColorTokens( text ), maxwidth, font, colorBlack );
+		trap_SCR_DrawStringWidth( x + shadowOffset, y + shadowOffset, ALIGN_CENTER_TOP, COM_RemoveColorTokens( text ), maxwidth, font, colorBlack );
 		trap_SCR_DrawStringWidth( x, y, ALIGN_CENTER_TOP, text, maxwidth, font, colorWhite );
 		return;
 	}
@@ -726,7 +728,7 @@ void CG_Democam_DrawCenterSubtitle( int y, unsigned int maxwidth, struct qfontfa
 		{
 			c = *s;
 			*s = 0;
-			trap_SCR_DrawStringWidth( x + 2, y + 2, ALIGN_CENTER_TOP, COM_RemoveColorTokens( ptr ), maxwidth, font, colorBlack );
+			trap_SCR_DrawStringWidth( x + shadowOffset, y + shadowOffset, ALIGN_CENTER_TOP, COM_RemoveColorTokens( ptr ), maxwidth, font, colorBlack );
 			trap_SCR_DrawStringWidth( x, y, ALIGN_CENTER_TOP, ptr, maxwidth, font, colorWhite );
 			*s = c;
 
@@ -753,7 +755,7 @@ void CG_Democam_DrawCenterSubtitle( int y, unsigned int maxwidth, struct qfontfa
 			*s = c;
 			d = *t;
 			*t = 0;
-			trap_SCR_DrawStringWidth( x + 2, y + 2, ALIGN_CENTER_TOP, COM_RemoveColorTokens( ptr ), maxwidth, font, colorBlack );
+			trap_SCR_DrawStringWidth( x + shadowOffset, y + shadowOffset, ALIGN_CENTER_TOP, COM_RemoveColorTokens( ptr ), maxwidth, font, colorBlack );
 			trap_SCR_DrawStringWidth( x, y, ALIGN_CENTER_TOP, ptr, maxwidth, font, colorWhite );
 			*t = d;
 			s = t;
@@ -800,8 +802,8 @@ void CG_DrawDemocam2D( void )
 		CG_DrawEntityNumbers();
 
 		// draw the cams info
-		xpos = 8;
-		ypos = 100;
+		xpos = 8 * cgs.vidHeight / 600;
+		ypos = 100 * cgs.vidHeight / 600;
 
 		if( *cgs.demoName )
 		{

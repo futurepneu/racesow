@@ -19,12 +19,6 @@
 #include "wswcurl.h"
 #include "qcommon.h"
 
-#ifdef WIN32
-# define snprintf				_snprintf
-# define strdup					_strdup
-#endif
-
-
 ///////////////////////
 #define WMALLOC(x)		_Mem_Alloc(wswcurl_mempool, x, 0, 0, __FILE__, __LINE__)
 #define WREALLOC(x, y)	( (x) ? Mem_Realloc((x), (y) ) : WMALLOC(y) )
@@ -138,7 +132,7 @@ int wswcurl_formadd(wswcurl_req *req, const char *field, const char *value, ...)
 	if (!value) return -3;
 
 	va_start(arg, value);
-	vsnprintf(buf, sizeof(buf), value, arg);
+	Q_vsnprintfz(buf, sizeof(buf), value, arg);
 	va_end(arg);
 	curl_formadd(&req->post, &req->post_last, CURLFORM_COPYNAME, field, CURLFORM_COPYCONTENTS, buf, CURLFORM_END);
 	return 0;
@@ -501,18 +495,18 @@ int wswcurl_header( wswcurl_req *req, const char *key, const char *value, ...)
 	if (req->status) return -1;
 	if (!req->curl) return -2;
 
-	snprintf(buf, sizeof(buf), "%s: ", key);
+	Q_snprintfz(buf, sizeof(buf), "%s: ", key);
 	ptr = &buf[strlen(buf)];
 
 	va_start(arg, value);
-	vsnprintf(ptr, (sizeof(buf) - (ptr - buf)), value, arg);
+	Q_vsnprintfz(ptr, (sizeof(buf) - (ptr - buf)), value, arg);
 	va_end(arg);
 
 	req->txhead = curl_slist_append(req->txhead, buf);
 	return (req->txhead == NULL);
 }
 
-static int wswcurl_debug_callback( CURL *curl, curl_infotype infotype, char *buf, size_t buf_size, wswcurl_req *req )
+static int wswcurl_debug_callback( CURL *curl, curl_infotype infotype, char *buf, size_t buf_size, void *userp )
 {
 	char *temp;
 	
@@ -530,7 +524,7 @@ static int wswcurl_debug_callback( CURL *curl, curl_infotype infotype, char *buf
 	return 0;
 }
 
-wswcurl_req *wswcurl_create( const char *furl, ... )
+wswcurl_req *wswcurl_create( const char *iface, const char *furl, ... )
 {
 	wswcurl_req *retreq;
 	CURL *curl;
@@ -542,7 +536,7 @@ wswcurl_req *wswcurl_create( const char *furl, ... )
 
 	// Prepare url formatting with variable arguments
 	va_start( arg, furl );
-	vsnprintf( url, sizeof( url ), furl, arg );
+	Q_vsnprintfz( url, sizeof( url ), furl, arg );
 	va_end( arg );
 
 	// Initialize structure
@@ -570,6 +564,7 @@ wswcurl_req *wswcurl_create( const char *furl, ... )
 	CURLSETOPT( curl, res, CURLOPT_WRITEDATA, ( void * )retreq );
 	CURLSETOPT( curl, res, CURLOPT_WRITEHEADER, ( void * )retreq );
 	CURLSETOPT( curl, res, CURLOPT_PRIVATE, ( void * )retreq );
+	CURLSETOPT( curl, res, CURLOPT_INTERFACE, ( void * )iface );
 
 	if( developer->integer ) {
 		CURLSETOPT( curl, res, CURLOPT_DEBUGFUNCTION, &wswcurl_debug_callback );

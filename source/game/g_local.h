@@ -195,6 +195,7 @@ typedef struct
 	unsigned int framenum;
 	unsigned int time; // time in milliseconds
 	unsigned int spawnedTimeStamp; // time when map was restarted
+	unsigned int finalMatchDuration;
 
 	char level_name[MAX_CONFIGSTRING_CHARS];    // the descriptive name (Outer Base, etc)
 	char mapname[MAX_CONFIGSTRING_CHARS];       // the server name (q3dm0, etc)
@@ -300,6 +301,7 @@ extern int meansOfDeath;
 #define	STOFS( x ) (size_t)&( ( (spawn_temp_t *)0 )->x )
 #define	LLOFS( x ) (size_t)&( ( (level_locals_t *)0 )->x )
 #define	CLOFS( x ) (size_t)&( ( (gclient_t *)0 )->x )
+#define	AWOFS( x ) (size_t)&( ( (award_info_t *)0 )->x )
 
 extern cvar_t *password;
 extern cvar_t *g_operator_password;
@@ -313,6 +315,7 @@ extern cvar_t *g_gravity;
 extern cvar_t *g_maxvelocity;
 
 extern cvar_t *sv_cheats;
+extern cvar_t *sv_mm_enable;
 
 extern cvar_t *cm_mapHeader;
 extern cvar_t *cm_mapVersion;
@@ -857,6 +860,8 @@ void ClientDisconnect( edict_t *ent, const char *reason );
 void ClientBegin( edict_t *ent );
 void ClientCommand( edict_t *ent );
 void G_PredictedEvent( int entNum, int ev, int parm );
+void G_TeleportPlayer( edict_t *player, edict_t *dest );
+bool G_PlayerCanTeleport( edict_t *player );
 
 //
 // g_player.c
@@ -887,6 +892,8 @@ void SP_target_give( edict_t *self );
 void SP_target_changelevel( edict_t *ent );
 void SP_target_relay( edict_t *self );
 void SP_target_delay( edict_t *ent );
+void SP_target_teleporter( edict_t *self );
+void SP_target_kill( edict_t *self );
 
 //
 // g_svcmds.c
@@ -972,9 +979,12 @@ const char *G_GetEntitySpawnKey( const char *key, edict_t *self );
 //
 // g_awards.c
 //
+#define PLAYER_OF_THE_MATCH_AWARD "Player of the Match!"
+#define FAIR_PLAY_AWARD "Fair Play!"
 
 void G_PlayerAward( edict_t *ent, const char *awardMsg );
 void G_PlayerMetaAward( edict_t *ent, const char *awardMsg );
+void G_PlayerAwardOfs( edict_t *ent, const char *awardMsg, int ofs, int limit, bool meta );
 void G_AwardPlayerHit( edict_t *targ, edict_t *attacker, int mod );
 void G_AwardPlayerMissedElectrobolt( edict_t *self, int mod );
 void G_AwardPlayerMissedLasergun( edict_t *self, int mod );
@@ -1065,6 +1075,8 @@ typedef struct
 	qbyte combo[MAX_CLIENTS]; // combo management for award
 	edict_t *lasthit;
 	unsigned int lasthit_time;
+
+	int goodgame_award;
 } award_info_t;
 
 #define MAX_CLIENT_EVENTS   16

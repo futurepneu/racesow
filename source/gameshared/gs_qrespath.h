@@ -137,22 +137,14 @@ extern "C" {
 #define PATH_SHELL_SIMPLEITEM			"gfx/simpleitems/powerup/warshell"
 #define PATH_REGEN_SIMPLEITEM			"gfx/simpleitems/powerup/regen"
 
-#define PATH_KEYICON_FORWARD_ON			"gfx/hud/keys/key_forward_on"
-#define PATH_KEYICON_BACKWARD_ON		"gfx/hud/keys/key_back_on"
-#define PATH_KEYICON_LEFT_ON			"gfx/hud/keys/key_left_on"
-#define PATH_KEYICON_RIGHT_ON			"gfx/hud/keys/key_right_on"
-#define PATH_KEYICON_FIRE_ON			"gfx/hud/keys/act_fire_on"
-#define PATH_KEYICON_JUMP_ON			"gfx/hud/keys/act_jump_on"
-#define PATH_KEYICON_CROUCH_ON			"gfx/hud/keys/act_crouch_on"
-#define PATH_KEYICON_SPECIAL_ON			"gfx/hud/keys/act_special_on"
-#define PATH_KEYICON_FORWARD_OFF		"gfx/hud/keys/key_forward_off"
-#define PATH_KEYICON_BACKWARD_OFF		"gfx/hud/keys/key_back_off"
-#define PATH_KEYICON_LEFT_OFF			"gfx/hud/keys/key_left_off"
-#define PATH_KEYICON_RIGHT_OFF			"gfx/hud/keys/key_right_off"
-#define PATH_KEYICON_FIRE_OFF			"gfx/hud/keys/act_fire_off"
-#define PATH_KEYICON_JUMP_OFF			"gfx/hud/keys/act_jump_off"
-#define PATH_KEYICON_CROUCH_OFF			"gfx/hud/keys/act_crouch_off"
-#define PATH_KEYICON_SPECIAL_OFF		"gfx/hud/keys/act_special_off"
+#define PATH_KEYICON_FORWARD			"gfx/hud/keys/key_forward"
+#define PATH_KEYICON_BACKWARD			"gfx/hud/keys/key_back"
+#define PATH_KEYICON_LEFT				"gfx/hud/keys/key_left"
+#define PATH_KEYICON_RIGHT				"gfx/hud/keys/key_right"
+#define PATH_KEYICON_FIRE				"gfx/hud/keys/act_fire"
+#define PATH_KEYICON_JUMP				"gfx/hud/keys/act_jump"
+#define PATH_KEYICON_CROUCH				"gfx/hud/keys/act_crouch"
+#define PATH_KEYICON_SPECIAL			"gfx/hud/keys/act_special"
 
 // weapon firing
 #define PATH_SMOKE_PUFF		    "smokePuff"
@@ -272,6 +264,7 @@ extern "C" {
 #define S_CHAT			"sounds/misc/chat"
 #define S_TIMER_BIP_BIP		"sounds/misc/timer_bip_bip"
 #define S_TIMER_PLOINK		"sounds/misc/timer_ploink"
+#define S_GIBS_EXPLOSION	"sounds/misc/gibs_explosion"
 
 //wsw: pb disable unreferenced sounds
 //#define S_LAND					"sounds/misc/land"
@@ -387,6 +380,11 @@ extern "C" {
 #define S_WEAPON_LASERGUN_W_QUAD_HUM		"sounds/weapons/laser_weak_quad_hum"
 #define S_WEAPON_LASERGUN_S_STOP		"sounds/weapons/laser_strong_stop"
 #define S_WEAPON_LASERGUN_W_STOP		"sounds/weapons/laser_weak_stop"
+#define S_WEAPON_LASERGUN_HIT_0			"sounds/weapons/laser_hit0"
+#define S_WEAPON_LASERGUN_HIT_1			"sounds/weapons/laser_hit1"
+#define S_WEAPON_LASERGUN_HIT_2			"sounds/weapons/laser_hit2"
+
+#define S_WEAPON_ELECTROBOLT_HIT		"sounds/weapons/electrobolt_hit"
 
 // announcer sounds
 // readyup
@@ -457,9 +455,8 @@ extern "C" {
 #define UI_SHADER_BIGLOGO			"gfx/ui/logo512"
 #define UI_SHADER_CURSOR			"gfx/ui/cursor"
 
-#define UI_SHADER_PROGRESSBAR		"gfx/ui/progressbar"
-#define UI_SHADER_BACKGROUND		"gfx/ui/loadingscreen"
-#define UI_SHADER_BACKGROUND_LOADING "gfx/ui/loadingscreen%02i"
+#define UI_SHADER_LOADINGLOGO		"gfx/ui/loadinglogo"
+#define UI_SHADER_LOADINGBAR		"gfx/ui/loadingbar"
 
 // vsay icons
 #define PATH_VSAY_GENERIC_ICON	    "gfx/hud/icons/vsay/generic"
@@ -488,7 +485,6 @@ extern "C" {
 #define PATH_VSAY_ROGER_ICON	    "gfx/hud/icons/vsay/roger"
 #define PATH_VSAY_ARMORFREE_ICON    "gfx/hud/icons/vsay/armorfree"
 #define PATH_VSAY_AREASECURED_ICON  "gfx/hud/icons/vsay/areasecured"
-#define PATH_VSAY_SHUTUP_ICON	    "gfx/hud/icons/vsay/shutup"
 #define PATH_VSAY_BOOMSTICK_ICON    "gfx/hud/icons/vsay/boomstick"
 #define PATH_VSAY_GOTOPOWERUP_ICON  "gfx/hud/icons/vsay/gotopowerup"
 #define PATH_VSAY_GOTOQUAD_ICON	    "gfx/hud/icons/vsay/gotoquad"
@@ -520,7 +516,6 @@ extern "C" {
 #define S_VSAY_ROGER				"sounds/vsay/roger"
 #define S_VSAY_ARMORFREE			"sounds/vsay/armorfree"
 #define S_VSAY_AREASECURED			"sounds/vsay/areasecured"
-#define S_VSAY_SHUTUP				"sounds/vsay/shutup"
 #define S_VSAY_BOOMSTICK			"sounds/vsay/boomstick"
 #define S_VSAY_GOTOPOWERUP			"sounds/vsay/gotopowerup"
 #define S_VSAY_GOTOQUAD				"sounds/vsay/gotoquad"

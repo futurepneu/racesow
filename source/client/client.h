@@ -250,6 +250,8 @@ typedef struct
 
 	download_t download;
 
+	qboolean registrationOpen;
+
 	// demo recording info must be here, so it isn't cleared on level change
 	cl_demo_t demo;
 
@@ -257,10 +259,8 @@ typedef struct
 	shader_t *whiteShader;
 	shader_t *consoleShader;
 
-	// system fonts
-	qfontface_t *fontSystemSmall;
-	qfontface_t *fontSystemMedium;
-	qfontface_t *fontSystemBig;
+	// system font
+	qfontface_t *consoleFont;
 
 	// these are our reliable messages that go to the server
 	unsigned int reliableSequence;          // the last one we put in the list to be sent
@@ -291,6 +291,8 @@ typedef struct
 	clientRating_t *ratings;
 
 	char session[MAX_INFO_VALUE];
+
+	void *wakelock;
 } client_static_t;
 
 extern client_static_t cls;
@@ -309,6 +311,8 @@ extern cvar_t *cl_pitchspeed;
 extern cvar_t *cl_run;
 
 extern cvar_t *cl_anglespeedkey;
+
+extern cvar_t *cl_zoom;
 
 extern cvar_t *cl_compresspackets;
 extern cvar_t *cl_shownet;
@@ -412,9 +416,10 @@ float CL_GameModule_GetSensitivityScale( float sens, float zoomSens );
 qboolean CL_GameModule_NewSnapshot( int pendingSnapshot );
 void CL_GameModule_RenderView( float stereo_separation );
 void CL_GameModule_GetEntitySpatilization( int entnum, vec3_t origin, vec3_t velocity );
+void CL_GameModule_AddMovement( usercmd_t *cmd, vec3_t viewangles, int frametime );
 void CL_GameModule_TouchEvent( int id, touchevent_t type, int x, int y );
-void CL_GameModule_TouchFrame( qboolean active );
-void CL_GameModule_TouchMove( usercmd_t *cmd, vec3_t viewangles, int frametime );
+void CL_GameModule_TouchFrame( void );
+void CL_GameModule_CancelTouches( void );
 
 //
 // cl_sound.c
@@ -423,7 +428,7 @@ void CL_SoundModule_Init( qboolean verbose );
 void CL_SoundModule_Shutdown( qboolean verbose );
 void CL_SoundModule_BeginRegistration( void );
 void CL_SoundModule_EndRegistration( void );
-void CL_SoundModule_StopAllSounds( void );
+void CL_SoundModule_StopAllSounds( qboolean clear, qboolean stopMusic );
 void CL_SoundModule_Clear( void );
 void CL_SoundModule_Update( const vec3_t origin, const vec3_t velocity, const mat3_t axis, const char *identity, qboolean avidump );
 void CL_SoundModule_Activate( qboolean activate );
@@ -506,6 +511,7 @@ void CL_NewUserCommand( int msec );
 void CL_WriteUcmdsToMessage( msg_t *msg );
 void CL_MouseMove( usercmd_t *cmd, int mx, int my );
 void CL_TouchEvent( int id, touchevent_t type, int x, int y, unsigned int time );
+void CL_CancelTouches( void );
 void CL_UpdateCommandInput( void );
 void IN_CenterView( void );
 
@@ -576,12 +582,8 @@ void SCR_DrawString( int x, int y, int align, const char *str, qfontface_t *font
 size_t SCR_DrawStringWidth( int x, int y, int align, const char *str, size_t maxwidth, qfontface_t *font, vec4_t color );
 void SCR_DrawClampString( int x, int y, const char *str, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, vec4_t color );
 void SCR_DrawRawChar( int x, int y, qwchar num, qfontface_t *font, vec4_t color );
+void SCR_DrawClampChar( int x, int y, qwchar num, int xmin, int ymin, int xmax, int ymax, qfontface_t *font, vec4_t color );
 void SCR_DrawFillRect( int x, int y, int w, int h, vec4_t color );
-// wrappers/stubs for irc
-struct shader_s *SCR_RegisterPic( const char *name );
-void SCRR_DrawStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, const float *color, const struct shader_s *shader );
-unsigned int SCR_GetScreenWidth( void );
-unsigned int SCR_GetScreenHeight( void );
 
 void CL_InitMedia( void );
 void CL_ShutdownMedia( void );

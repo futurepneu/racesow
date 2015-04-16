@@ -143,7 +143,6 @@ static void target_explosion_explode( edict_t *self )
 {
 	float save;
 	int radius;
-	edict_t *event;
 
 	G_RadiusDamage( self, self->activator, NULL, NULL, MOD_EXPLOSIVE );
 
@@ -152,14 +151,14 @@ static void target_explosion_explode( edict_t *self )
 		radius = ( self->projectileInfo.radius * 1/16 ) & 0xFF;
 		if( radius < 1 )
 			radius = 1;
-		event = G_SpawnEvent( EV_EXPLOSION2, radius, self->s.origin );
+		G_SpawnEvent( EV_EXPLOSION2, radius, self->s.origin );
 	}
 	else
 	{
 		radius = ( self->projectileInfo.radius * 1/8 ) & 0xFF;
 		if( radius < 1 )
 			radius = 1;
-		event = G_SpawnEvent( EV_EXPLOSION1, radius, self->s.origin );
+		G_SpawnEvent( EV_EXPLOSION1, radius, self->s.origin );
 	}
 
 	save = self->delay;
@@ -217,7 +216,7 @@ void use_target_changelevel( edict_t *self, edict_t *other, edict_t *activator )
 
 	// let everyone know who hit the exit
 	if( other && other->client )
-	G_Printf( "%s exited the level.\n", other->client->pers.netname);
+	G_Printf( "%s" S_COLOR_WHITE " exited the level.\n", other->client->pers.netname);
 	}
 	*/
 	trap_Cvar_SetValue( "g_maprotation", -1 );
@@ -925,5 +924,79 @@ void SP_target_give( edict_t *self )
 {
 	self->r.svflags |= SVF_NOCLIENT;
 	self->use = target_give_use;
+}
+
+
+//==========================================================
+
+//QUAKED target_teleporter (1 0 0) (-8 -8 -8) (8 8 8)
+//The activator will be teleported away.
+//-------- KEYS --------
+//target : point this to a misc_teleporter_dest entity to set the teleport destination.
+//targetname : activating trigger points to this.
+//notsingle : when set to 1, entity will not spawn in Single Player mode
+//notfree : when set to 1, entity will not spawn in "Free for all" and "Tournament" modes.
+//notduel : when set to 1, entity will not spawn in "Teamplay" and "CTF" modes. (jal: todo)
+//notteam : when set to 1, entity will not spawn in "Teamplay" and "CTF" modes.
+//notctf : when set to 1, entity will not spawn in "Teamplay" and "CTF" modes. (jal: todo)
+//-------- SPAWNFLAGS --------
+//SPECTATOR : &1 only teleport players moving in spectator mode
+
+static void target_teleporter_use( edict_t *self, edict_t *other, edict_t *activator )
+{
+	edict_t	*dest;
+
+	if( !G_PlayerCanTeleport( activator ) )
+		return;
+
+	if( ( self->s.team != TEAM_SPECTATOR ) && ( self->s.team != activator->s.team ) )
+		return;
+	if( self->spawnflags & 1 && activator->r.client->ps.pmove.pm_type != PM_SPECTATOR )
+		return;
+
+	dest = G_Find( NULL, FOFS( targetname ), self->target );
+	if( !dest )
+	{
+		if( developer->integer )
+			G_Printf( "Couldn't find destination.\n" );
+		return;
+	}
+
+	G_TeleportPlayer( activator, dest );
+}
+
+void SP_target_teleporter( edict_t *self )
+{
+	self->r.svflags |= SVF_NOCLIENT;
+
+	if( !self->targetname )
+	{
+		if( developer->integer )
+			G_Printf( "untargeted %s at %s\n", self->classname, vtos( self->s.origin ) );
+	}
+
+	if( st.gameteam >= TEAM_SPECTATOR && st.gameteam < GS_MAX_TEAMS )
+		self->s.team = st.gameteam;
+	else
+		self->s.team = TEAM_SPECTATOR;
+
+	self->use = target_teleporter_use;
+}
+
+
+//==========================================================
+
+//QUAKED target_kill (.5 .5 .5) (-8 -8 -8) (8 8 8)
+//Kills the activator.
+
+static void target_kill_use( edict_t *self, edict_t *other, edict_t *activator )
+{
+	G_Damage( activator, self, world, vec3_origin, vec3_origin, activator->s.origin, 100000, 0, 0, DAMAGE_NO_PROTECTION, MOD_TRIGGER_HURT );
+}
+
+void SP_target_kill( edict_t *self )
+{
+	self->r.svflags |= SVF_NOCLIENT;
+	self->use = target_kill_use;
 }
 

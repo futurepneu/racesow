@@ -39,9 +39,9 @@ static int xi_opcode;
 
 static int mx, my;
 
-static Atom XA_TARGETS, XA_text, XA_utf8_string;
+Atom XA_TARGETS, XA_text, XA_utf8_string;
 
-static char* clip_data;
+char* clip_data;
 
 int Sys_XTimeToSysTime( unsigned long xtime );
 
@@ -49,101 +49,6 @@ int Sys_XTimeToSysTime( unsigned long xtime );
 #define CTRLV 22
 
 //============================================
-
-/*
-* Sys_GetClipboardData
-*
-* Orginally from EzQuake
-*/
-char *Sys_GetClipboardData( qboolean primary )
-{
-	Window win;
-	Atom type;
-	int format, ret;
-	unsigned long nitems, bytes_after, bytes_left;
-	unsigned char *data;
-	char *buffer;
-	Atom atom;
-
-	if( !x11display.dpy )
-		return NULL;
-
-	if( primary )
-	{
-		atom = XInternAtom( x11display.dpy, "PRIMARY", True );
-	}
-	else
-	{
-		atom = XInternAtom( x11display.dpy, "CLIPBOARD", True );
-	}
-	if( atom == None )
-		return NULL;
-
-	win = XGetSelectionOwner( x11display.dpy, atom );
-	if( win == None )
-		return NULL;
-
-	XConvertSelection( x11display.dpy, atom, XA_utf8_string, atom, win, CurrentTime );
-	XFlush( x11display.dpy );
-
-	XGetWindowProperty( x11display.dpy, win, atom, 0, 0, False, AnyPropertyType, &type, &format, &nitems, &bytes_left,
-		&data );
-	if( bytes_left <= 0 )
-		return NULL;
-
-	ret = XGetWindowProperty( x11display.dpy, win, atom, 0, bytes_left, False, AnyPropertyType, &type,
-		&format, &nitems, &bytes_after, &data );
-	if( ret == Success )
-	{
-		buffer = Q_malloc( bytes_left + 1 );
-		memcpy( buffer, data, bytes_left + 1 );
-	}
-	else
-	{
-		buffer = NULL;
-	}
-
-	XFree( data );
-
-	return buffer;
-}
-
-/*
-* Sys_SetClipboardData
-* Adapted from GLFW - x11_clipboard:_glfwPlatformSetClipboardString
-* See: https://github.com/glfw/glfw/blob/master/src/x11_clipboard.c
-*
-* @param e The XEvent of the request
-* @returns The proterty Atom for the appropriate response
-*/
-qboolean Sys_SetClipboardData( char *data )
-{
-	// Save the message
-	Q_free( clip_data );
-	clip_data = Q_malloc( strlen( data ) - 1 );
-	memcpy( clip_data, data, strlen( data ) - 1 );
-	
-	// Requesting clipboard ownership
-	Atom XA_CLIPBOARD = XInternAtom( x11display.dpy, "CLIPBOARD", True );
-	if( XA_CLIPBOARD == None )
-		return qfalse;
-
-	XSetSelectionOwner( x11display.dpy, XA_CLIPBOARD, x11display.win, CurrentTime );
-
-	// Check if we got ownership
-	if( XGetSelectionOwner( x11display.dpy, XA_CLIPBOARD ) == x11display.win )
-		return qtrue;
-
-	return qfalse;
-}
-
-/*
-* Sys_FreeClipboardData
-*/
-void Sys_FreeClipboardData( char *data )
-{
-	Q_free( data );
-}
 
 /*
 * Sys_SendClipboardData
@@ -323,7 +228,7 @@ static void uninstall_grabs_mouse( void )
 
 static void install_grabs_keyboard( void )
 {
-	int i;
+	//int i;
 	int num_devices;
 	XIDeviceInfo *info;
 	XIEventMask mask;
@@ -345,6 +250,11 @@ static void install_grabs_keyboard( void )
 	XISelectEvents(x11display.dpy, x11display.win, &mask, 1);
 
 	info = XIQueryDevice(x11display.dpy, XIAllDevices, &num_devices);
+	
+	//Grabing the entire keyboard breaks all global hotkeys (Alt+Tab, volume keys, PrtSc, etc).
+	//There is no way to avoid this: 'active' grabs (= grab the entire keyboard) 
+	//always get priority over 'passive' grabs (= grab one key).
+	/* 
 	for(i = 0; i < num_devices; i++) {
 		int id = info[i].deviceid;
 		if(info[i].use == XIMasterKeyboard)
@@ -352,6 +262,7 @@ static void install_grabs_keyboard( void )
 			XIGrabDevice(x11display.dpy, id, x11display.win, CurrentTime, None, GrabModeAsync, GrabModeAsync, False, &mask);
 		}
 	}
+	*/
 	XIFreeDeviceInfo(info);
 
 	free(mask.mask);
@@ -363,7 +274,7 @@ static void install_grabs_keyboard( void )
 
 static void uninstall_grabs_keyboard( void )
 {
-	int i;
+	//int i;
 	int num_devices;
 	XIDeviceInfo *info;
 
@@ -374,11 +285,13 @@ static void uninstall_grabs_keyboard( void )
 
 	info = XIQueryDevice(x11display.dpy, XIAllDevices, &num_devices);
 
+	/*
 	for(i = 0; i < num_devices; i++) {
 		if(info[i].use == XIMasterKeyboard) {
 			XIUngrabDevice(x11display.dpy, info[i].deviceid, CurrentTime);
 		}
 	}
+	*/
 	XIFreeDeviceInfo(info);
 
 	input_active = qfalse;
@@ -652,8 +565,8 @@ static void HandleEvents( void )
 			}
 			if( focus )
 			{
-				if( Cvar_Value( "vid_fullscreen" ) ) {
-					Cbuf_ExecuteText( EXEC_APPEND, "set vid_fullscreen 0\n" );
+				if ( Cvar_Value( "vid_fullscreen" ) ) {
+					XIconifyWindow( x11display.dpy, x11display.win, x11display.scr );
 				}
 				uninstall_grabs_keyboard();
 				Key_ClearStates();
@@ -828,4 +741,13 @@ void IN_Frame( void )
 	}
 
 	IN_Activate( m_active );
+}
+
+void IN_ShowIME( qboolean show )
+{
+}
+
+qboolean IN_ShowUICursor( void )
+{
+	return qtrue;
 }

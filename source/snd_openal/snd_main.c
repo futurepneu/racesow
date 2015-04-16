@@ -140,7 +140,7 @@ qboolean SF_Init( void *hwnd, int maxEntities, qboolean verbose )
 		return qfalse;
 	}
 
-	trap_Thread_Create( &s_backThread, S_BackgroundUpdateProc, s_cmdQueue );
+	s_backThread = trap_Thread_Create( S_BackgroundUpdateProc, s_cmdQueue );
 
 	S_IssueInitCmd( s_cmdQueue, hwnd, maxEntities, verbose );
 
@@ -164,7 +164,7 @@ void SF_Shutdown( qboolean verbose )
 		return;
 	}
 	
-	SF_StopAllSounds();
+	SF_StopAllSounds( qtrue, qtrue );
 
 	// wait for the queue to be processed
 	S_FinishSoundQueue( s_cmdQueue );
@@ -306,9 +306,9 @@ void SF_LockBackgroundTrack( qboolean lock )
 /*
 * SF_StopAllSounds
 */
-void SF_StopAllSounds( void )
+void SF_StopAllSounds( qboolean clear, qboolean stopMusic )
 {
-	S_IssueStopAllSoundsCmd( s_cmdQueue );
+	S_IssueStopAllSoundsCmd( s_cmdQueue, clear, stopMusic );
 }
 
 /*

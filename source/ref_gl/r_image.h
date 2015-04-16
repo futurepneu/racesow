@@ -41,26 +41,28 @@ enum
 	,IT_LUMINANCE		= 1<<14
 	,IT_BGRA			= 1<<15
 	,IT_SYNC			= 1<<16		// load image synchronously
+	,IT_DEPTHCOMPARE	= 1<<17
+	,IT_ARRAY			= 1<<18
 };
 
 #define IT_CINEMATIC		( IT_NOPICMIP|IT_NOMIPMAP|IT_CLAMP|IT_NOCOMPRESS )
 #define IT_PORTALMAP		( IT_NOMIPMAP|IT_NOCOMPRESS|IT_NOPICMIP|IT_CLAMP )
-#define IT_SHADOWMAP		( IT_NOMIPMAP|IT_NOCOMPRESS|IT_NOPICMIP|IT_CLAMP )
+#define IT_SHADOWMAP		( IT_NOMIPMAP|IT_NOCOMPRESS|IT_NOPICMIP|IT_CLAMP|IT_DEPTHCOMPARE )
+#define IT_GL_ES_NPOT		( IT_CLAMP|IT_NOMIPMAP )
 
 typedef struct image_s
 {
 	char			*name;						// game path, not including extension
 	size_t			name_size;
 	int				registrationSequence;
-	volatile qboolean	
-					loaded;
-	volatile qboolean
-					missing;
+	volatile qboolean loaded;
+	volatile qboolean missing;
 
 	char			extension[8];				// file extension
 	int				flags;
 	GLuint			texnum;						// gl texture binding
 	int				width, height;				// source image
+	int				layers;						// texture array size
 	int				upload_width,
 					upload_height;				// after power of two and picmip
 	int				samples;
@@ -70,7 +72,7 @@ typedef struct image_s
 } image_t;
 
 void R_SelectTextureUnit( int tmu );
-void R_BindTexture( int tmu, const image_t *tex );
+qboolean R_BindTexture( int tmu, const image_t *tex );
 
 void R_InitImages( void );
 void R_TouchImage( image_t *image );
@@ -92,8 +94,10 @@ void R_AnisotropicFilter( int value );
 
 image_t *R_LoadImage( const char *name, qbyte **pic, int width, int height, int flags, int samples );
 image_t	*R_FindImage( const char *name, const char *suffix, int flags );
+image_t *R_CreateArrayImage( const char *name, int width, int height, int layers, int flags, int samples );
 void R_ReplaceImage( image_t *image, qbyte **pic, int width, int height, int flags, int samples );
-void R_ReplaceSubImage( image_t *image, qbyte **pic, int width, int height );
+void R_ReplaceSubImage( image_t *image, int layer, qbyte **pic, int width, int height );
+void R_ReplaceImageLayer( image_t *image, int layer, qbyte **pic );
 
 void R_BeginAviDemo( void );
 void R_WriteAviFrame( int frame, qboolean scissor );

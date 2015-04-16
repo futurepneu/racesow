@@ -22,13 +22,18 @@ typedef Rocket::Core::CompiledGeometryHandle CompiledGeometryHandle;
 
 typedef struct shader_s shader_t;
 
-UI_RenderInterface::UI_RenderInterface( int vidWidth, int vidHeight )
+UI_RenderInterface::UI_RenderInterface( int vidWidth, int vidHeight, float pixelRatio )
 	: vid_width( vidWidth ), vid_height( vidHeight ), polyAlloc()
 {
+	pixelsPerInch = 160.0f * pixelRatio;
+
 	texCounter = 0;
 
 	scissorEnabled = false;
-	scissorX = scissorY = scissorWidth = scissorHeight = -1;
+	scissorX = 0;
+	scissorY = 0;
+	scissorWidth = vid_width;
+	scissorHeight = vid_height;
 
 	whiteShader = trap::R_RegisterPic( "$whiteimage" );
 }
@@ -65,6 +70,7 @@ void UI_RenderInterface::RenderCompiledGeometry(Rocket::Core::CompiledGeometryHa
 
 	poly_t *poly = ( poly_t * )geometry;
 
+	if( !trap::Cvar_Value("foo"))
 	trap::R_DrawStretchPoly( poly, translation.x, translation.y );
 }
 
@@ -74,6 +80,7 @@ void UI_RenderInterface::RenderGeometry(Rocket::Core::Vertex *vertices, int num_
 
 	poly = RocketGeometry2Poly( true, vertices, num_vertices, indices, num_indices, texture );
 
+	if( !trap::Cvar_Value("foo"))
 	trap::R_DrawStretchPoly( poly, translation.x, translation.y );
 }
 
@@ -93,7 +100,7 @@ void UI_RenderInterface::EnableScissorRegion(bool enable)
 	if( enable )
 		trap::R_Scissor( scissorX, scissorY, scissorWidth, scissorHeight );
 	else
-		trap::R_Scissor( -1, -1, -1, -1 );
+		trap::R_ResetScissor();
 
 	scissorEnabled = enable;
 }
@@ -158,6 +165,11 @@ int UI_RenderInterface::GetHeight( void )
 int UI_RenderInterface::GetWidth( void )
 {
 	return this->vid_width;
+}
+
+float UI_RenderInterface::GetPixelsPerInch( void )
+{
+	return this->pixelsPerInch;
 }
 
 poly_t *UI_RenderInterface::RocketGeometry2Poly( bool temp, Rocket::Core::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rocket::Core::TextureHandle texture )

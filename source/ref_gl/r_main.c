@@ -142,8 +142,7 @@ void R_TransformForWorld( void )
 	Matrix4_Identity( rn.objectMatrix );
 	Matrix4_Copy( rn.cameraMatrix, rn.modelviewMatrix );
 
-	RB_LoadObjectMatrix( rn.objectMatrix );
-	RB_LoadModelviewMatrix( rn.modelviewMatrix );
+	RB_LoadObjectMatrix( mat4x4_identity );
 }
 
 /*
@@ -160,10 +159,7 @@ static void R_TranslateForEntity( const entity_t *e )
 	rn.objectMatrix[13] = e->origin[1];
 	rn.objectMatrix[14] = e->origin[2];
 
-	Matrix4_MultiplyFast( rn.cameraMatrix, rn.objectMatrix, rn.modelviewMatrix );
-
 	RB_LoadObjectMatrix( rn.objectMatrix );
-	RB_LoadModelviewMatrix( rn.modelviewMatrix );
 }
 
 /*
@@ -213,7 +209,6 @@ void R_TransformForEntity( const entity_t *e )
 	Matrix4_MultiplyFast( rn.cameraMatrix, rn.objectMatrix, rn.modelviewMatrix );
 
 	RB_LoadObjectMatrix( rn.objectMatrix );
-	RB_LoadModelviewMatrix( rn.modelviewMatrix );
 }
 
 /*
@@ -444,6 +439,7 @@ void R_BatchSpriteSurf( const entity_t *e, const shader_t *shader, const mfog_t 
 	mesh.xyzArray = xyz;
 	mesh.normalsArray = normals;
 	mesh.lmstArray[0] = NULL;
+	mesh.lmlayersArray[0] = NULL;
 	mesh.stArray = texcoords;
 	mesh.colorsArray[0] = colors;
 	mesh.colorsArray[1] = NULL;
@@ -544,7 +540,7 @@ qboolean R_DrawNullSurf( const entity_t *e, const shader_t *shader, const mfog_t
 
 	RB_BindVBO( rsh.nullVBO->index, GL_LINES );
 
-	RB_DrawElements( 0, 6, 0, 6 );
+	RB_DrawElements( 0, 6, 0, 6, 0, 0, 0, 0 );
 
 	return qfalse;
 }
@@ -568,7 +564,7 @@ static vec4_t pic_xyz[4] = { {0,0,0,1}, {0,0,0,1}, {0,0,0,1}, {0,0,0,1} };
 static vec4_t pic_normals[4] = { {0,0,0,0}, {0,0,0,0}, {0,0,0,0}, {0,0,0,0} };
 static vec2_t pic_st[4];
 static byte_vec4_t pic_colors[4];
-static mesh_t pic_mesh = { 4, pic_xyz, pic_normals, NULL, pic_st, { 0, 0, 0, 0 }, { pic_colors, pic_colors, pic_colors, pic_colors }, 0, NULL };
+static mesh_t pic_mesh = { 4, pic_xyz, pic_normals, NULL, pic_st, { 0, 0, 0, 0 }, { 0 }, { pic_colors, pic_colors, pic_colors, pic_colors }, 0, NULL };
 static const shader_t *pic_mbuffer_shader;
 static float pic_x_offset, pic_y_offset;
 
@@ -600,7 +596,7 @@ void R_BeginStretchBatch( const shader_t *shader, float x_offset, float y_offset
 			Matrix4_Identity( translation );
 			Matrix4_Translate2D( translation, pic_x_offset, pic_y_offset );
 
-			RB_LoadModelviewMatrix( translation );
+			RB_LoadObjectMatrix( translation );
 		}
 
 		RB_BindShader( NULL, shader, NULL );
@@ -629,7 +625,7 @@ void R_EndStretchBatch( void )
 
 	// reset matrix
 	if( pic_x_offset != 0 || pic_y_offset != 0 ) {
-		RB_LoadModelviewMatrix( mat4x4_identity );
+		RB_LoadObjectMatrix( mat4x4_identity );
 	}
 
 	R_ResetStretchPic();
@@ -672,9 +668,12 @@ void R_Set2DMode( qboolean enable )
 		RB_Viewport( 0, 0, width, height );
 
 		RB_LoadProjectionMatrix( rn.projectionMatrix );
-		RB_LoadModelviewMatrix( rn.modelviewMatrix );
+		RB_LoadCameraMatrix( mat4x4_identity );
+		RB_LoadObjectMatrix( mat4x4_identity );
 
 		RB_SetShaderStateMask( ~0, GLSTATE_NO_DEPTH_TEST );
+
+		RB_SetRenderFlags( 0 );
 	}
 	else
 	{
@@ -774,7 +773,7 @@ void R_DrawStretchRaw( int x, int y, int w, int h, int cols, int rows,
 			qbyte *nodata[1] = { NULL };
 			R_ReplaceImage( rsh.rawTexture, nodata, cols, rows, rsh.rawTexture->flags, 3 );
 		}
-		R_ReplaceSubImage( rsh.rawTexture, &data, cols, rows );
+		R_ReplaceSubImage( rsh.rawTexture, 0, &data, cols, rows );
 	}
 
 	h_scale = (float)rsh.rawTexture->width / rsh.rawTexture->upload_width;
@@ -839,7 +838,7 @@ void R_DrawStretchRawYUVBuiltin( int x, int y, int w, int h,
 				qbyte *nodata[1] = { NULL };
 				R_ReplaceImage( yuvTextures[i], nodata, stride, height, flags, 1 );
 			}
-			R_ReplaceSubImage( yuvTextures[i], &data, stride, height );
+			R_ReplaceSubImage( yuvTextures[i], 0, &data, stride, height );
 		}
 	}
 
@@ -943,22 +942,13 @@ void R_BindFrameBufferObject( int object )
 /*
 * R_Scissor
 *
-* Set scissor region for 2D drawing. Passing a negative value
-* for any of the variables sets the scissor region to full screen.
-* x and y represent the bottom left corner of the region/rectangle.
+* Set scissor region for 2D drawing.
+* x and y represent the top left corner of the region/rectangle.
 */
 void R_Scissor( int x, int y, int w, int h )
 {
-	// flush batched 2D geometry
-	R_EndStretchBatch();
-
-	if( x < 0 || y < 0 || w < 0 || h < 0 ) {
-		// reset
-		RB_Scissor( 0, 0, rf.frameBufferWidth, rf.frameBufferHeight );
-	}
-	else {
-		RB_Scissor( x, y, w, h );
-	}
+	R_EndStretchBatch(); // flush batched 2D geometry
+	RB_Scissor( x, y, w, h );
 }
 
 /*
@@ -967,6 +957,15 @@ void R_Scissor( int x, int y, int w, int h )
 void R_GetScissor( int *x, int *y, int *w, int *h )
 {
 	RB_GetScissor( x, y, w, h );
+}
+
+/*
+* R_ResetScissor
+*/
+void R_ResetScissor( void )
+{
+	R_EndStretchBatch(); // flush batched 2D geometry
+	RB_Scissor( 0, 0, rf.frameBufferWidth, rf.frameBufferHeight );
 }
 
 /*
@@ -1189,13 +1188,15 @@ static void R_SetupGL( int clearBitMask )
 
 	RB_SetCamera( rn.viewOrigin, rn.viewAxis );
 
-	RB_SetMinLight( rn.refdef.minLight );
+	RB_SetLightParams( rn.refdef.minLight, rn.refdef.rdflags & RDF_NOWORLDMODEL ? qtrue : qfalse );
 
 	RB_SetRenderFlags( rn.renderFlags );
 
 	RB_LoadProjectionMatrix( rn.projectionMatrix );
 
-	RB_LoadModelviewMatrix( rn.cameraMatrix );
+	RB_LoadCameraMatrix( rn.cameraMatrix );
+
+	RB_LoadObjectMatrix( mat4x4_identity );
 
 	if( rn.renderFlags & RF_FLIPFRONTFACE )
 		RB_FlipFrontFace();
@@ -1245,7 +1246,7 @@ static void R_DrawEntities( void )
 		return;
 	}
 
-	for( i = 1; i < rsc.numEntities; i++ )
+	for( i = rsc.numLocalEntities; i < rsc.numEntities; i++ )
 	{
 		e = R_NUM2ENT(i);
 		culled = qtrue;
@@ -1435,6 +1436,12 @@ void R_RenderView( const refdef_t *fd )
 	R_DrawSurfaces();
 	if( r_speeds->integer )
 		rf.stats.t_draw_meshes += ( ri.Sys_Milliseconds() - msec );
+
+	rf.stats.c_slices_verts += rn.meshlist->numSliceVerts;
+	rf.stats.c_slices_verts_real += rn.meshlist->numSliceVertsReal;
+
+	rf.stats.c_slices_elems += rn.meshlist->numSliceElems;
+	rf.stats.c_slices_elems_real += rn.meshlist->numSliceElemsReal;
 
 	if( r_showtris->integer )
 		R_DrawOutlinedSurfaces();
@@ -1712,17 +1719,19 @@ const char *R_SpeedsMessage( char *out, size_t size )
 			RB_StatsMessage( backend_msg, sizeof( backend_msg ) );
 
 			Q_snprintfz( out, size,
-				"%4i wpoly %4i leafs\n"
+				"%4u wpoly %4u leafs\n"
+				"sverts: %5u\\%5u  stris: %5u\\%5u\n"
 				"%s",
 				rf.stats.c_brush_polys, rf.stats.c_world_leafs,
+				rf.stats.c_slices_verts, rf.stats.c_slices_verts_real, rf.stats.c_slices_elems/3, rf.stats.c_slices_elems_real/3,
 				backend_msg
 			);
 			break;
 		case 2:
 		case 3:
 			Q_snprintfz( out, size,
-				"lvs: %5i  node: %5i\n"
-				"polys\\ents: %5i\\%5i  draw: %5i",
+				"lvs: %5u  node: %5u\n"
+				"polys\\ents: %5u\\%5i  draw: %5u\n",
 				rf.stats.t_mark_leaves, rf.stats.t_world_node,
 				rf.stats.t_add_polys, rf.stats.t_add_entities, rf.stats.t_draw_meshes
 			);
@@ -1820,7 +1829,7 @@ void R_WriteAviFrame( int frame, qboolean scissor )
 	checkname_size = sizeof( char ) * ( strlen( "avi/avi" ) + 6 + strlen( extension ) + 1 );
 	checkname = malloc( checkname_size );
 	Q_snprintfz( checkname, checkname_size, "avi/avi%06i", frame );
-	COM_DefaultExtension( checkname, ".jpg", checkname_size );
+	COM_DefaultExtension( checkname, extension, checkname_size );
 
 	R_ScreenShot( checkname, x, y, w, h, quality, qfalse, qfalse, qfalse, qtrue );
 
@@ -1989,6 +1998,7 @@ int R_LoadFile_( const char *path, void **buffer, const char *filename, int file
 
 	// look for it in the filesystem or pack files
 	len = ri.FS_FOpenFile( path, &fhandle, FS_READ );
+
 	if( !fhandle )
 	{
 		if( buffer )

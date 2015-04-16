@@ -1043,6 +1043,7 @@ void CG_AddFlagModelOnTag( centity_t *cent, byte_vec4_t teamcolor, const char *t
 		flag.frame = flag.oldframe = 0;
 		flag.radius = 32.0f;
 		flag.customShader = CG_MediaShader( cgs.media.shaderFlagFlare );
+		flag.outlineHeight = 0;
 
 		CG_AddEntityToScene( &flag );
 	}
@@ -1110,9 +1111,7 @@ static void CG_AddFlagBaseEnt( centity_t *cent )
 	}
 
 	// render effects
-	cent->ent.renderfx = cent->renderfx;
-	if( cg_shadows->integer <= 1 )
-		cent->ent.renderfx |= RF_NOSHADOW;
+	cent->ent.renderfx = cent->renderfx|RF_NOSHADOW;
 
 	// let's see: We add first the modelindex 1 (the base)
 
@@ -1152,7 +1151,7 @@ static void CG_AddFlagBaseEnt( centity_t *cent )
 		number.origin2[2] += 24;
 		number.model = NULL;
 		number.radius = 12;
-		number.customShader = CG_MediaShader( cgs.media.sbNums[cent->current.modelindex2 - 1] );
+		number.customShader = CG_MediaShader( cgs.media.shaderFlagNums[cent->current.modelindex2 - 1] );
 		CG_AddEntityToScene( &number );
 	}
 }
@@ -1961,8 +1960,6 @@ void CG_AddEntities( void )
 			if( cg_gibs->integer )
 			{
 				CG_AddGenericEnt( cent );
-				if( cg_gibs->integer != 1 )
-					CG_NewBloodTrail( cent );
 				CG_EntityLoopSound( state, ATTN_STATIC );
 				canLight = true;
 			}
@@ -2217,7 +2214,7 @@ void CG_UpdateEntities( void )
 				}
 				else
 				{
-					cent->ent.model = CG_MediaModel( cgs.media.modMeatyGibs[ 0 ] );
+					cent->ent.model = CG_MediaModel( cgs.media.modIlluminatiGibs );
 				}
 			}
 			break;

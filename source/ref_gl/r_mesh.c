@@ -55,6 +55,9 @@ void R_ClearDrawList( void )
 	// clear counters
 	list->numDrawSurfs = 0;
 
+	list->numSliceElems = list->numSliceElemsReal = 0;
+	list->numSliceVerts = list->numSliceVertsReal = 0;
+
 	// clear VBO slices
 	if( list->vboSlices ) {
 		memset( list->vboSlices, 0, sizeof( *list->vboSlices ) * list->maxVboSlices );
@@ -253,18 +256,28 @@ void R_AddVBOSlice( unsigned int index, unsigned int numVerts, unsigned int numE
 		slice->numVerts = numVerts;
 		slice->numElems = numElems;
 	}
-	else if( firstVert < slice->firstVert ) {
-		// prepend
-		slice->numVerts = slice->numVerts + slice->firstVert - firstVert;
-		slice->numElems = slice->numElems + slice->firstElem - firstElem;
+	else {
+		list->numSliceVertsReal -= slice->numVerts;
+		list->numSliceElemsReal -= slice->numElems;
 
-		slice->firstVert = firstVert;
-		slice->firstElem = firstElem;
-	} else {
-		// append
-		slice->numVerts = max( slice->numVerts, numVerts + firstVert - slice->firstVert );
-		slice->numElems = max( slice->numElems, numElems + firstElem - slice->firstElem );
+		if( firstVert < slice->firstVert ) {
+			// prepend
+			slice->numVerts = slice->numVerts + slice->firstVert - firstVert;
+			slice->numElems = slice->numElems + slice->firstElem - firstElem;
+
+			slice->firstVert = firstVert;
+			slice->firstElem = firstElem;
+		} else {
+			// append
+			slice->numVerts = max( slice->numVerts, numVerts + firstVert - slice->firstVert );
+			slice->numElems = max( slice->numElems, numElems + firstElem - slice->firstElem );
+		}
 	}
+
+	list->numSliceVerts += numVerts;
+	list->numSliceVertsReal += slice->numVerts;
+	list->numSliceElems += numElems;
+	list->numSliceElemsReal += slice->numElems;
 }
 
 /*
@@ -274,7 +287,6 @@ vboSlice_t *R_GetVBOSlice( unsigned int index )
 {
 	drawList_t *list = rn.meshlist;
 
-	assert( index < list->maxVboSlices );
 	if( index >= list->maxVboSlices ) {
 		return NULL;
 	}
@@ -333,7 +345,7 @@ static void _R_DrawSurfaces( void )
 	unsigned int i;
 	unsigned int sortKey;
 	unsigned int shaderNum = 0, prevShaderNum = MAX_SHADERS;
-	unsigned int entNum = 0, prevEntNum = MAX_ENTITIES;
+	unsigned int entNum = 0, prevEntNum = MAX_REF_ENTITIES;
 	int portalNum = -1, prevPortalNum = -100500;
 	int fogNum = -1, prevFogNum = -100500;
 	sortedDrawSurf_t *sds;
@@ -445,7 +457,7 @@ static void _R_DrawSurfaces( void )
 
 			RB_BindShader( entity, shader, fog );
 
-			RB_SetShadowBits( rsc.entShadowBits[entNum] & rn.shadowBits );
+			RB_SetShadowBits( (rsc.entShadowBits[entNum] & rn.shadowBits) & rsc.renderedShadowBits );
 
 			RB_SetPortalSurface( portalSurface );
 
@@ -491,7 +503,10 @@ void R_DrawSurfaces( void )
 	qboolean triOutlines;
 	
 	triOutlines = RB_EnableTriangleOutlines( qfalse );
-	_R_DrawSurfaces();
+	if( !triOutlines ) {
+		// do not recurse into normal mode when rendering triangle outlines
+		_R_DrawSurfaces();
+	}
 	RB_EnableTriangleOutlines( triOutlines );
 }
 

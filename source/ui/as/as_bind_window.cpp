@@ -46,6 +46,13 @@ public:
 
 	~ASWindow()
 	{
+		shutdown();
+	}
+
+	void shutdown()
+	{
+		shuttingDown = true;
+
 		// detatch itself from the possibly opened modal window
 		detachAsEventListener();
 
@@ -55,6 +62,8 @@ public:
 			FunctionCallScheduler *scheduler = it->second;
 
 			doc->RemoveReference();
+			doc->RemoveEventListener( "beforeUnload", this );
+
 			scheduler->shutdown();
 			__delete__( scheduler );
 		}
@@ -62,21 +71,25 @@ public:
 	}
 
 	/// Loads document from the passed URL.
-	void open( const ASURL &location )
+	ElementDocument *open( const asstring_t &location )
 	{
-		WSWUI::NavigationStack *stack = UI_Main::Get()->getNavigator();
+		WSWUI::NavigationStack *stack = UI_Main::Get()->createStack();
 		if( stack == NULL ) {
-			return;
+			return NULL;
 		}
-
-		stack->pushDocument( location.GetURL()->buffer );
+		WSWUI::Document *ui_document = stack->pushDocument( location.buffer );
+		if( !ui_document ) {
+			return NULL;
+		}
+		ui_document->addReference();
+		return ui_document->getRocketDocument();
 	}
 
 	/// Loads modal document from the URL.
 	/// FIXME: move to window.
-	void modal( const ASURL &location, int defaultCode = -1 )
+	void modal( const asstring_t &location, int defaultCode = -1 )
 	{
-		WSWUI::NavigationStack *stack = UI_Main::Get()->getNavigator();
+		WSWUI::NavigationStack *stack = GetCurrentUIStack();
 
 		// default return value when modal window is not closed via window.close()
 		modalValue = defaultCode;
@@ -92,7 +105,7 @@ public:
 		if( suspendedContext ) {
 			// attach itself as a listener of hide event so the context
 			// can be resumed after the modal document is hidden
-			WSWUI::Document *doc = stack->pushDocument( location.GetURL()->buffer, true, true );
+			WSWUI::Document *doc = stack->pushDocument( location.buffer, true, true );
 			if( doc ) {
 				attachedModalDocument = doc->getRocketDocument();
 				attachedModalDocument->AddEventListener( "hide", this );
@@ -110,7 +123,7 @@ public:
 	/// Stores exit code to be passed to suspended context if modal.
 	void close( int code = 0 )
 	{
-		WSWUI::NavigationStack *stack = UI_Main::Get()->getNavigator();
+		WSWUI::NavigationStack *stack = GetCurrentUIStack();
 		if( stack == NULL ) {
 			return;
 		}
@@ -130,7 +143,7 @@ public:
 		}
 		else {
 			// not really a modal window, clear the stack
-			UI_Main::Get()->showUI( false );
+			stack->popAllDocuments();
 		}
 	}
 
@@ -140,40 +153,55 @@ public:
 	{
 		SchedulerMap::iterator it = schedulers.begin();
 		while( it != schedulers.end() ) {
-			ElementDocument *doc = it->first;
 			FunctionCallScheduler *scheduler = it->second;
-
-			if( doc->GetReferenceCount() == 1 ) {
-				scheduler->shutdown();
-				__delete__( scheduler );
-
-				doc->RemoveReference();
-
-				schedulers.erase( it++ );
-			}
-			else {
-				scheduler->update();
-				++it;
-			}
+			scheduler->update();
+			++it;
 		}
+	}
+
+	virtual void OnDetach( Element *element ) {
+		if( shuttingDown ) {
+			return;
+		}
+
+		ElementDocument *doc = dynamic_cast<ElementDocument *>(element);
+		SchedulerMap::iterator it = schedulers.find( doc );
+		if( it == schedulers.end() ) {
+			// FIXME
+			return;
+		}
+
+		FunctionCallScheduler *scheduler = it->second;
+		scheduler->shutdown();
+		__delete__( scheduler );
+
+		doc->RemoveReference();
+
+		schedulers.erase( it );
 	}
 
 	ElementDocument *getDocument( void ) const
 	{
 		ElementDocument *document = GetCurrentUIDocument();
+		assert( document != NULL );
 		document->AddReference();
 		return document;
 	}
 
-	ASURL getLocation( void ) const
+	asstring_t *getLocation( void ) const
 	{
 		ElementDocument *document = GetCurrentUIDocument();
-		return ASURL( document->GetSourceURL().CString() );
+		assert( document != NULL );
+		return ASSTR( document->GetSourceURL().CString() );
 	}
 
-	void setLocation( const ASURL &location )
+	void setLocation( const asstring_t &location )
 	{
-		open( location );
+		WSWUI::NavigationStack *stack = GetCurrentUIStack();
+		if( stack == NULL ) {
+			return;
+		}
+		stack->pushDocument( location.buffer );
 	}
 
 	unsigned int getTime( void ) const
@@ -200,9 +228,15 @@ public:
 		return state.height;
 	}
 
+	float getPixelRatio( void ) const
+	{
+		const RefreshState &state = UI_Main::Get()->getRefreshState();
+		return state.pixelRatio;
+	}
+
 	unsigned int historySize( void ) const
 	{
-		WSWUI::NavigationStack *stack = UI_Main::Get()->getNavigator();
+		WSWUI::NavigationStack *stack = GetCurrentUIStack();
 		if( stack != NULL ) {
 			return stack->getStackSize();
 		}
@@ -211,7 +245,7 @@ public:
 
 	void historyBack( void ) const
 	{
-		WSWUI::NavigationStack *stack = UI_Main::Get()->getNavigator();
+		WSWUI::NavigationStack *stack = GetCurrentUIStack();
 		if( stack != NULL && stack->hasAtLeastTwoDocuments() && !stack->isTopModal() ) {
 			stack->popDocument();
 		}
@@ -284,6 +318,11 @@ public:
 		return UI_Main::Get()->getConnectCount();
 	}
 
+	void showIME( bool show )
+	{
+		trap::IN_ShowIME( show ? qtrue : qfalse );
+	}
+
 private:
 	typedef std::map<ElementDocument *, FunctionCallScheduler *>  SchedulerMap;
 	SchedulerMap schedulers;
@@ -304,9 +343,24 @@ private:
 
 	static ElementDocument *GetCurrentUIDocument( void )
 	{
-		// we assume we set the user data at document instancing in asui_scriptdocument.cpp
-		// also note that this method can called outside of AS execution context!
-		return static_cast<ElementDocument *>( UI_Main::Get()->getAS()->getActiveModule()->GetUserData() );
+		// note that this method can be called outside the AS execution context!
+		asIScriptModule *m = UI_Main::Get()->getAS()->getActiveModule();
+		if( !m ) {
+			return NULL;
+		}
+		WSWUI::Document *ui_document = static_cast<WSWUI::Document *>( m->GetUserData() );
+		return ui_document ? ui_document->getRocketDocument() : NULL;
+	}
+
+	static WSWUI::NavigationStack *GetCurrentUIStack( void )
+	{
+		// note that this method can be called outside the AS execution context!
+		asIScriptModule *m = UI_Main::Get()->getAS()->getActiveModule();
+		if( !m ) {
+			return NULL;
+		}
+		WSWUI::Document *ui_document = static_cast<WSWUI::Document *>( m->GetUserData() );
+		return ui_document ? ui_document->getStack() : NULL;
 	}
 
 	void detachAsEventListener( void )
@@ -321,11 +375,15 @@ private:
 	FunctionCallScheduler *getSchedulerForCurrentUIDocument( void )
 	{
 		ElementDocument *doc = GetCurrentUIDocument();
+
+		assert( doc != NULL );
+
 		SchedulerMap::iterator it = schedulers.find( doc );
 
 		FunctionCallScheduler *scheduler;
 		if( it == schedulers.end() ) {
 			doc->AddReference();
+			doc->AddEventListener( "beforeUnload", this );
 
 			scheduler = __new__( FunctionCallScheduler )();
 			scheduler->init( UI_Main::Get()->getAS() );
@@ -348,6 +406,7 @@ private:
 
 	// exit code passed via document.close() of the modal document
 	int modalValue;
+	bool shuttingDown;
 
 	bool backgroundTrackPlaying;
 };
@@ -386,6 +445,7 @@ void BindWindow( ASInterface *as )
 		.method( &ASWindow::getDrawBackground, "get_drawBackground" )
 		.method( &ASWindow::getWidth, "get_width" )
 		.method( &ASWindow::getHeight, "get_height" )
+		.method( &ASWindow::getPixelRatio, "get_pixelRatio" )
 
 		.method( &ASWindow::historySize, "history_size" )
 		.method( &ASWindow::historyBack, "history_back" )
@@ -410,6 +470,8 @@ void BindWindow( ASInterface *as )
 		.method( &ASWindow::flash, "flash" )
 
 		.method( &ASWindow::getConnectCount, "get_connectCount" )
+
+		.method( &ASWindow::showIME, "showIME" );
 	;
 }
 

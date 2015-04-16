@@ -20,19 +20,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef R_BACKEND_LOCAL_H
 #define R_BACKEND_LOCAL_H
 
-#define MAX_STREAM_VBO_VERTS		32768
+#define MAX_STREAM_VBO_VERTS		8192
 #define MAX_STREAM_VBO_ELEMENTS		MAX_STREAM_VBO_VERTS*6
 #define MAX_STREAM_VBO_TRIANGLES	MAX_STREAM_VBO_ELEMENTS/3
 #define MAX_STREAM_VBO_INSTANCES	8192
 
-#define MAX_BATCH_VERTS				8192
+#define MAX_BATCH_VERTS				4096
 #define MAX_BATCH_ELEMENTS			MAX_BATCH_VERTS*6
 #define MAX_BATCH_TRIANGLES			MAX_BATCH_ELEMENTS/3
 
 typedef struct r_backend_stats_s
 {
 	unsigned int numVerts, numElems;
-	unsigned int c_totalVerts, c_totalTris, c_totalStaticVerts, c_totalStaticTris, c_totalDraws;
+	unsigned int c_totalVerts, c_totalTris, c_totalStaticVerts, c_totalStaticTris, c_totalDraws, c_totalBinds;
 } rbStats_t;
 
 typedef struct
@@ -41,6 +41,15 @@ typedef struct
 	dualquat_t dualQuats[MAX_GLSL_UNIFORM_BONES];
 	unsigned int maxWeights;
 } rbBonesData_t;
+
+typedef struct
+{
+	unsigned int firstVert;
+	unsigned int numVerts;
+	unsigned int firstElem;
+	unsigned int numElems;
+	unsigned int numInstances;
+} rbDrawElements_t;
 
 typedef struct r_backend_s
 {
@@ -63,15 +72,16 @@ typedef struct r_backend_s
 
 		int				fbWidth, fbHeight;
 
-		float			polygonOffset[2];
-
 		float			depthmin, depthmax;
+
+		qboolean		depthoffset;
 	} gl;
 
 	unsigned int time;
 
 	rbStats_t stats;
 
+	mat4_t cameraMatrix;
 	mat4_t objectMatrix;
 	mat4_t modelviewMatrix;
 	mat4_t projectionMatrix;
@@ -92,27 +102,22 @@ typedef struct r_backend_s
 	int currentProgramObject;
 
 	mesh_t batchMesh;
-	vboSlice_t batches[RB_VBO_NUM_STREAMS];
-	vboSlice_t streamOffset[RB_VBO_NUM_STREAMS];
+	rbDrawElements_t batches[RB_VBO_NUM_STREAMS];
+	rbDrawElements_t streamOffset[RB_VBO_NUM_STREAMS];
 	mesh_vbo_t *streamVBOs[RB_VBO_NUM_STREAMS];
 
 	instancePoint_t *drawInstances;
 	int maxDrawInstances;
 
-	struct {
-		unsigned int firstVert;
-		unsigned int numVerts;
-		unsigned int firstElem;
-		unsigned int numElems;
-		unsigned int numInstances;
-	} drawElements;
+	rbDrawElements_t drawElements;
+	rbDrawElements_t drawShadowElements;
 
 	vattribmask_t currentVAttribs;
 
 	int primitive;
 	int currentVBOId;
 	mesh_vbo_t *currentVBO;
-	vboSlice_t *currentBatch;
+	rbDrawElements_t *currentBatch;
 
 	unsigned int currentDlightBits;
 	unsigned int currentShadowBits;
@@ -144,6 +149,7 @@ typedef struct r_backend_s
 	float hackedAlpha;
 
 	float minLight;
+	qboolean noWorldLight;
 } rbackend_t;
 
 extern rbackend_t rb;
@@ -152,7 +158,7 @@ extern rbackend_t rb;
 #define RB_Alloc(size) R_MallocExt( rb.mempool, size, 16, 1 )
 #define RB_Free(data) R_Free(data)
 
-void RB_DrawElementsReal( void );
+void RB_DrawElementsReal( rbDrawElements_t *de );
 #define RB_IsAlphaBlending(blendsrc,blenddst) \
 	( (blendsrc) == GLSTATE_SRCBLEND_SRC_ALPHA || (blenddst) == GLSTATE_DSTBLEND_SRC_ALPHA ) || \
 	( (blendsrc) == GLSTATE_SRCBLEND_ONE_MINUS_SRC_ALPHA || (blenddst) == GLSTATE_DSTBLEND_ONE_MINUS_SRC_ALPHA )
@@ -162,6 +168,7 @@ void RB_InitShading( void );
 void RB_DrawOutlinedElements( void );
 void RB_DrawShadedElements( void );
 int RB_BindProgram( int program );
+void RB_BindTexture( int tmu, const image_t *tex );
 void RB_SetInstanceData( int numInstances, instancePoint_t *instances );
 qboolean RB_ScissorForBounds( vec3_t bbox[8], int *x, int *y, int *w, int *h );
 

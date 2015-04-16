@@ -16,6 +16,8 @@ namespace WSWUI {
 #define TABLE_NAME_RACE		"race"
 #define TABLE_NAME_FAVORITES "favorites"
 
+#define TABLE_SUFFIX_SUGGESTIONS "_suggestions"
+
 //=====================================
 
 namespace {
@@ -336,6 +338,9 @@ void ServerInfo::fixStrings()
 // 3) hostname ASC
 bool ServerInfo::DefaultCompareBinary( const ServerInfo *lhs, const ServerInfo *rhs )
 {
+	if( lhs->mm > rhs->mm ) return true;
+	if( lhs->mm < rhs->mm ) return false;
+
 	if( lhs->curuser > rhs->curuser ) return true;
 	if( lhs->curuser < rhs->curuser ) return false;
 
@@ -437,14 +442,13 @@ void ServerInfoFetcher::startQuery( const std::string &adr )
 ServerBrowserDataSource::ServerBrowserDataSource() :
 		Rocket::Controls::DataSource("serverbrowser_source"),
 		serverList(),
-		fetcher(this), active(false),
+		fetcher(), active(false), updateId(0), lastActiveTime(0),
 		lastUpdateTime(0)
 {
 	// default sorting function
 	// hostname
 	sortCompare = lastSortCompare = &ServerInfo::DefaultCompareBinary;
 	sortDirection = -1;
-	active = false;
 
 	referenceListMap.clear();
 
@@ -625,6 +629,8 @@ void ServerBrowserDataSource::updateFrame()
 
 	if( active && fetcher.numActive() == 0 && fetcher.numWaiting() == 0 && fetcher.numIssued() > 0 && !referenceListMap.empty() ) {
 		active = false;
+		lastActiveTime = trap::Milliseconds();
+		compileSuggestionsList();
 	}
 }
 
@@ -635,6 +641,7 @@ void ServerBrowserDataSource::startFullUpdate( void )
 	std::string gameName = trap::Cvar_String( "gamename" );
 
 	active = true;
+	updateId++;
 
 	// formulate the query and execute
 	// basic prototype:
@@ -656,15 +663,16 @@ void ServerBrowserDataSource::startFullUpdate( void )
 	// query for LAN servers too
 	trap::Cmd_ExecuteText( EXEC_APPEND, "requestservers local full empty\n" );
 
-	for( ReferenceListMap::iterator it = referenceListMap.begin(); it != referenceListMap.end(); ++it ) {
+	ReferenceListMap referenceListMapCopy = referenceListMap;
+	referenceListMap.clear();
+
+	for( ReferenceListMap::iterator it = referenceListMapCopy.begin(); it != referenceListMapCopy.end(); ++it ) {
 		size_t size = it->second.size();
 		if( size > 0 ) {
 			it->second.clear();
 			NotifyRowRemove( it->first, 0, size );
 		}
-	}
-
-	referenceListMap.clear();
+	}	
 }
 
 // callback from client propagates to here
@@ -761,8 +769,73 @@ void ServerBrowserDataSource::startRefresh( void )
 // and stop current update/refresh
 void ServerBrowserDataSource::stopUpdate( void )
 {
+	if (active) {
+		lastActiveTime = trap::Milliseconds();
+	}
 	active = false;
 	fetcher.clearQueries();
+	compileSuggestionsList();
+}
+
+void ServerBrowserDataSource::compileSuggestionsList( void )
+{
+	std::map<String, ReferenceListMap> suggestedServers;
+
+	// for each table, compile the list of suggested servers,
+	// ignoring full and passworded servers
+	// one server per unique gametype
+	for( ReferenceListMap::iterator it = referenceListMap.begin(); it != referenceListMap.end(); ++it ) {
+		ReferenceListMap gtServers;
+
+		ReferenceList &referenceList = it->second;
+		for( ReferenceList::iterator it_ = referenceList.begin(); it_ != referenceList.end(); ++it_ ) {
+			ServerInfo *info = *it_;
+			String gametype = info->gametype.c_str();
+
+			if( info->password ) {
+				continue;
+			}
+			if( info->curuser == info->maxuser ) {
+				continue;
+			}
+			if( gametype == "error" ) {
+				continue;
+			}
+			if( info->ping > 120 ) {
+				continue;
+			}
+
+			bool insertInfo = false;
+			ReferenceListMap::iterator gtBest = gtServers.find( gametype );
+			if( gtBest == gtServers.end() || gtBest->second.empty() ) {
+				insertInfo = true;
+			}
+			else {
+				ServerInfo *gtBestInfo = *(gtBest->second).begin();
+				if( gtBestInfo->curuser < info->curuser || int(gtBestInfo->mm) < int(info->mm) ) {
+					insertInfo = true;
+				}
+			}
+
+			if( insertInfo ) {
+				gtServers[gametype].clear();
+				gtServers[gametype].push_front( info );
+			}
+		}
+
+		suggestedServers[it->first + TABLE_SUFFIX_SUGGESTIONS] = gtServers;
+	}
+
+	// compile the final list sorted by player count in descending order
+	for( std::map<String, ReferenceListMap>::iterator it = suggestedServers.begin(); it != suggestedServers.end(); ++it ) {
+		ReferenceListMap &gtServers = it->second;
+		for( ReferenceListMap::iterator it_ = gtServers.begin(); it_ != gtServers.end(); ++it_ ) {
+			ServerInfo *gtBestInfo = *(it_->second).begin();
+			ReferenceList &referenceList = referenceListMap[it->first];
+			referenceList.insert( lower_bound( referenceList, gtBestInfo, ServerInfo::DefaultCompareBinary ), gtBestInfo );
+		}
+		NotifyRowChange( it->first );
+	}
 }
 
 // called to re-sort the data
@@ -801,6 +874,8 @@ void ServerBrowserDataSource::sortByColumn( const char *_column )
 		sortCompare = ServerInfo::LessPtrBinary<bool, &ServerInfo::mm>;
 	else if( column == "ping" )
 		sortCompare = ServerInfo::LessPtrBinary<unsigned int, &ServerInfo::ping>;
+	else if( column == "" )
+		sortCompare = &ServerInfo::DefaultCompareBinary;
 	else
 	{
 		Com_Printf("Serverbrowser sort: unknown column %s\n", _column );

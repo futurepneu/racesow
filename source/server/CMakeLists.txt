@@ -36,6 +36,7 @@ file(GLOB SERVER_SOURCES
     "../qcommon/steam.c"
     "*.c"
     "../null/cl_null.c"
+    "../null/clipboard_null.c"
     "../gameshared/q_*.c"
     "../qalgo/*.c"
     "../matchmaker/mm_*.c"
@@ -46,8 +47,11 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
         "../win32/win_fs.c"
         "../win32/win_net.c"
         "../win32/win_sys.c"
+        "../win32/win_console.c"
+        "../win32/win_time.c"
         "../win32/win_lib.c"
         "../win32/win_threads.c"
+        "../null/sys_vfs_null.c"
         "../win32/conproc.c"
     )
 
@@ -58,8 +62,11 @@ else()
         "../unix/unix_fs.c"
         "../unix/unix_net.c"
         "../unix/unix_sys.c"
+        "../unix/unix_console.c"
+        "../unix/unix_time.c"
         "../unix/unix_lib.c"
         "../unix/unix_threads.c"
+        "../null/sys_vfs_null.c"
     )
 
     set(SERVER_PLATFORM_LIBRARIES "pthread" "dl" "m")
@@ -67,7 +74,7 @@ else()
 endif()
 
 add_executable(${QFUSION_SERVER_NAME} ${SERVER_BINARY_TYPE} ${SERVER_HEADERS} ${SERVER_SOURCES} ${SERVER_PLATFORM_SOURCES})
-target_link_libraries(${QFUSION_SERVER_NAME} cin ${CURL_LIBRARIES} ${ZLIB_LIBRARY} ${SERVER_PLATFORM_LIBRARIES})
+target_link_libraries(${QFUSION_SERVER_NAME} ${CURL_LIBRARY} ${ZLIB_LIBRARY} ${SERVER_PLATFORM_LIBRARIES})
 qf_set_output_dir(${QFUSION_SERVER_NAME} "")
 
 set_target_properties(${QFUSION_SERVER_NAME} PROPERTIES COMPILE_DEFINITIONS "DEDICATED_ONLY")

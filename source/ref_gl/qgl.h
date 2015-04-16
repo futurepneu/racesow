@@ -63,6 +63,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define GLX_GLXEXT_LEGACY
 
 #if !defined (__MACOSX__) && !defined (__ANDROID__)
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <GL/gl.h>
 #endif
 
@@ -503,6 +506,25 @@ typedef unsigned short GLhalfARB;
 #define EGL_DEPTH_ENCODING_NONLINEAR_NV						0x30E3
 #endif
 
+/* GL_EXT_texture3D */
+#ifndef GL_EXT_texture3D
+#define GL_EXT_texture3D
+
+#define GL_TEXTURE_3D_EXT									0x806F
+#define GL_TEXTURE_WRAP_R_EXT								0x8072
+#define GL_MAX_3D_TEXTURE_SIZE_EXT							0x8073
+#define GL_TEXTURE_BINDING_3D_EXT							0x806A
+#endif
+
+/* GL_EXT_texture_array */
+#ifndef GL_EXT_texture_array
+#define GL_EXT_texture_array
+
+#define GL_TEXTURE_2D_ARRAY_EXT								0x8C1A
+#define GL_TEXTURE_BINDING_2D_ARRAY_EXT						0x8C1D
+#define GL_MAX_ARRAY_TEXTURE_LAYERS_EXT						0x88FF
+#endif
+
 /* EGL_EXT_multiview_window */
 #ifndef EGL_EXT_multiview_window
 #define EGL_EXT_multiview_window
@@ -565,7 +587,6 @@ QGL_EGL(EGLBoolean, eglTerminate, (EGLDisplay dpy));
 
 // GL Functions
 QGL_FUNC(void, glBindTexture, (GLenum target, GLuint texture));
-QGL_FUNC(void, glBlendFunc, (GLenum sfactor, GLenum dfactor));
 QGL_FUNC(void, glClear, (GLbitfield mask));
 QGL_FUNC(void, glClearColor, (GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha));
 QGL_FUNC(void, glClearStencil, (GLint s));
@@ -897,6 +918,29 @@ QGL_FUNC(void, glCompressedTexSubImage2D, (GLenum, GLint, GLint, GLint, GLsizei,
 #ifndef qglCompressedTexImage2DARB
 #define qglCompressedTexImage2DARB qglCompressedTexImage2D
 #define qglCompressedTexSubImage2DARB qglCompressedTexSubImage2D
+#endif
+#endif
+
+#ifndef GL_ES_VERSION_2_0
+QGL_EXT(void, glBlendFuncSeparateEXT, (GLenum sfactorRGB, GLenum dfactorRGB, GLenum sfactorAlpha, GLenum dfactorAlpha));
+#else
+QGL_FUNC(void, glBlendFuncSeparate, (GLenum sfactorRGB, GLenum dfactorRGB, GLenum sfactorAlpha, GLenum dfactorAlpha));
+#ifndef qglBlendFuncSeparateEXT
+#define qglBlendFuncSeparateEXT qglBlendFuncSeparate
+#endif
+#endif
+
+#ifndef GL_ES_VERSION_2_0
+QGL_EXT(void, glTexImage3DEXT, (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid *pixels));
+QGL_EXT(void, glTexSubImage3DEXT, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels));
+#else
+QGL_EXT(void, glTexImage3DOES, (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid *pixels));
+QGL_EXT(void, glTexSubImage3DOES, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels));
+QGL_FUNC_OPT(void, glTexImage3D, (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid *pixels));
+QGL_FUNC_OPT(void, glTexSubImage3D, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels));
+#ifndef qglTexImage3DEXT
+#define qglTexImage3DEXT qglTexImage3DOES
+#define qglTexSubImage3DEXT qglTexSubImage3DOES
 #endif
 #endif
 

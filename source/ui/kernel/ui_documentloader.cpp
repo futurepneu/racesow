@@ -12,8 +12,8 @@ namespace Core = Rocket::Core;
 
 // Document
 
-Document::Document( const std::string &name, Core::ElementDocument *elem )
-	: documentName( name ), rocketDocument( elem ), viewed( false )
+Document::Document( const std::string &name, NavigationStack *stack )
+	: documentName( name ), rocketDocument( NULL ), stack( stack ), viewed( false )
 {}
 
 Document::~Document()
@@ -35,15 +35,6 @@ int Document::removeReference()
 {
 	if( rocketDocument )
 	{
-		// here we have to handle releasing
-		if( rocketDocument->GetReferenceCount() == 1 )
-		{
-			Core::ElementDocument *tempDoc = rocketDocument;
-			rocketDocument = 0;
-			tempDoc->RemoveReference();
-			return 0;
-		}
-		// else
 		rocketDocument->RemoveReference();
 		return rocketDocument->GetReferenceCount();
 	}
@@ -115,12 +106,12 @@ Document *DocumentCache::getDocument( const std::string &name )
 	if( it == documentSet.end() )
 	{
 		// load it up, and keep the reference for the stack
-		DocumentLoader loader( name.c_str() );
+		DocumentLoader loader;
 
-		if( !loader.getDocument() )
+		document = loader.loadDocument(name.c_str());
+		if( !document )
 			return 0;
 
-		document = __new__( Document )( name, loader.getDocument() );
 		documentSet.insert( document );
 
 		if( UI_Main::Get()->debugOn() ) {
@@ -130,9 +121,7 @@ Document *DocumentCache::getDocument( const std::string &name )
 	else
 	{
 		document = *it;
-		document->addReference();
 
-		// document has refcount of 1*cache + 1*previous owners + 1*caller
 		if( UI_Main::Get()->debugOn() ) {
 			Com_Printf( "DocumentCache::getDocument, found document %s from cache (refcount %d)\n", name.c_str(), document->getReference() );
 		}
@@ -148,9 +137,6 @@ DocumentCache::DocumentSet::iterator DocumentCache::purgeDocument( DocumentSet::
 	DocumentSet::iterator next = it;
 	++next;
 
-	// just trust the reference-counting
-	doc->removeReference();
-
 	// unload modal documents as we may actually have many of them
 	// during the UI session, keeping all of them in memory seems rather wasteful
 	// another reason is that modal document will keep stealing focus
@@ -158,8 +144,9 @@ DocumentCache::DocumentSet::iterator DocumentCache::purgeDocument( DocumentSet::
 	// the modal flag set
 	if( doc->IsModal() ) {
 		DocumentLoader loader;
-		loader.closeDocument( doc->getRocketDocument() );
+		loader.closeDocument( doc );
 		documentSet.erase( it );
+		doc->removeReference();
 	}
 	
 	return next;
@@ -211,13 +198,13 @@ void DocumentCache::clearCaches()
 	}
 
 	// force destroy all documents
-	// purgeAllDocuments();
+	purgeAllDocuments();
 
 	DocumentLoader loader;
 	for( DocumentSet::iterator it = documentSet.begin(); it != documentSet.end(); ++it ) {
 		if( (*it)->getRocketDocument() ) {
-			//(*it)->removeReference();
-			loader.closeDocument( (*it)->getRocketDocument() );
+			(*it)->removeReference();
+			loader.closeDocument( (*it) );
 		}
 	}
 
@@ -253,7 +240,7 @@ void DocumentCache::invalidateAssets(void)
 
 NavigationStack::NavigationStack() : modalTop( false ), stackLocked( false )
 {
-
+	documentStack.clear();
 }
 
 NavigationStack::~NavigationStack()
@@ -300,6 +287,8 @@ Document *NavigationStack::pushDocument(const std::string &name, bool modal, boo
 	if( !doc || !doc->getRocketDocument() )
 		return NULL;
 
+	doc->setStack( this );
+
 	// the loading document might have pushed another document onto the stack 
 	// in the onload event, pushing ourselves on top of it now is going to fuck up the order
 	Document *new_top = documentStack.size() > 0 ? documentStack.back() : 0;
@@ -336,6 +325,7 @@ void NavigationStack::_popDocument(bool focusOnNext)
 
 	Document *doc = documentStack.back();
 	documentStack.pop_back();
+	doc->setStack( NULL );
 	Document *top = hasDocuments() ? documentStack.back() : NULL;
 
 	doc->Hide();
@@ -359,6 +349,7 @@ void NavigationStack::_popDocument(bool focusOnNext)
 		}
 
 		while( top && !top->IsViewed() ) {
+			top->setStack( NULL );
 			documentStack.pop_back();
 			top = documentStack.back();
 		}
@@ -399,17 +390,21 @@ void NavigationStack::attachMainEventListenerToTop( Document *prev )
 	}
 
 	Document *top = documentStack.back();
+	if( !top ) {
+		return;
+	}
 
 	// global event listeners, TODO: if we ever change eventlistener to be
 	// dynamically instanced, then we cant call GetMainListener every time?
 	// only for UI documents!
 	Rocket::Core::EventListener *listener = UI_GetMainListener();
+
 	if( prev && prev->getRocketDocument() ) {
 		top->getRocketDocument()->RemoveEventListener( "keydown", listener );
 		top->getRocketDocument()->RemoveEventListener( "change", listener );
 	}
 
-	if( top && top->getRocketDocument() ) {
+	if( top->getRocketDocument() ) {
 		top->getRocketDocument()->AddEventListener( "keydown", listener );
 		top->getRocketDocument()->AddEventListener( "change", listener );
 	}
@@ -541,17 +536,8 @@ void NavigationStack::printStack()
 //==========================================
 
 DocumentLoader::DocumentLoader()
-	: isLoading(false), loadedDocument(0)
 {
 	// register itself to UI_Main
-
-}
-
-DocumentLoader::DocumentLoader(const char *filename)
-	: isLoading(false), loadedDocument(0)
-{
-	// this will set loadedDocument if succeeded
-	loadDocument( filename );
 }
 
 DocumentLoader::~DocumentLoader()
@@ -559,93 +545,45 @@ DocumentLoader::~DocumentLoader()
 
 }
 
-// TODO: return UI_Document
-Core::ElementDocument *DocumentLoader::loadDocument(const char *path)
+Document *DocumentLoader::loadDocument(const char *path)
 {
-	// FIXME: use RocketModule
 	UI_Main *ui = UI_Main::Get();
 	RocketModule *rm = ui->getRocket();
-	ASUI::ASInterface *as = ui->getAS();
+	Document *loadedDocument;
 
-	isLoading = true;
-	currentLoadPath = path;
-
-	// backwards development compatibility TODO: eliminate this system
-	ui->setDocumentLoader( this );
-
-	// clear the postponed onload events
-	onloads.clear();
-
-	// tell angelscript to start building a new module
-	as->startBuilding(path);
+	loadedDocument = __new__( Document )( path );
 
 	// load the .rml
-	loadedDocument = rm->loadDocument(path, /* true */ false);
-	if( !loadedDocument )
-	{
-		// TODO: failsafe instead of this
-		// trap::Error( va("DocumentLoader::loadDocument failed to load %s", filename) );
-		Com_Printf( "DocumentLoader::loadDocument failed to load %s\n", path);
-	}
+	Rocket::Core::ElementDocument *rocketDocument = rm->loadDocument( path, /* true */ false, loadedDocument );
+	loadedDocument->setRocketDocument( rocketDocument );
 
-	// tell angelscript it can compile and link the module
-	// has to be called even if document loading fails!
-	// also ensure the 1-to-1 match between the build and document names
-	as->finishBuilding( loadedDocument ? loadedDocument->GetSourceURL().CString() : NULL );
+	if( !rocketDocument ) {
+		Com_Printf( "DocumentLoader::loadDocument failed to load %s\n", path);
+		__delete__( loadedDocument );
+		return NULL;
+	}
 
 	// handle postponed onload events (HOWTO handle these in cached documents?)
-	if( loadedDocument )
-	{
-		for( PostponedList::iterator it = onloads.begin(); it != onloads.end(); ++it )
-		{
-			it->first->ProcessEvent( *it->second );
-			it->second->RemoveReference();
-		}
-	}
+	Rocket::Core::Dictionary ev_parms;
+	ev_parms.Set( "owner", loadedDocument );
+	rocketDocument->DispatchEvent( "afterLoad", ev_parms );
 
-	// and clear the events
-	onloads.clear();
-	isLoading = false;
-
-	// backwards development compatibility TODO: eliminate this system
-	ui->setDocumentLoader( 0 );
-
-	return loadedDocument;
-}
-
-// get last document
-Rocket::Core::ElementDocument *DocumentLoader::getDocument()
-{
 	return loadedDocument;
 }
 
 // TODO: redundant
-void DocumentLoader::closeDocument(Rocket::Core::ElementDocument *document)
+void DocumentLoader::closeDocument(Document *document)
 {
 	UI_Main *ui = UI_Main::Get();
-	ASUI::ASInterface *as = ui ? ui->getAS() : 0;
+	RocketModule *rm = ui->getRocket();
+	Rocket::Core::ElementDocument *rocketDocument = document->getRocketDocument();
 
-	if( as ) {
-		// we need to release AS handles referencing libRocket resources
-		as->buildReset( document->GetSourceURL().CString() );
-	}
+	// handle postponed onload events (HOWTO handle these in cached documents?)
+	Rocket::Core::Dictionary ev_parms;
+	rocketDocument->DispatchEvent( "beforeUnload", ev_parms );
 
-	ui->getRocketContext()->UnloadDocument(document);
+	rm->closeDocument(rocketDocument);
 }
 
-void DocumentLoader::postponeOnload(Rocket::Core::EventListener *listener, Rocket::Core::Event &event)
-{
-	// use InstanceEvent here, I have no clue what to use as interruptible here
-	Rocket::Core::Event *instanced = Rocket::Core::Factory::InstanceEvent( event.GetTargetElement(),
-														event.GetType(), *event.GetParameters(), true );
-	instanced->SetPhase( event.GetPhase() );
-
-	// DEBUG
-	if( UI_Main::Get()->debugOn() ) {
-		Com_Printf("Reference count of instanced event %d\n", instanced->GetReferenceCount() );
-	}
-
-	onloads.push_back( PostponedEvent( listener, instanced ) );
-}
 
 }

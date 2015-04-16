@@ -19,6 +19,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // snd_ogg.c
 
+#define OV_EXCLUDE_STATIC_CALLBACKS
+
 #include "snd_local.h"
 #include <vorbis/vorbisfile.h>
 
@@ -321,10 +323,10 @@ qboolean SNDOGG_OpenTrack( bgTrack_t *track, qboolean *delay )
 		return qfalse;
 
 	track->file = file;
-	track->vorbisFile = vf = S_Malloc( sizeof( OggVorbis_File ) );
 	track->read = SNDOGG_FRead;
 	track->seek = SNDOGG_FSeek;
 	track->close = SNDOGG_FClose;
+	track->vorbisFile = vf = NULL;
 	if( track->isUrl ) {
 		callbacks.seek_func = NULL;
 		callbacks.tell_func = NULL;
@@ -336,6 +338,8 @@ qboolean SNDOGG_OpenTrack( bgTrack_t *track, qboolean *delay )
 			*delay = qtrue;
 		return qtrue;
 	}
+
+	track->vorbisFile = vf = S_Malloc( sizeof( OggVorbis_File ) );
 
 	if( qov_open_callbacks( (void *)(qintptr)track->file, vf, NULL, 0, callbacks ) < 0 )
 	{
@@ -349,12 +353,6 @@ qboolean SNDOGG_OpenTrack( bgTrack_t *track, qboolean *delay )
 	if( ( vi->channels != 1 ) && ( vi->channels != 2 ) )
 	{
 		Com_Printf( "SNDOGG_OpenTrack: %s has an unsupported number of channels: %i\n", real_path, vi->channels );
-		goto error;
-	}
-
-	if( qov_streams( vf ) != 1 )
-	{
-		Com_Printf( "Error unsupported .ogg file (multiple logical bitstreams): %s\n", real_path );
 		goto error;
 	}
 
@@ -415,6 +413,12 @@ static int SNDOGG_FSeek( bgTrack_t *track, int pos )
 {
 	if( !track->vorbisFile )
 		return OV_ENOSEEK;
+
+	// can't use ov_pcm_seek on .ogv files because of 
+	// https://trac.xiph.org/ticket/1486
+	// so just seek to the beginning of the file
+	if( pos == 0 )
+		return trap_FS_Seek( track->file, 0, FS_SEEK_SET );
 	return qov_pcm_seek( track->vorbisFile, (ogg_int64_t)pos );
 }
 
@@ -423,10 +427,13 @@ static int SNDOGG_FSeek( bgTrack_t *track, int pos )
 */
 static void SNDOGG_FClose( bgTrack_t *track )
 {
-	if( !track->vorbisFile )
-		return;
-	qov_clear( track->vorbisFile );
-	S_Free( track->vorbisFile );
+	if( track->vorbisFile ) {
+		qov_clear( track->vorbisFile ); // calls FS_FCloseFile
+		S_Free( track->vorbisFile );
+	}
+	else if( track->file ) {
+		trap_FS_FCloseFile( track->file );
+	}
 	track->file = 0;
 	track->vorbisFile = 0;
 }

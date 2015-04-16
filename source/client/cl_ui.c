@@ -239,6 +239,8 @@ void CL_UIModule_Init( void )
 	import.Key_SetBinding = Key_SetBinding;
 	import.Key_IsDown = Key_IsDown;
 
+	import.IN_ShowIME = IN_ShowIME;
+
 	import.R_ClearScene = re.ClearScene;
 	import.R_AddEntityToScene = re.AddEntityToScene;
 	import.R_AddLightToScene = re.AddLightToScene;
@@ -262,6 +264,7 @@ void CL_UIModule_Init( void )
 	import.R_TransformVectorToScreen = re.TransformVectorToScreen;
 	import.R_Scissor = re.Scissor;
 	import.R_GetScissor = re.GetScissor;
+	import.R_ResetScissor = re.ResetScissor;
 	import.R_GetShaderDimensions = re.GetShaderDimensions;
 	import.R_SkeletalGetNumBones = re.SkeletalGetNumBones;
 	import.R_SkeletalGetBoneInfo = re.SkeletalGetBoneInfo;
@@ -341,8 +344,8 @@ void CL_UIModule_Init( void )
 
 	CL_UIModule_AsyncStream_Init();
 
-	uie->Init( viddef.width, viddef.height, APP_PROTOCOL_VERSION,
-		APP_DEMO_EXTENSION_STR, APP_UI_BASEPATH );
+	uie->Init( viddef.width, viddef.height, VID_GetPixelRatio(),
+		APP_PROTOCOL_VERSION, APP_DEMO_EXTENSION_STR, APP_UI_BASEPATH );
 
 	Com_Printf( "------------------------------------\n" );
 }

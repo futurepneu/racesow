@@ -208,6 +208,22 @@ const char *Sys_FS_GetHomeDirectory( void )
 }
 
 /*
+* Sys_FS_GetCacheDirectory
+*/
+const char *Sys_FS_GetCacheDirectory( void )
+{
+	return NULL;
+}
+
+/*
+* Sys_FS_GetSecureDirectory
+*/
+const char *Sys_FS_GetSecureDirectory( void )
+{
+	return NULL;
+}
+
+/*
 * Sys_FS_LockFile
 */
 void *Sys_FS_LockFile( const char *path )

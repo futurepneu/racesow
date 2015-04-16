@@ -130,6 +130,14 @@ static float objectCVar_getValue( ascvar_t *self )
 	return self->cvar->value;
 }
 
+static bool objectCVar_setModified( bool modified, ascvar_t *self )
+{
+	if( !self->cvar )
+		return false;
+
+	return self->cvar->modified == (modified ? qtrue : qfalse);
+}
+
 static const asstring_t *objectCVar_getName( ascvar_t *self )
 {
 	if( !self->cvar || !self->cvar->name )
@@ -171,6 +179,8 @@ void PreRegisterCvarAddon( asIScriptEngine *engine )
 
 	// register the cvar flags enum
 	r = engine->RegisterEnum( "eCvarFlag" ); assert( r >= 0 );
+
+	(void)sizeof(r); // hush the compiler
 }
 
 void RegisterCvarAddon( asIScriptEngine *engine )
@@ -194,6 +204,7 @@ void RegisterCvarAddon( asIScriptEngine *engine )
 	r = engine->RegisterObjectMethod( "Cvar", "void forceSet( int value )", asFUNCTION( objectCVar_forceSetI ), asCALL_CDECL_OBJLAST ); assert( r >= 0 );
 	r = engine->RegisterObjectMethod( "Cvar", "void forceSet( double value )", asFUNCTION( objectCVar_forceSetD ), asCALL_CDECL_OBJLAST ); assert( r >= 0 );
 #endif
+	r = engine->RegisterObjectMethod( "Cvar", "void set_modified( bool modified )", asFUNCTION( objectCVar_setModified ), asCALL_CDECL_OBJLAST ); assert( r >= 0 );
 
 	r = engine->RegisterObjectMethod( "Cvar", "bool get_modified() const", asFUNCTION( objectCVar_getModified ), asCALL_CDECL_OBJLAST ); assert( r >= 0 );
 	r = engine->RegisterObjectMethod( "Cvar", "bool get_boolean() const", asFUNCTION( objectCVar_getBool ), asCALL_CDECL_OBJLAST ); assert( r >= 0 );
@@ -215,4 +226,5 @@ void RegisterCvarAddon( asIScriptEngine *engine )
 	r = engine->RegisterEnumValue( "eCvarFlag", "CVAR_CHEAT", CVAR_CHEAT ); assert( r >= 0 );
 	r = engine->RegisterEnumValue( "eCvarFlag", "CVAR_READONLY", CVAR_READONLY ); assert( r >= 0 );
 
+	(void)sizeof(r); // hush the compiler
 }

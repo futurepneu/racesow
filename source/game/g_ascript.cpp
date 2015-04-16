@@ -1829,7 +1829,7 @@ static unsigned int objectGameClient_getPMoveFeatures( gclient_t *self )
 static void objectGameClient_setPMoveMaxSpeed( float speed, gclient_t *self )
 {
 	if( speed < 0.0f )
-		self->ps.pmove.stats[PM_STAT_MAXSPEED] = DEFAULT_PLAYERSPEED;
+		self->ps.pmove.stats[PM_STAT_MAXSPEED] = (short)DEFAULT_PLAYERSPEED;
 	else
 		self->ps.pmove.stats[PM_STAT_MAXSPEED] = ( (int)( speed + 0.5f ) & 0xFFFF );
 }
@@ -1842,7 +1842,7 @@ static float objectGameClient_getPMoveMaxSpeed( gclient_t *self )
 static void objectGameClient_setPMoveJumpSpeed( float speed, gclient_t *self )
 {
 	if( speed < 0.0f )
-		self->ps.pmove.stats[PM_STAT_JUMPSPEED] = DEFAULT_JUMPSPEED;
+		self->ps.pmove.stats[PM_STAT_JUMPSPEED] = (short)DEFAULT_JUMPSPEED;
 	else
 		self->ps.pmove.stats[PM_STAT_JUMPSPEED] = ( (int)( speed + 0.5f ) & 0xFFFF );
 }
@@ -1855,7 +1855,7 @@ static float objectGameClient_getPMoveJumpSpeed( gclient_t *self )
 static void objectGameClient_setPMoveDashSpeed( float speed, gclient_t *self )
 {
 	if( speed < 0.0f )
-		self->ps.pmove.stats[PM_STAT_DASHSPEED] = DEFAULT_DASHSPEED;
+		self->ps.pmove.stats[PM_STAT_DASHSPEED] = (short)DEFAULT_DASHSPEED;
 	else
 		self->ps.pmove.stats[PM_STAT_DASHSPEED] = ( (int)( speed + 0.5f ) & 0xFFFF );
 }
@@ -2408,7 +2408,6 @@ static void objectGameEntity_splashDamage( edict_t *attacker, int radius, float 
 
 static void objectGameEntity_explosionEffect( int radius, edict_t *self )
 {
-	edict_t *event;
 	int i, eventType, eventRadius;
 	vec3_t center;
 
@@ -2433,7 +2432,7 @@ static void objectGameEntity_explosionEffect( int radius, edict_t *self )
 	for( i = 0; i < 3; i++ )
 		center[i] = self->s.origin[i] + ( 0.5f * ( self->r.maxs[i] + self->r.mins[i] ) );
 
-	event = G_SpawnEvent( eventType, eventRadius, center );
+	G_SpawnEvent( eventType, eventRadius, center );
 }
 
 static const asFuncdef_t gedict_Funcdefs[] =

@@ -110,6 +110,10 @@ void BindEvent( ASInterface *as )
 		( "EVENT_PHASE_BUBBLE", Event::PHASE_BUBBLE )
 		;
 
+	ASBind::Enum( as->getEngine(), "eInputKey" )
+		( "KI_ESCAPE", Input::KI_ESCAPE )
+	;
+
 	// reference (without factory)
 	ASBind::GetClass<Rocket::Core::Event>( as->getEngine() )
 		.refs( &Event::AddReference, &Event::RemoveReference )
@@ -154,6 +158,25 @@ static void Element_EventListenerCallback( Element *elem, Event *event )
 {
 }
 
+
+static Element *Element_Factory( void ) {
+	Element *e = dynamic_cast<Element *>(Factory::InstanceElement( NULL, "#text#", "#text", XMLAttributes()));
+	return e;
+}
+
+static Element *Element_Factory2( Element *parent ) {
+	Element *e = dynamic_cast<Element *>(Factory::InstanceElement( parent, "#text#", "#text", XMLAttributes()));
+	return e;
+}
+
+static Element *Element_FactoryRML( Element *parent, const asstring_t &rml ) {
+	Element *e = dynamic_cast<Element *>(Factory::InstanceElement( parent, "#text#", "#text", XMLAttributes()));
+	if( e ) {
+		e->SetInnerRML( ASSTR(rml) );
+	}
+	return e;
+}
+
 static EventListener *Element_AddEventListener( Element *elem, const asstring_t &event, asIScriptFunction *func ) {
 	EventListener *listener = CreateScriptEventCaller( UI_Main::Get()->getAS(), func );
 	elem->AddEventListener( ASSTR(event), listener );
@@ -194,8 +217,9 @@ static Element *Element_SetCSS(Element *self, const asstring_t &prop, const asst
 	_RETREF(self);
 }
 
-static asstring_t *Element_GetCSS(Element *self, const asstring_t &prop) {
-	return ASSTR( self->GetProperty<String>( ASSTR(prop) ) );
+static asstring_t *Element_GetCSS(Element *self, const asstring_t &name) {
+	const Property* prop = self->GetProperty( ASSTR( name ) );
+	return ASSTR( prop ? prop->ToString() : "" );
 }
 
 // NODES
@@ -229,25 +253,34 @@ static Element *Element_GetChild(Element *self, unsigned int index) {
 	_RETREF(e);
 }
 
-static void Element_AppendChild(Element *self, Element *child) {
-	self->AppendChild(child);
-	_DECREF(child);
+static void Element_AppendChild(Element *self, Element *child, bool dom_element) {
+	if( child ) {
+		self->AppendChild(child, dom_element);
+		_DECREF(child);
+	}
 }
 
 static void Element_InsertBefore(Element *self, Element *a, Element *b) {
-	self->InsertBefore(a,b);
-	_DECREF(a);
-	_DECREF(b);
+	if( a && b ) {
+		self->InsertBefore(a,b);
+		_DECREF(a);
+		_DECREF(b);
+	}
 }
 
 static void Element_RemoveChild(Element *self, Element *a) {
-	self->RemoveChild(a);
-	_DECREF(a);
+	if( a ) {
+		self->RemoveChild(a);
+		_DECREF(a);
+	}
 }
 
 static Element *Element_Clone(Element *self) {
-	Element *e = self->Clone();
-	_RETREF(e);
+	if( self ) {
+		Element *e = self->Clone();
+		_RETREF(e);
+	}
+	return NULL;
 }
 
 // CONTENTS
@@ -588,7 +621,7 @@ static void ElementFormControl_SetName( ElementFormControl *self, const asstring
 	self->SetName( ASSTR( name ) );
 }
 
-static asstring_t *ElementFormControl_GetValue( ElementFormControl *self) {
+static asstring_t *ElementFormControl_GetValue( ElementFormControl *self ) {
 	return ASSTR( self->GetValue() );
 }
 
@@ -664,6 +697,41 @@ static void ElementFormControlDataSelect_SetDataSource( ElementFormControlDataSe
 	self->SetDataSource( ASSTR( source ) );
 }
 
+static void ElementFormControlDataSelect_SetSelection( ElementFormControlDataSelect *self, int selection ) {
+	self->SetSelection( selection );
+}
+
+static int ElementFormControlDataSelect_GetSelection( ElementFormControlDataSelect *self ) {
+	return self->GetSelection();
+}
+
+static int ElementFormControlDataSelect_GetNumOptions( ElementFormControlDataSelect *self ) {
+	return self->GetNumOptions();
+}
+
+static int ElementFormControlDataSelect_AddOption( ElementFormControlDataSelect *self, const asstring_t &rml, const asstring_t &value, int before, bool selectable ) {
+	return self->Add( ASSTR( rml ), ASSTR( value ), before, selectable );
+}
+
+static void ElementFormControlDataSelect_RemoveOption( ElementFormControlDataSelect *self, int index ) {
+	self->Remove( index );
+}
+
+static void ElementFormControlDataSelect_RemoveAllOptions( ElementFormControlDataSelect *self ) {
+	self->RemoveAll();
+}
+
+static void ElementFormControlDataSelect_Spin( ElementFormControlDataSelect *self, int dir ) {
+	int sel = self->GetSelection() + dir;
+	if( sel < 0 ) {
+		sel = self->GetNumOptions() - 1;
+	}
+	else if( sel >= self->GetNumOptions() ) {
+		sel = 0;
+	}
+	self->SetSelection( sel );
+}
+
 static void PreBindElementFormControlDataSelect( ASInterface *as )
 {
 	ASBind::Class<ElementFormControlDataSelect, ASBind::class_ref>( as->getEngine() );
@@ -677,6 +745,13 @@ static void BindElementFormControlDataSelect( ASInterface *as )
 		.refs( &ElementFormControlDataSelect::AddReference, &ElementFormControlDataSelect::RemoveReference )
 
 		.method( &ElementFormControlDataSelect_SetDataSource, "setDataSource", true )
+		.method( &ElementFormControlDataSelect_GetSelection, "getSelection", true )
+		.method( &ElementFormControlDataSelect_SetSelection, "setSelection", true )
+		.method( &ElementFormControlDataSelect_GetNumOptions, "getNumOptions", true )
+		.method2( &ElementFormControlDataSelect_AddOption, "void addOption(const String &rml, const String &value, int before = -1, bool selectable = true)", true )
+		.method( &ElementFormControlDataSelect_RemoveOption, "removeOption", true )
+		.method( &ElementFormControlDataSelect_RemoveAllOptions, "removeAllOptions", true )
+		.method( &ElementFormControlDataSelect_Spin, "spin", true )
 
 		.refcast( &FormControlDataSelect_CastToElement, true, true )
 		.refcast( &FormControlDataSelect_CastToFormControl, true, true )
@@ -765,13 +840,28 @@ static unsigned int DataGrid_GetNumRows( ElementDataGrid *self ) {
 static asstring_t *DataGrid_GetColumn( ElementDataGrid *self, int idx ) {
 	// Tricky SOB, build a string from column->fields
 	const ElementDataGrid::Column *column = self->GetColumn( idx );
+
 	if( !column )
 		return ASSTR( "" );
+
 	String ret;
-	for( StringList::const_iterator it = column->fields.begin(); it != column->fields.end(); ++it) {
-		ret += *it + " ";
+	StringList::const_iterator begin = column->fields.begin(), end = column->fields.end();
+	for( StringList::const_iterator it = begin; it != end; ++it) {
+		ret += (it == begin ? "" : " ") + *it;
 	}
-	return ASSTR( ret.Substring( 0, std::max( 0U, ret.Length() - 1 ) ) );
+	return ASSTR( ret );
+}
+
+static Element *DataGrid_GetColumnHeader( ElementDataGrid *self, int idx ) {
+	const ElementDataGrid::Column *column = self->GetColumn( idx );
+	if ( !column )
+		return NULL;
+	Element *e = column->header->GetChild( idx );
+	_RETREF(e);
+}
+
+static unsigned int DataGrid_GetNumColumns( ElementDataGrid *self ) {
+	return self->GetNumColumns();
 }
 
 static void DataGrid_SetDataSource( ElementDataGrid *self, const asstring_t &source ) {
@@ -791,8 +881,10 @@ static void BindElementDataGrid( ASInterface *as )
 		.refs( &ElementDataGrid::AddReference, &ElementDataGrid::RemoveReference )
 
 		.method( &DataGrid_GetRow, "getRow", true )
-		.method( &DataGrid_GetNumRows, "getNumRows", true )
-		.method( &DataGrid_GetColumn, "getColumn", true )
+		.constmethod( &DataGrid_GetNumRows, "getNumRows", true )
+		.constmethod( &DataGrid_GetColumn, "getColumn", true )
+		.method( &DataGrid_GetColumnHeader, "getColumnHeader", true )
+		.constmethod( &DataGrid_GetNumColumns, "getNumColumns", true )
 		.method( &DataGrid_SetDataSource, "setDataSource", true )
 		.refcast( &DataGrid_CastToElement, true, true )
 		;
@@ -834,11 +926,14 @@ void BindElement( ASInterface *as )
 
 	ASBind::Global( as->getEngine() )
 		// setTimeout and setInterval callback funcdefs
-		.funcdef( &Element_EventListenerCallback, "EventListenerCallback" )
+		.funcdef( &Element_EventListenerCallback, "DOMEventListenerCallback" )
 	;
 
-	// Elements are bound as reference types that cant be explicitly constructed
+	// Elements are bound as reference types
 	ASBind::GetClass<Element>( engine )
+		.factory( &Element_Factory )
+		.factory( &Element_Factory2 )
+		.factory( &Element_FactoryRML )
 		.refs( &Element::AddReference, &Element::RemoveReference )
 
 		// css/style
@@ -887,7 +982,7 @@ void BindElement( ASInterface *as )
 		.method( &Element::Focus, "focus" )
 		.method( &Element::Blur, "unfocus" )
 		.method( &Element::Click, "click" )
-		.method( &Element_AppendChild, "addChild", true )
+		.method2( &Element_AppendChild, "void addChild( Element @el, bool dom_element = true )", true )
 		.method( &Element_InsertBefore, "insertChild", true )
 		.method( &Element_RemoveChild, "removeChild", true )
 		.method( &Element::HasChildNodes, "hasChildren" )
@@ -898,7 +993,7 @@ void BindElement( ASInterface *as )
 		.method( Element_GetElementsByClassName, "getElementsByClassName", true )
 		.method( Element_GetOwnerDocument, "get_ownerDocument", true )
 
-		.method2( Element_AddEventListener, "void addEventListener( const String &event, EventListenerCallback @callback )", true )
+		.method2( Element_AddEventListener, "void addEventListener( const String &event, DOMEventListenerCallback @callback )", true )
 		.method( Element_RemoveEventListener, "removeEventListener", true )
 
 		.method( &Element::GetClientLeft, "clientLeft" )

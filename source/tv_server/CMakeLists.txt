@@ -34,6 +34,7 @@ file(GLOB TV_SERVER_SOURCES
     "../null/cl_null.c"
     "../null/ascript_null.c"
     "../null/mm_null.c"
+    "../null/clipboard_null.c"
     "../gameshared/q_*.c"
     "../qalgo/*.c"
     "tv_module/*.c"
@@ -44,8 +45,11 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
         "../win32/win_fs.c"
         "../win32/win_net.c"
         "../win32/win_sys.c"
+        "../win32/win_console.c"
+        "../win32/win_time.c"
         "../win32/win_lib.c"
         "../win32/win_threads.c"
+        "../null/sys_vfs_null.c"
         "../win32/conproc.c"
     )
 
@@ -56,8 +60,11 @@ else()
         "../unix/unix_fs.c"
         "../unix/unix_net.c"
         "../unix/unix_sys.c"
+        "../unix/unix_console.c"
+        "../unix/unix_time.c"
         "../unix/unix_lib.c"
         "../unix/unix_threads.c"
+        "../null/sys_vfs_null.c"
     )
 
     set(TV_SERVER_PLATFORM_LIBRARIES "pthread" "dl" "m")
@@ -65,7 +72,7 @@ else()
 endif()
 
 add_executable(${QFUSION_TVSERVER_NAME} ${TV_SERVER_BINARY_TYPE} ${TV_SERVER_HEADERS} ${TV_SERVER_SOURCES} ${TV_SERVER_PLATFORM_SOURCES})
-target_link_libraries(${QFUSION_TVSERVER_NAME} cin ${CURL_LIBRARIES} ${ZLIB_LIBRARY} ${TV_SERVER_PLATFORM_LIBRARIES})
+target_link_libraries(${QFUSION_TVSERVER_NAME} ${CURL_LIBRARY} ${ZLIB_LIBRARY} ${TV_SERVER_PLATFORM_LIBRARIES})
 qf_set_output_dir(${QFUSION_TVSERVER_NAME} "")
 
 set_target_properties(${QFUSION_TVSERVER_NAME} PROPERTIES COMPILE_DEFINITIONS "DEDICATED_ONLY;TV_SERVER_ONLY;TV_MODULE_HARD_LINKED")

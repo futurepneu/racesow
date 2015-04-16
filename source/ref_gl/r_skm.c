@@ -53,7 +53,9 @@ static void Mod_SkeletalBuildStaticVBOForMesh( mskmesh_t *mesh )
 	if( glConfig.maxGLSLBones > 0 ) {
 		vattribs |= VATTRIB_BONES_BITS;
 	}
-	vattribs |= mesh->skin.shader->vattribs;
+	if( mesh->skin.shader ) {
+		vattribs |= mesh->skin.shader->vattribs;
+	}
 
 	mesh->vbo = R_CreateMeshVBO( ( void * )mesh, 
 		mesh->numverts, mesh->numtris * 3, 0, vattribs, VBO_TAG_MODEL, vattribs );
@@ -528,12 +530,11 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 	poutmodel->sVectorsArray = ( vec4_t * )pmem; pmem += sizeof( *poutmodel->sVectorsArray ) * header->num_vertexes;
 
 	if( vtangent ) {
+		memcpy( poutmodel->sVectorsArray, vtangent, sizeof( vec4_t ) * header->num_vertexes );
 		for( i = 0; i < header->num_vertexes; i++ ) {
-			memcpy( poutmodel->sVectorsArray[i], vtangent, sizeof( vec4_t ) );
 			for( j = 0; j < 4; j++ ) {
 				poutmodel->sVectorsArray[i][j] = LittleFloat( poutmodel->sVectorsArray[i][j] );
 			}
-			vtangent += 4;
 		}
 	}
 
@@ -561,8 +562,8 @@ void Mod_LoadSkeletalModel( model_t *mod, const model_t *parent, void *buffer, b
 
 	// texture coordinates
 	poutmodel->stArray = ( vec2_t * )pmem; pmem += sizeof( *poutmodel->stArray ) * header->num_vertexes;
+	memcpy( poutmodel->stArray, vtexcoord, sizeof( vec2_t ) * header->num_vertexes );
 	for( i = 0; i < header->num_vertexes; i++ ) {
-		memcpy( poutmodel->stArray[i], vtexcoord, sizeof( vec2_t ) );
 		for( j = 0; j < 2; j++ ) {
 			poutmodel->stArray[i][j] = LittleFloat( poutmodel->stArray[i][j] );
 		}
@@ -904,7 +905,7 @@ mempool_t *r_skmcachepool;
 
 static skmcacheentry_t *r_skmcache_head;	// actual entries are linked to this
 static skmcacheentry_t *r_skmcache_free;	// actual entries are linked to this
-static skmcacheentry_t *r_skmcachekeys[MAX_ENTITIES*(MOD_MAX_LODS+1)];		// entities linked to cache entries
+static skmcacheentry_t *r_skmcachekeys[MAX_REF_ENTITIES*(MOD_MAX_LODS+1)];		// entities linked to cache entries
 
 #define R_SKMCacheAlloc(size) R_MallocExt(r_skmcachepool, (size), 16, 1)
 
@@ -1214,7 +1215,8 @@ qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mf
 		// fastpath: render static frame 0 as is
 		RB_BindVBO( skmesh->vbo->index, GL_TRIANGLES );
 
-		RB_DrawElements( 0, skmesh->numverts, 0, skmesh->numtris * 3 );
+		RB_DrawElements( 0, skmesh->numverts, 0, skmesh->numtris * 3, 
+			0, skmesh->numverts, 0, skmesh->numtris * 3 );
 
 		return qfalse;
 	}
@@ -1318,7 +1320,8 @@ qboolean R_DrawSkeletalSurf( const entity_t *e, const shader_t *shader, const mf
 	{
 		RB_BindVBO( skmesh->vbo->index, GL_TRIANGLES );
 		RB_SetBonesData( skmodel->numbones, bonePoseRelativeDQ, skmesh->maxWeights );
-		RB_DrawElements( 0, skmesh->numverts, 0, skmesh->numtris * 3 );
+		RB_DrawElements( 0, skmesh->numverts, 0, skmesh->numtris * 3, 
+			0, skmesh->numverts, 0, skmesh->numtris * 3 );
 	}
 	else
 	{

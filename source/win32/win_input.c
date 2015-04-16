@@ -810,13 +810,13 @@ static void IN_StartupMouse( void )
 	dinput_initialized = qfalse;
 	rawinput_initialized = qfalse;
 
-	cv = Cvar_Get( "m_raw", "0", CVAR_ARCHIVE );
+	cv = Cvar_Get( "m_raw", "1", CVAR_ARCHIVE );
 	if( cv->integer )
 		rawinput_initialized = IN_RawInput_Init();
 
 	if( !rawinput_initialized )
 	{
-		cv = Cvar_Get( "in_dinput", "1", CVAR_ARCHIVE );
+		cv = Cvar_Get( "in_dinput", "0", CVAR_ARCHIVE );
 		if( cv->integer )
 			dinput_initialized = IN_InitDInput();
 	}
@@ -1511,4 +1511,19 @@ void IN_JoyMove( usercmd_t *cmd, int frametime )
 			break;
 		}
 	}
+}
+
+/*
+* IN_ShowIME
+*/
+void IN_ShowIME( qboolean show )
+{
+}
+
+/*
+* IN_ShowUICursor
+*/
+qboolean IN_ShowUICursor( void )
+{
+	return qtrue;
 }
