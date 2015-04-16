@@ -30,7 +30,7 @@ typedef unsigned int (*cg_get_raw_samples_cb_t)(void*);
 
 // cg_public.h -- client game dll information visible to engine
 
-#define	CGAME_API_VERSION   65
+#define	CGAME_API_VERSION   67
 
 //
 // structs and variables shared with the main engine
@@ -272,13 +272,19 @@ typedef struct
 
 	void ( *GetEntitySpatilization )( int entNum, vec3_t origin, vec3_t velocity );
 
-	float ( *SetSensitivityScale )( const float sens );
+	float ( *GetSensitivityScale )( float sens, float zoomSens );
 
 	void ( *Trace )( trace_t *tr, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, int passent, int contentmask );
 
 	void ( *RenderView )( float frameTime, float realFrameTime, int realTime, unsigned int serverTime, float stereo_separation, unsigned int extrapolationTime );
 
 	void ( *NewFrameSnapshot )( snapshot_t *newSnapshot, snapshot_t *currentSnapshot );
+
+	void ( *TouchEvent )( int id, touchevent_t type, int x, int y );
+
+	void ( *TouchFrame )( qboolean active );
+
+	void ( *TouchMove )( usercmd_t *cmd, vec3_t viewangles, int frametime );
 } cgame_export_t;
 
 #endif

@@ -713,9 +713,15 @@ static void RB_UpdateCommonUniforms( int program, const shaderpass_t *pass, mat4
 	vec3_t tmp;
 	vec2_t blendMix = { 0, 0 };
 
-	VectorCopy( e->origin, entOrigin );
-	VectorSubtract( rb.cameraOrigin, e->origin, tmp );
-	Matrix3_TransformVector( e->axis, tmp, entDist );
+	// the logic here should match R_TransformForEntity
+	if( e->rtype != RT_MODEL ) {
+		VectorClear( entOrigin );
+		VectorCopy( rb.cameraOrigin, entDist );
+	} else {
+		VectorCopy( e->origin, entOrigin );
+		VectorSubtract( rb.cameraOrigin, e->origin, tmp );
+		Matrix3_TransformVector( e->axis, tmp, entDist );
+	}
 
 	// calculate constant color
 	RB_GetShaderpassColor( pass, constColor );
@@ -2092,12 +2098,12 @@ static void RB_SetShaderState( void )
 	if( shaderFlags & SHADER_POLYGONOFFSET )
 	{
 		state |= GLSTATE_OFFSET_FILL;
-		RB_PolygonOffset( -1.0, -2.0f );
+		RB_PolygonOffset( r_polygon_offset_factor->value, r_polygon_offset_units->value );
 	}
 	else if( rb.renderFlags & RF_SHADOWMAPVIEW )
 	{
 		state |= GLSTATE_OFFSET_FILL;
-		RB_PolygonOffset( 4.0f, 1.0f );
+		RB_PolygonOffset( r_shadows_polygon_offset_factor->value, r_shadows_polygon_offset_units->value );
 	}
 
 	if( shaderFlags & SHADER_NO_DEPTH_TEST )

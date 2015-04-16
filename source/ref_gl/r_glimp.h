@@ -158,6 +158,7 @@ typedef struct
 				,texture_edge_clamp
 				,texture_filter_anisotropic
 				,texture_compression
+				,compressed_ETC1_RGB8_texture
 				,vertex_buffer_object
 				,GLSL
 				,GLSL_core
@@ -178,9 +179,11 @@ typedef struct
 				,meminfo
 				,framebuffer_blit
 				,depth24
+				,depth_nonlinear
 				,multiview_draw_buffers
 				,get_program_binary
 				,rgb8_rgba8
+				,ES3_compatibility
 				;
 	union {
 		char	shadow, shadow_samplers;
@@ -211,7 +214,7 @@ typedef struct
 	qboolean		wideScreen;
 
 	qboolean		stereoEnabled;
-	qboolean		stencilEnabled;
+	int				stencilBits;
 
 	qboolean		hwGamma;
 	unsigned short	gammaRampSize;
@@ -222,6 +225,7 @@ typedef struct
 					,maxTextureCubemapSize
 					,maxTextureSize3D
 					,maxTextureFilterAnisotropic
+					,maxRenderbufferSize
 					,maxVaryingFloats
 					,maxVertexUniformComponents
 					,maxVertexAttribs
@@ -241,12 +245,14 @@ IMPLEMENTATION SPECIFIC FUNCTIONS
 ====================================================================
 */
 
+qboolean	GLimp_ScreenEnabled( void );
 void		GLimp_BeginFrame( void );
 void		GLimp_EndFrame( void );
 int			GLimp_Init( const char *applicationName, void *hinstance, void *wndproc, void *parenthWnd );
 void	    GLimp_Shutdown( void );
 rserr_t		GLimp_SetMode( int x, int y, int width, int height, int displayFrequency,
 				qboolean fullscreen, qboolean wideScreen );
+qboolean	GLimp_SetWindow( void *hinstance, void *wndproc, void *parenthWnd );
 void	    GLimp_AppActivate( qboolean active, qboolean destroy );
 qboolean	GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp );
 void		GLimp_SetGammaRamp( size_t stride, unsigned short   size, unsigned short *ramp );

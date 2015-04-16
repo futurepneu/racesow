@@ -65,7 +65,7 @@ typedef struct r_backend_s
 
 		float			polygonOffset[2];
 
-		float			depthmin, depthmax, depthoffset;
+		float			depthmin, depthmax;
 	} gl;
 
 	unsigned int time;
@@ -122,7 +122,7 @@ typedef struct r_backend_s
 
 	// shader state
 	const shader_t *currentShader;
-	float currentShaderTime;
+	double currentShaderTime;
 	int currentShaderState;
 	int shaderStateORmask, shaderStateANDmask;
 	qboolean dirtyUniformState;

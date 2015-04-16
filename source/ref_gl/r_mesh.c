@@ -344,7 +344,7 @@ static void _R_DrawSurfaces( void )
 	const mfog_t *fog;
 	const portalSurface_t *portalSurface;
 	drawList_t *list = rn.meshlist;
-	float depthmin = 0.0f, depthmax = 0.0f, depthoffset = 0.0f;
+	float depthmin = 0.0f, depthmax = 0.0f;
 	qboolean depthHack = qfalse, cullHack = qfalse;
 	qboolean infiniteProj = qfalse, prevInfiniteProj = qfalse;
 	qboolean depthWrite = qfalse;
@@ -398,14 +398,14 @@ static void _R_DrawSurfaces( void )
 					}
 					if( !depthHack ) {
 						depthHack = qtrue;
-						RB_GetDepthRange( &depthmin, &depthmax, &depthoffset );
-						RB_DepthRange( depthmin, depthmin + 0.3 * ( depthmax - depthmin ), depthoffset );
+						RB_GetDepthRange( &depthmin, &depthmax );
+						RB_DepthRange( depthmin, depthmin + 0.3 * ( depthmax - depthmin ) );
 					}
 				} else if( depthHack ) {
 					// bind the main framebuffer back
 					R_BindFrameBufferObject( riFBO );
 					depthHack = qfalse;
-					RB_DepthRange( depthmin, depthmax, depthoffset );
+					RB_DepthRange( depthmin, depthmax );
 				}
 
 				// backface culling for left-handed weapons
@@ -474,7 +474,7 @@ static void _R_DrawSurfaces( void )
 		RB_EndBatch();
 	}
 	if( depthHack ) {
-		RB_DepthRange( depthmin, depthmax, depthoffset );
+		RB_DepthRange( depthmin, depthmax );
 	}
 	if( cullHack ) {
 		RB_FlipFrontFace();
@@ -532,7 +532,7 @@ void R_CopyOffsetTriangles( const elem_t *inelems, int numElems, int vertsOffset
 	int i;
 	int numTris = numElems / 3;
 
-	for( i = 2; i < numTris; i++, inelems += 3, outelems += 3 ) {
+	for( i = 0; i < numTris; i++, inelems += 3, outelems += 3 ) {
 		outelems[0] = vertsOffset + inelems[0];
 		outelems[1] = vertsOffset + inelems[1];
 		outelems[2] = vertsOffset + inelems[2];

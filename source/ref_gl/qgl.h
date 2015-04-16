@@ -120,7 +120,7 @@ QGL_EXTERN	const char				*(*qglGetGLWExtensionsString)( void );
 #endif
 
 #define GL_TEXTURE0_ARB										0x84C0
-#define GL_MAX_TEXTURE_UNITS_ARB							0x84E2
+#define GL_MAX_TEXTURE_IMAGE_UNITS_ARB						0x8872
 
 /* GL_ARB_texture_compression */
 #ifndef GL_ARB_texture_compression
@@ -445,21 +445,26 @@ typedef unsigned int GLhandleARB;
 
 typedef unsigned short GLhalfARB;
 
-#ifndef GL_HALF_FLOAT
+#ifdef GL_HALF_FLOAT
+#undef GL_HALF_FLOAT
+#endif
+#ifdef GL_ES_VERSION_2_0
+#define GL_HALF_FLOAT										0x8D61
+#else
 #define GL_HALF_FLOAT										0x140B
 #endif
 #endif /* GL_ARB_half_float_vertex */
 
-/* GL_NV_multiview_draw_buffers */
-#ifndef GL_NV_multiview_draw_buffers
-#define GL_NV_multiview_draw_buffers
+/* GL_EXT_multiview_draw_buffers */
+#ifndef GL_EXT_multiview_draw_buffers
+#define GL_EXT_multiview_draw_buffers
 
-#define GL_COLOR_ATTACHMENT_NV								0x90F0
-#define GL_MULTIVIEW_NV										0x90F1
-#define GL_DRAW_BUFFER_NV									0x0C01
-#define GL_READ_BUFFER_NV									0x0C02
-#define GL_MAX_MULTIVIEW_BUFFERS_NV							0x90F2
-#endif /* GL_NV_multiview_draw_buffers */
+#define GL_COLOR_ATTACHMENT_EXT								0x90F0
+#define GL_MULTIVIEW_EXT									0x90F1
+#define GL_DRAW_BUFFER_EXT									0x0C01
+#define GL_READ_BUFFER_EXT									0x0C02
+#define GL_MAX_MULTIVIEW_BUFFERS_EXT						0x90F2
+#endif /* GL_EXT_multiview_draw_buffers */
 
 /* GL_ARB_get_program_binary */
 #ifndef GL_ARB_get_program_binary
@@ -468,6 +473,42 @@ typedef unsigned short GLhalfARB;
 #define GL_NUM_PROGRAM_BINARY_FORMATS						0x87FE
 #define GL_PROGRAM_BINARY_FORMATS							0x87FF
 #endif /* GL_ARB_get_program_binary */
+
+/* GL_ARB_ES3_compatibility */
+#ifndef GL_ARB_ES3_compatibility
+#define GL_ARB_ES3_compatibility
+
+#define GL_COMPRESSED_RGB8_ETC2								0x9274
+#define GL_COMPRESSED_SRGB8_ETC2							0x9275
+#define GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2			0x9276
+#define GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2		0x9277
+#define GL_COMPRESSED_RGBA8_ETC2_EAC						0x9278
+#define GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC					0x9279
+#define GL_COMPRESSED_R11_EAC								0x9270
+#define GL_COMPRESSED_SIGNED_R11_EAC						0x9271
+#define GL_COMPRESSED_RG11_EAC								0x9272
+#define GL_COMPRESSED_SIGNED_RG11_EAC						0x9273
+#define GL_PRIMITIVE_RESTART_FIXED_INDEX					0x8D69
+#define GL_ANY_SAMPLES_PASSED_CONSERVATIVE					0x8D6A
+#define GL_MAX_ELEMENT_INDEX								0x8D6B
+#endif
+
+/* GL_NV_depth_nonlinear */
+#ifndef GL_NV_depth_nonlinear
+#define GL_NV_depth_nonlinear
+
+#define GL_DEPTH_COMPONENT16_NONLINEAR_NV					0x8E2C
+#define EGL_DEPTH_ENCODING_NV								0x30E2
+#define EGL_DEPTH_ENCODING_NONE_NV							0
+#define EGL_DEPTH_ENCODING_NONLINEAR_NV						0x30E3
+#endif
+
+/* EGL_EXT_multiview_window */
+#ifndef EGL_EXT_multiview_window
+#define EGL_EXT_multiview_window
+
+#define EGL_MULTIVIEW_VIEW_COUNT_EXT						0x3134
+#endif
 
 #endif // QGL_H
 
@@ -829,8 +870,8 @@ QGL_EXT(void, glBlitFramebufferNV, (GLint, GLint, GLint, GLint, GLint, GLint, GL
 #endif
 
 #ifdef GL_ES_VERSION_2_0
-QGL_EXT(void, glReadBufferIndexedNV, (GLenum, GLint));
-QGL_EXT(void, glDrawBuffersIndexedNV, (GLint, const GLenum *, const GLint *));
+QGL_EXT(void, glReadBufferIndexedEXT, (GLenum, GLint));
+QGL_EXT(void, glDrawBuffersIndexedEXT, (GLint, const GLenum *, const GLint *));
 #endif
 
 QGL_EXT(void, glSwapInterval, (int interval));
@@ -845,6 +886,18 @@ QGL_EXT(void, glProgramBinaryOES, (GLuint program, GLenum binaryFormat, const GL
 QGL_FUNC_OPT(void, glProgramParameteri, (GLuint program, GLenum pname, GLint value));
 QGL_FUNC_OPT(void, glGetProgramBinary, (GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, GLvoid *binary));
 QGL_FUNC_OPT(void, glProgramBinary, (GLuint program, GLenum binaryFormat, const GLvoid *binary, GLsizei length));
+#endif
+
+#ifndef GL_ES_VERSION_2_0
+QGL_EXT(void, glCompressedTexImage2DARB, (GLenum, GLint, GLenum, GLsizei, GLsizei, GLint, GLsizei, const GLvoid *));
+QGL_EXT(void, glCompressedTexSubImage2DARB, (GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLsizei, const GLvoid *));
+#else
+QGL_FUNC(void, glCompressedTexImage2D, (GLenum, GLint, GLenum, GLsizei, GLsizei, GLint, GLsizei, const GLvoid *));
+QGL_FUNC(void, glCompressedTexSubImage2D, (GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLsizei, const GLvoid *));
+#ifndef qglCompressedTexImage2DARB
+#define qglCompressedTexImage2DARB qglCompressedTexImage2D
+#define qglCompressedTexSubImage2DARB qglCompressedTexSubImage2D
+#endif
 #endif
 
 // WGL_EXT Functions

@@ -33,8 +33,10 @@ typedef struct
 static image_t images[MAX_GLIMAGES];
 static image_t images_hash_headnode[IMAGES_HASH_SIZE], *free_images;
 
-int	currentTMU;
-GLuint currentTextures[MAX_TEXTURE_UNITS];
+static int currentTMU;
+static GLuint currentTextures[MAX_TEXTURE_UNITS];
+
+static int unpackAlignment[NUM_QGL_CONTEXTS];
 
 static int *r_8to24table;
 
@@ -212,6 +214,18 @@ void R_TextureMode( char *string )
 }
 
 /*
+* R_UnpackAlignment
+*/
+static void R_UnpackAlignment( int ctx, int value )
+{
+	if( unpackAlignment[ctx] == value )
+		return;
+
+	unpackAlignment[ctx] = value;
+	qglPixelStorei( GL_UNPACK_ALIGNMENT, value );
+}
+
+/*
 * R_AnisotropicFilter
 */
 void R_AnisotropicFilter( int value )
@@ -358,19 +372,36 @@ void R_FreeImageBuffers( void )
 /*
 * R_SwapBlueRed
 */
-static void R_SwapBlueRed( qbyte *data, int width, int height, int samples )
+static void R_SwapBlueRed( qbyte *data, int width, int height, int samples, int alignment )
 {
-	int i, j, size;
+	int i, j, k, padding;
 
-	size = width * height;
-	for( i = 0; i < size; i++, data += samples )
+	padding = ALIGN( width * samples, alignment ) - width * samples;
+	for( i = 0; i < height; i++, data += padding )
 	{
-		j = data[0];
-		data[0] = data[2];
-		data[2] = j;
-		// data[0] ^= data[2];
-		// data[2] = data[0] ^ data[2];
-		// data[0] ^= data[2];
+		for( j = 0; j < width; j++, data += samples )
+		{
+			k = data[0];
+			data[0] = data[2];
+			data[2] = k;
+			// data[0] ^= data[2];
+			// data[2] = data[0] ^ data[2];
+			// data[0] ^= data[2];
+		}
+	}
+}
+
+/*
+* R_EndianSwap16BitImage
+*/
+static void R_EndianSwap16BitImage( unsigned short *data, int width, int height )
+{
+	int i;
+	while( height-- > 0 )
+	{
+		for( i = 0; i < width; i++, data++ )
+			*data = ( ( *data & 255 ) << 8 ) | ( *data >> 8 );
+		data += width & 1; // 4 unpack alignment
 	}
 }
 
@@ -417,7 +448,7 @@ static int R_ReadImageFromDisk( int ctx, char *pathname, size_t pathname_size,
 		{
 			if( ( (imginfo.comp & ~1) == IMGCOMP_BGR ) && ( !glConfig.ext.bgra || !flags ) )
 			{
-				R_SwapBlueRed( imginfo.pixels, imginfo.width, imginfo.height, imginfo.samples );
+				R_SwapBlueRed( imginfo.pixels, imginfo.width, imginfo.height, imginfo.samples, 1 );
 				imginfo.comp = IMGCOMP_RGB | (imginfo.comp & 1);
 			}
 		}
@@ -436,26 +467,40 @@ static int R_ReadImageFromDisk( int ctx, char *pathname, size_t pathname_size,
 /*
 * R_ScaledImageSize
 */
-static void R_ScaledImageSize( int width, int height, int *scaledWidth, int *scaledHeight, int flags, qboolean fromMipmap )
+static int R_ScaledImageSize( int width, int height, int *scaledWidth, int *scaledHeight, int flags, int mips, qboolean forceNPOT )
 {
-	int maxSize = ( flags & IT_CUBEMAP ) ? glConfig.maxTextureCubemapSize : glConfig.maxTextureSize;
+	int maxSize;
+	int mip = 0;
+	int clampedWidth, clampedHeight;
+
+	if( flags & IT_DEPTHRB )
+		maxSize = glConfig.maxRenderbufferSize;
+	else if( flags & IT_CUBEMAP )
+		maxSize = glConfig.maxTextureCubemapSize;
+	else
+		maxSize = glConfig.maxTextureSize;
+
+	if( !glConfig.ext.texture_non_power_of_two && !forceNPOT )
+	{
+		int potWidth, potHeight;
+
+		for( potWidth = 1; potWidth < width; potWidth <<= 1 );
+		for( potHeight = 1; potHeight < height; potHeight <<= 1 );
+
+		if( ( width != potWidth ) || ( height != potHeight ) )
+			mips = 1;
+
+		width = potWidth;
+		height = potHeight;
+	}
 
 	if( !( flags & IT_NOPICMIP ) )
 	{
 		// let people sample down the sky textures for speed
-		int mip = ( flags & IT_SKY ) ? r_skymip->integer : r_picmip->integer;
-		width >>= mip;
-		height >>= mip;
-		if( !width )
-			width = 1;
-		if( !height )
-			height = 1;
-	}
-
-	if( fromMipmap )
-	{
-		while( ( width > maxSize ) || ( height > maxSize ) )
+		int mips = ( flags & IT_SKY ) ? r_skymip->integer : r_picmip->integer;
+		while( ( mip < mips ) && ( ( width > 1 ) || ( height > 1 ) ) ) // loop since picmip can be out of range
 		{
+			++mip;
 			width >>= 1;
 			height >>= 1;
 			if( !width )
@@ -464,16 +509,32 @@ static void R_ScaledImageSize( int width, int height, int *scaledWidth, int *sca
 				height = 1;
 		}
 	}
-	else
+
+	// try to find the smallest supported texture size from mipmaps
+	clampedWidth = width;
+	clampedHeight = height;
+	while( ( clampedWidth > maxSize ) || ( clampedHeight > maxSize ) )
 	{
-		if( width > maxSize )
-			width = maxSize;
-		if( height > maxSize )
-			height = maxSize;
+		++mip;
+		clampedWidth >>= 1;
+		clampedHeight >>= 1;
+		if( !clampedWidth )
+			clampedWidth = 1;
+		if( !clampedHeight )
+			clampedHeight = 1;
 	}
 
-	*scaledWidth = width;
-	*scaledHeight = height;
+	if( mip >= mips )
+	{
+		// the smallest size is not in mipmaps, so ignore mipmaps and aspect ratio and simply clamp
+		*scaledWidth = min( width, maxSize );
+		*scaledHeight = min( height, maxSize );
+		return -1;
+	}
+
+	*scaledWidth = clampedWidth;
+	*scaledHeight = clampedHeight;
+	return mip;
 }
 
 /*
@@ -510,7 +571,7 @@ static void R_FlipTexture( const qbyte *in, qbyte *out, int width, int height,
 * R_ResampleTexture
 */
 static void R_ResampleTexture( int ctx, const qbyte *in, int inwidth, int inheight, qbyte *out, 
-	int outwidth, int outheight, int samples )
+	int outwidth, int outheight, int samples, int alignment )
 {
 	int i, j, k;
 	int inwidthS, outwidthS;
@@ -521,7 +582,7 @@ static void R_ResampleTexture( int ctx, const qbyte *in, int inwidth, int inheig
 
 	if( inwidth == outwidth && inheight == outheight )
 	{
-		memcpy( out, in, inwidth * inheight * samples );
+		memcpy( out, in, inheight * ALIGN( inwidth * samples, alignment ) );
 		return;
 	}
 
@@ -544,8 +605,8 @@ static void R_ResampleTexture( int ctx, const qbyte *in, int inwidth, int inheig
 		frac += fracstep;
 	}
 
-	inwidthS = inwidth * samples;
-	outwidthS = outwidth * samples;
+	inwidthS = ALIGN( inwidth * samples, alignment );
+	outwidthS = ALIGN( outwidth * samples, alignment );
 	for( i = 0; i < outheight; i++, out += outwidthS )
 	{
 		inrow = in + inwidthS * (int)( ( i + 0.25 ) * inheight / outheight );
@@ -566,11 +627,14 @@ static void R_ResampleTexture( int ctx, const qbyte *in, int inwidth, int inheig
 
 /*
 * R_ResampleTexture16
+*
+* Assumes 16-bit unpack alignment
 */
 static void R_ResampleTexture16( int ctx, const unsigned short *in, int inwidth, int inheight,
 	unsigned short *out, int outwidth, int outheight, int rMask, int gMask, int bMask, int aMask )
 {
 	int i, j;
+	int inwidthA, outwidthA;
 	unsigned int frac, fracstep;
 	const unsigned short *inrow, *inrow2, *pix1, *pix2, *pix3, *pix4;
 	unsigned *p1, *p2;
@@ -578,7 +642,7 @@ static void R_ResampleTexture16( int ctx, const unsigned short *in, int inwidth,
 
 	if( inwidth == outwidth && inheight == outheight )
 	{
-		memcpy( out, in, inwidth * inheight * sizeof( unsigned short ) );
+		memcpy( out, in, inheight * ALIGN( inwidth * sizeof( unsigned short ), 4 ) );
 		return;
 	}
 
@@ -601,10 +665,12 @@ static void R_ResampleTexture16( int ctx, const unsigned short *in, int inwidth,
 		frac += fracstep;
 	}
 
-	for( i = 0; i < outheight; i++, out += outwidth )
+	inwidthA = ALIGN( inwidth, 2 );
+	outwidthA = ALIGN( outwidth, 2 );
+	for( i = 0; i < outheight; i++, out += outwidthA )
 	{
-		inrow = in + inwidth * (int)( ( i + 0.25 ) * inheight / outheight );
-		inrow2 = in + inwidth * (int)( ( i + 0.75 ) * inheight / outheight );
+		inrow = in + inwidthA * (int)( ( i + 0.25 ) * inheight / outheight );
+		inrow2 = in + inwidthA * (int)( ( i + 0.75 ) * inheight / outheight );
 		for( j = 0; j < outwidth; j++ )
 		{
 			pix1 = inrow + p1[j];
@@ -625,27 +691,39 @@ static void R_ResampleTexture16( int ctx, const unsigned short *in, int inwidth,
 * R_MipMap
 * 
 * Operates in place, quartering the size of the texture
-* note: if given odd width/height this discards the last row/column of
-* pixels, rather than doing a proper box-filter scale down (LordHavoc)
 */
-static void R_MipMap( qbyte *in, int width, int height, int samples )
+static void R_MipMap( qbyte *in, int width, int height, int samples, int alignment )
 {
-	int i, j, k, samples2;
-	qbyte *out;
+	int i, j, k;
+	int instride = ALIGN( width * samples, alignment );
+	int outwidth, outheight, outpadding;
+	qbyte *out = in;
+	qbyte *next;
+	int inofs;
 
-	// width <<= 2;
-	width *= samples;
-	height >>= 1;
-	samples2 = samples << 1;
+	outwidth = width >> 1;
+	outheight = height >> 1;
+	if( !outwidth )
+		outwidth = 1;
+	if( !outheight )
+		outheight = 1;
+	outpadding = ALIGN( outwidth * samples, alignment ) - outwidth * samples;
 
-
-	out = in;
-	for( i = 0; i < height; i++, in += width )
+	for( i = 0; i < outheight; i++, in += instride * 2, out += outpadding )
 	{
-		for( j = 0; j < width; j += samples2, out += samples, in += samples2 )
+		next = ( ( ( i << 1 ) + 1 ) < height ) ? ( in + instride ) : in;
+		for( j = 0, inofs = 0; j < outwidth; j++, inofs += samples )
 		{
-			for( k = 0; k < samples; k++ )
-				out[k] = ( in[k] + in[k+samples] + in[width+k] + in[width+k+samples] )>>2;
+			if( ( ( j << 1 ) + 1 ) < width )
+			{
+				for( k = 0; k < samples; ++k, ++inofs )
+					*( out++ ) = ( in[inofs] + in[inofs + samples] + next[inofs] + next[inofs + samples] ) >> 2;
+			}
+			else
+			{
+				for( k = 0; k < samples; ++k, ++inofs )
+					*( out++ ) = ( in[inofs] + next[inofs] ) >> 1;
+			}
 		}
 	}
 }
@@ -653,29 +731,48 @@ static void R_MipMap( qbyte *in, int width, int height, int samples )
 /*
 * R_MipMap16
 *
-* A version of R_MipMap for 16-bit images.
+* Operates in place, quartering the size of the 16-bit texture, assumes unpack alignment of 4
 */
 static void R_MipMap16( unsigned short *in, int width, int height, int rMask, int gMask, int bMask, int aMask )
 {
 	int i, j;
-	unsigned short *out;
+	int instride = ALIGN( width, 2 );
+	int outwidth, outheight, outpadding;
+	unsigned short *out = in;
+	unsigned short *next;
 	int p[4];
-	
-	height >>= 1;
 
-	out = in;
-	for( i = 0; i < height; i++, in += width )
+	outwidth = width >> 1;
+	outheight = height >> 1;
+	if( !outwidth )
+		outwidth = 1;
+	if( !outheight )
+		outheight = 1;
+	outpadding = outwidth & 1;
+
+	for( i = 0; i < outheight; i++, in += instride * 2, out += outpadding )
 	{
-		for( j = 0; j < width; j += 2, out += 1, in += 2 )
+		next = ( ( ( i << 1 ) + 1 ) < height ) ? ( in + instride ) : in;
+		for( j = 0; j < outwidth; j++ )
 		{
 			p[0] = in[0];
-			p[1] = in[1];
-			p[2] = in[width];
-			p[3] = in[width + 1];
-			*out =	( ( ( ( p[0] & rMask ) + ( p[1] & rMask ) + ( p[2] & rMask ) + ( p[3] & rMask ) ) >> 2 ) & rMask ) |
-					( ( ( ( p[0] & gMask ) + ( p[1] & gMask ) + ( p[2] & gMask ) + ( p[3] & gMask ) ) >> 2 ) & gMask ) |
-					( ( ( ( p[0] & bMask ) + ( p[1] & bMask ) + ( p[2] & bMask ) + ( p[3] & bMask ) ) >> 2 ) & bMask ) |
-					( ( ( ( p[0] & aMask ) + ( p[1] & aMask ) + ( p[2] & aMask ) + ( p[3] & aMask ) ) >> 2 ) & aMask );
+			p[1] = next[0];
+			if( ( ( j << 1 ) + 1 ) < width )
+			{
+				p[2] = in[1];
+				p[3] = next[1];
+				*( out++ ) =	( ( ( ( p[0] & rMask ) + ( p[1] & rMask ) + ( p[2] & rMask ) + ( p[3] & rMask ) ) >> 2 ) & rMask ) |
+								( ( ( ( p[0] & gMask ) + ( p[1] & gMask ) + ( p[2] & gMask ) + ( p[3] & gMask ) ) >> 2 ) & gMask ) |
+								( ( ( ( p[0] & bMask ) + ( p[1] & bMask ) + ( p[2] & bMask ) + ( p[3] & bMask ) ) >> 2 ) & bMask ) |
+								( ( ( ( p[0] & aMask ) + ( p[1] & aMask ) + ( p[2] & aMask ) + ( p[3] & aMask ) ) >> 2 ) & aMask );
+			}
+			else
+			{
+				*( out++ ) =	( ( ( ( p[0] & rMask ) + ( p[1] & rMask ) ) >> 1 ) & rMask ) |
+								( ( ( ( p[0] & gMask ) + ( p[1] & gMask ) ) >> 1 ) & gMask ) |
+								( ( ( ( p[0] & bMask ) + ( p[1] & bMask ) ) >> 1 ) & bMask ) |
+								( ( ( ( p[0] & aMask ) + ( p[1] & aMask ) ) >> 1 ) & aMask );
+			}
 		}
 	}
 }
@@ -783,8 +880,7 @@ static void R_Upload32( int ctx, qbyte **data, int width, int height, int flags,
 	assert( samples );
 
 	// we can't properly mipmap a NPT-texture in software
-	if( ( glConfig.ext.texture_non_power_of_two && ( flags & IT_NOMIPMAP ) )
-		|| ( subImage && noScale ) )
+	if( glConfig.ext.texture_non_power_of_two || ( subImage && noScale ) )
 	{
 		scaledWidth = width;
 		scaledHeight = height;
@@ -795,7 +891,8 @@ static void R_Upload32( int ctx, qbyte **data, int width, int height, int flags,
 		for( scaledHeight = 1; scaledHeight < height; scaledHeight <<= 1 );
 	}
 
-	R_ScaledImageSize( scaledWidth, scaledHeight, &scaledWidth, &scaledHeight, flags, qfalse );
+	R_ScaledImageSize( scaledWidth, scaledHeight, &scaledWidth, &scaledHeight, flags, 1,
+		( subImage && noScale ) ? qtrue : qfalse );
 
 	// don't ever bother with > maxSize textures
 	if( flags & IT_CUBEMAP )
@@ -829,7 +926,16 @@ static void R_Upload32( int ctx, qbyte **data, int width, int height, int flags,
 	if( flags & IT_DEPTH )
 	{
 		comp = format = GL_DEPTH_COMPONENT;
-		type = glConfig.ext.depth24 ? GL_UNSIGNED_INT : GL_UNSIGNED_SHORT;
+		if( glConfig.ext.depth24 )
+		{
+			type = GL_UNSIGNED_INT;
+		}
+		else
+		{
+			type = GL_UNSIGNED_SHORT;
+			if( glConfig.ext.depth_nonlinear )
+				comp = GL_DEPTH_COMPONENT16_NONLINEAR_NV;
+		}
 	}
 	else if( flags & IT_FRAMEBUFFER )
 	{
@@ -865,6 +971,8 @@ static void R_Upload32( int ctx, qbyte **data, int width, int height, int flags,
 
 	R_SetupTexParameters( target, flags );
 
+	R_UnpackAlignment( ctx, 1 );
+
 	if( ( scaledWidth == width ) && ( scaledHeight == height ) && ( flags & IT_NOMIPMAP ) )
 	{
 		if( subImage )
@@ -891,7 +999,7 @@ static void R_Upload32( int ctx, qbyte **data, int width, int height, int flags,
 			// resample the texture
 			mip = scaled;
 			if( data && data[i] )
-				R_ResampleTexture( ctx, data[i], width, height, (qbyte*)mip, scaledWidth, scaledHeight, samples );
+				R_ResampleTexture( ctx, data[i], width, height, (qbyte*)mip, scaledWidth, scaledHeight, samples, 1 );
 			else
 				mip = NULL;
 
@@ -910,7 +1018,7 @@ static void R_Upload32( int ctx, qbyte **data, int width, int height, int flags,
 				h = scaledHeight;
 				while( w > 1 || h > 1 )
 				{
-					R_MipMap( mip, w, h, samples );
+					R_MipMap( mip, w, h, samples, 1 );
 
 					w >>= 1;
 					h >>= 1;
@@ -988,24 +1096,437 @@ static int R_MipCount( int width, int height )
 }
 
 /*
-* R_MipLevel
+* R_UploadMipmapped
+*
+* Loads a 16/24/32-bit image or cubemap (faces are consecutive) with mipmaps.
 */
-static int R_MipLevel( int width, int height, int scaledWidth, int scaledHeight )
+static void R_UploadMipmapped( int ctx, qbyte **data,
+	int width, int height, int mipLevels, int flags,
+	int *upload_width, int *upload_height,
+	int format, int type )
 {
-	int mip = 0;
-	while ( (width > scaledWidth ) || ( height > scaledHeight ) )
-    {
-        width >>= 1;
-        height >>= 1;
-        if ( !width )
-            width = 1;
-        if ( !height )
-            height = 1;
-        ++mip;
-    }
-	if( ( width != scaledWidth ) && ( height != scaledHeight ) )
-		return -1;
-	return mip;
+	int i, j;
+	int pixelSize = R_PixelFormatSize( format, type );
+	int rMask = 0, gMask = 0, bMask = 0, aMask = 0;
+	int scaledWidth, scaledHeight;
+	int mip;
+	qbyte *scaled = NULL;
+	int faces, faceSize = 0;
+	int target, target2, comp;
+	int mips;
+	qbyte *face;
+	int oldWidth = 0, oldHeight = 0;
+
+	switch( type )
+	{
+	case GL_UNSIGNED_SHORT_4_4_4_4:
+		rMask = 15;
+		gMask = 15 << 4;
+		bMask = 15 << 8;
+		aMask = 15 << 12;
+		break;
+	case GL_UNSIGNED_SHORT_5_5_5_1:
+		rMask = 31;
+		gMask = 31 << 5;
+		bMask = 31 << 10;
+		aMask = 1 << 15;
+		break;
+	case GL_UNSIGNED_SHORT_5_6_5:
+		rMask = 31;
+		gMask = 63 << 5;
+		bMask = 31 << 11;
+		break;
+	}
+
+	if( flags & IT_CUBEMAP )
+	{
+		target = GL_TEXTURE_CUBE_MAP_ARB;
+		target2 = GL_TEXTURE_CUBE_MAP_POSITIVE_X_ARB;
+		faces = 6;
+	}
+	else
+	{
+		target = target2 = GL_TEXTURE_2D;
+		faces = 1;
+	}
+
+	mip = R_ScaledImageSize( width, height, &scaledWidth, &scaledHeight, flags, mipLevels, qfalse );
+
+	if( upload_width )
+		*upload_width = scaledWidth;
+	if( upload_height )
+		*upload_height = scaledHeight;
+
+	if( mip < 0 )
+	{
+		int oldFaceSize = ALIGN( width * pixelSize, 4 ) * height;
+		faceSize = ALIGN( scaledWidth * pixelSize, 4 ) * scaledHeight;
+		scaled = R_PrepareImageBuffer( ctx, TEXTURE_RESAMPLING_BUF, faceSize * faces );
+		if( type == GL_UNSIGNED_BYTE )
+		{
+			for( i = 0; i < faces; i++ )
+			{
+				R_ResampleTexture( ctx, data[0] + i * oldFaceSize, width, height,
+					scaled + i * faceSize, scaledWidth, scaledHeight, pixelSize, 4 );
+			}
+		}
+		else
+		{
+			for( i = 0; i < faces; i++ )
+			{
+				R_ResampleTexture16( ctx, ( unsigned short * )( data[0] + i * oldFaceSize ), width, height,
+					( unsigned short * )( scaled + i * faceSize ), scaledWidth, scaledHeight, rMask, gMask, bMask, aMask );
+			}
+		}
+		data = &scaled;
+		mip = 0;
+		mipLevels = 1;
+	}
+
+#ifdef GL_ES_VERSION_2_0
+	comp = format;
+#else
+	comp = R_TextureFormat( ( type == GL_UNSIGNED_BYTE ) ? pixelSize : ( ( format == GL_RGB ) ? 3 : 4 ),
+		( flags & IT_NOCOMPRESS ) ? qtrue : qfalse );
+#endif
+
+	R_SetupTexParameters( target, flags );
+
+	R_UnpackAlignment( ctx, 4 );
+
+	mips = ( flags & IT_NOMIPMAP ) ? 1 : R_MipCount( scaledWidth, scaledHeight );
+	for( i = 0; ( i < mips ) && ( mip < mipLevels ); ++i, ++mip )
+	{
+		face = data[mip];
+		faceSize = ALIGN( scaledWidth * pixelSize, 4 ) * scaledHeight;
+		for( j = 0; j < faces; j++ )
+		{
+			qglTexImage2D( target2 + j, i, comp, scaledWidth, scaledHeight, 0, format, type, face );
+			face += faceSize;
+		}
+		oldWidth = scaledWidth;
+		oldHeight = scaledHeight;
+		scaledWidth >>= 1;
+		scaledHeight >>= 1;
+		if( !scaledWidth )
+			scaledWidth = 1;
+		if( !scaledHeight )
+			scaledHeight = 1;
+	}
+
+	for( ; i < mips; ++i )
+	{
+		if( !scaled )
+		{
+			scaled = R_PrepareImageBuffer( ctx, TEXTURE_RESAMPLING_BUF, faces * faceSize );
+			memcpy( scaled, data[mip - 1], faces * faceSize );
+		}
+
+		face = scaled;
+		for( j = 0; j < faces; j++ )
+		{
+			if( type == GL_UNSIGNED_BYTE )
+				R_MipMap( face, oldWidth, oldHeight, pixelSize, 4 );
+			else
+				R_MipMap16( ( unsigned short * )face, oldWidth, oldHeight, rMask, gMask, bMask, aMask );
+			qglTexImage2D( target2 + j, i, comp, scaledWidth, scaledHeight, 0, format, type, face );
+			face += faceSize;
+		}
+
+		oldWidth = scaledWidth;
+		oldHeight = scaledHeight;
+		scaledWidth >>= 1;
+		scaledHeight >>= 1;
+		if( !scaledWidth )
+			scaledWidth = 1;
+		if( !scaledHeight )
+			scaledHeight = 1;
+	}
+}
+
+/*
+* R_IsKTXFormatValid
+*/
+static qboolean R_IsKTXFormatValid( int format, int type )
+{
+	switch( type )
+	{
+	case GL_UNSIGNED_BYTE:
+		switch( format )
+		{
+		case GL_RGBA:
+		case GL_BGRA_EXT:
+		case GL_RGB:
+		case GL_BGR_EXT:
+		case GL_LUMINANCE_ALPHA:
+		case GL_ALPHA:
+		case GL_LUMINANCE:
+			return qtrue;
+		}
+		return qfalse;
+	case GL_UNSIGNED_SHORT_4_4_4_4:
+	case GL_UNSIGNED_SHORT_5_5_5_1:
+		return ( format == GL_RGBA ) ? qtrue : qfalse;
+	case GL_UNSIGNED_SHORT_5_6_5:
+		return ( format == GL_RGB ) ? qtrue : qfalse;
+	case 0:
+		return ( format == GL_ETC1_RGB8_OES ) ? qtrue : qfalse;
+	}
+	return qfalse;
+}
+
+typedef struct ktx_header_s
+{
+	char identifier[12];
+	int endianness;
+	int type;
+	int typeSize;
+	int format;
+	int internalFormat;
+	int baseInternalFormat;
+	int pixelWidth;
+	int pixelHeight;
+	int pixelDepth;
+	int numberOfArrayElements;
+	int numberOfFaces;
+	int numberOfMipmapLevels;
+	int bytesOfKeyValueData;
+} ktx_header_t;
+
+/*
+* R_LoadKTX
+*/
+static qboolean R_LoadKTX( int ctx, image_t *image, void ( *bind )( int, const image_t * ) )
+{
+	int i, j;
+	qbyte *buffer;
+	ktx_header_t *header;
+	qboolean swapEndian;
+	qbyte *data;
+
+	R_LoadFile( image->name, ( void ** )&buffer );
+	if( !buffer )
+		return qfalse;
+
+	header = ( ktx_header_t * )buffer;
+	if( memcmp( header->identifier, "\xABKTX 11\xBB\r\n\x1A\n", 12 ) )
+	{
+		ri.Com_DPrintf( S_COLOR_YELLOW "R_LoadKTX: Bad file identifier: %s\n", image->name );
+		goto error;
+	}
+
+	swapEndian = ( header->endianness != 0x04030201 ) ? qtrue : qfalse;
+	if( swapEndian )
+	{
+		unsigned int field;
+		for( i = 3; i < 16; ++i )
+		{
+			field = ( ( unsigned int * )header )[i];
+			( ( unsigned int * )header )[i] =
+				( field >> 24 ) |
+				( ( ( field >> 16 ) & 255 ) << 8 ) |
+				( ( ( field >> 8 ) & 255 ) << 16 ) |
+				( ( field & 255 ) << 24 );
+		}
+	}
+
+	if( !R_IsKTXFormatValid( header->internalFormat, header->type ) )
+	{
+		ri.Com_DPrintf( S_COLOR_YELLOW "R_LoadKTX: Unsupported pixel format: %s\n", image->name );
+		goto error;
+	}
+	if( ( image->flags & IT_CUBEMAP ) && ( header->pixelWidth != header->pixelHeight ) )
+	{
+		ri.Com_DPrintf( S_COLOR_YELLOW "R_LoadKTX: Not square cubemap image: %s\n", image->name );
+		goto error;
+	}
+	if( ( header->pixelWidth < 1 ) || ( header->pixelHeight < 1 ) )
+	{
+		ri.Com_DPrintf( S_COLOR_YELLOW "R_LoadKTX: Zero or negative texture size: %s\n", image->name );
+		goto error;
+	}
+	if( ( header->pixelDepth > 1 ) || ( header->numberOfArrayElements > 1 ) )
+	{
+		ri.Com_DPrintf( S_COLOR_YELLOW "R_LoadKTX: 3D textures and texture arrays are not supported: %s\n", image->name );
+		goto error;
+	}
+	if( header->numberOfFaces != ( ( image->flags & IT_CUBEMAP ) ? 6 : 1 ) )
+	{
+		ri.Com_DPrintf( S_COLOR_YELLOW "R_LoadKTX: Bad number of cubemap faces: %s\n", image->name );
+		goto error;
+	}
+	if( header->numberOfMipmapLevels < 1 )
+		header->numberOfMipmapLevels = 1;
+
+	data = buffer + sizeof( ktx_header_t ) + header->bytesOfKeyValueData;
+	
+	bind( 0, image );
+
+	if( header->type == 0 )
+	{
+		int mips = R_MipCount( header->pixelWidth, header->pixelHeight );
+		int mip;
+		int scaledWidth, scaledHeight;
+
+		if( ( header->numberOfMipmapLevels == 1 ) && ( image->flags & IT_NOMIPMAP ) )
+		{
+			mips = 1;
+		}
+		else if( header->numberOfMipmapLevels < mips )
+		{
+			ri.Com_DPrintf( S_COLOR_YELLOW "R_LoadKTX: Compressed image has too few mip levels: %s\n", image->name );
+			goto error;
+		}
+
+		mip = R_ScaledImageSize( header->pixelWidth, header->pixelHeight, &scaledWidth, &scaledHeight,
+			image->flags, mips, qfalse );
+
+		image->upload_width = scaledWidth;
+		image->upload_height = scaledHeight;
+
+		// If different compression formats are added, make this more general-purpose!
+
+		if( !( glConfig.ext.compressed_ETC1_RGB8_texture || glConfig.ext.ES3_compatibility ) || ( mip < 0 ) )
+		{
+			int inSize = ( ( ALIGN( header->pixelWidth, 4 ) * ALIGN( header->pixelHeight, 4 ) ) >> 4 ) * 8;
+			int outSize = ALIGN( header->pixelWidth * 3, 4 ) * header->pixelHeight;
+			qbyte *in = data + sizeof( int );
+			qbyte *decompressed = R_PrepareImageBuffer( ctx, TEXTURE_LOADING_BUF0, outSize * header->numberOfFaces );
+			qbyte *out = decompressed;
+			for( i = 0; i < header->numberOfFaces; ++i )
+			{
+				DecompressETC1( in, header->pixelWidth, header->pixelHeight, out, glConfig.ext.bgra ? qtrue : qfalse );
+				in += inSize;
+				out += outSize;
+			}
+			R_UploadMipmapped( ctx, &decompressed, header->pixelWidth, header->pixelHeight, 1,
+				image->flags, &image->upload_width, &image->upload_height,
+				glConfig.ext.bgra ? GL_BGR_EXT : GL_RGB, GL_UNSIGNED_BYTE );
+		}
+		else
+		{
+			int target, target2;
+			int faceSize;
+			qbyte *in;
+			
+			if( image->flags & IT_CUBEMAP )
+			{
+				target = GL_TEXTURE_CUBE_MAP_ARB;
+				target2 = GL_TEXTURE_CUBE_MAP_POSITIVE_X_ARB;
+			}
+			else
+			{
+				target = target2 = GL_TEXTURE_2D;
+			}
+
+			R_SetupTexParameters( target, image->flags );
+
+			for( i = 0; i < mip; ++i )
+				data += sizeof( int ) + *( ( unsigned int * )data );
+
+			mips -= mip;
+			for( i = 0; i < mips; ++i )
+			{
+				faceSize = ( ( ALIGN( scaledWidth, 4 ) * ALIGN( scaledHeight, 4 ) ) >> 4 ) * 8;
+				in = data + sizeof( int );
+				for( j = 0; j < header->numberOfFaces; ++j )
+				{
+					qglCompressedTexImage2DARB( target2 + j, i,
+						glConfig.ext.ES3_compatibility ? GL_COMPRESSED_RGB8_ETC2 : GL_ETC1_RGB8_OES,
+						scaledWidth, scaledHeight, 0, faceSize, in );
+					in += faceSize;
+				}
+				scaledWidth >>= 1;
+				scaledHeight >>= 1;
+				if( !scaledWidth )
+					scaledWidth = 1;
+				if( !scaledHeight )
+					scaledHeight = 1;
+				data += sizeof( int ) + *( ( unsigned int * )data );
+			}
+		}
+
+		image->samples = 3;
+	}
+	else
+	{
+		int mips = ( image->flags & IT_NOMIPMAP ) ? 1 :
+			min( header->numberOfMipmapLevels, R_MipCount( header->pixelWidth, header->pixelHeight ) );
+		qbyte *images[32];
+		int mipWidth = header->pixelWidth, mipHeight = header->pixelHeight;
+
+		for( i = 0; i < mips; ++i )
+		{
+			images[i] = data + sizeof( int );
+			data += sizeof( int ) + *( ( unsigned int * )data );
+		}
+
+		if( !glConfig.ext.bgra &&
+			( ( header->internalFormat == GL_BGR_EXT ) || ( header->internalFormat == GL_BGRA_EXT ) ) )
+		{
+			for( i = 0; i < mips; ++i )
+			{
+				R_SwapBlueRed( images[i], mipWidth, mipHeight * header->numberOfFaces,
+					( header->internalFormat == GL_BGR_EXT ) ? 3 : 4, 4 );
+				mipWidth >>= 1;
+				mipHeight >>= 1;
+				if( !mipWidth )
+					mipWidth = 1;
+				if( !mipHeight )
+					mipHeight = 1;
+			}
+			header->internalFormat = ( header->internalFormat == GL_BGR_EXT ) ? GL_RGB : GL_RGBA;
+		}
+		else if( swapEndian && (
+			( header->type == GL_UNSIGNED_SHORT_4_4_4_4 ) || ( header->type == GL_UNSIGNED_SHORT_5_5_5_1 ) ||
+			( header->type == GL_UNSIGNED_SHORT_5_6_5 ) ) )
+		{
+			for( i = 0; i < mips; ++i )
+			{
+				R_EndianSwap16BitImage( ( unsigned short * )( images[i] ), mipWidth, mipHeight * header->numberOfFaces );
+				mipWidth >>= 1;
+				mipHeight >>= 1;
+				if( !mipWidth )
+					mipWidth = 1;
+				if( !mipHeight )
+					mipHeight = 1;
+			}
+		}
+
+		R_UploadMipmapped( ctx, images, header->pixelWidth, header->pixelHeight, mips, image->flags,
+			&image->upload_width, &image->upload_height, header->internalFormat, header->type );
+
+		switch( header->type )
+		{
+		case GL_RGBA:
+		case GL_BGRA_EXT:
+			image->samples = 4;
+			break;
+		case GL_RGB:
+		case GL_BGR_EXT:
+			image->samples = 3;
+			break;
+		case GL_LUMINANCE_ALPHA:
+			image->samples = 2;
+			break;
+		case GL_ALPHA:
+		case GL_LUMINANCE:
+			image->samples = 1;
+			break;
+		}
+	}
+	
+	COM_StripExtension( image->name );
+	Q_strncpyz( image->extension, ".ktx", sizeof( image->extension ) );
+	image->width = header->pixelWidth;
+	image->height = header->pixelHeight;
+	image->loaded = qtrue;
+	R_FreeFile( buffer );
+	return qtrue;
+
+error:
+	R_FreeFile( buffer );
+	return qfalse;
 }
 
 /*
@@ -1017,8 +1538,12 @@ static qboolean R_LoadImageFromDisk( int ctx, image_t *image, void (*bind)(int, 
 	char *pathname = image->name;
 	size_t pathsize = image->name_size;
 	size_t len = strlen( pathname );
-	const char *extension = "";
 	int width = 1, height = 1, samples = 1;
+	
+	Q_strncatz( pathname, ".ktx", pathsize );
+	if( R_LoadKTX( ctx, image, bind ) )
+		return qtrue;
+	pathname[len] = 0;
 
 	if( flags & IT_CUBEMAP )
 	{
@@ -1048,7 +1573,7 @@ static qboolean R_LoadImageFromDisk( int ctx, image_t *image, void (*bind)(int, 
 				pathname[len+2] = cubemapSides[i][j].suf[1];
 				pathname[len+3] = 0;
 
-				Q_strncatz( pathname, extension, pathsize );
+				Q_strncatz( pathname, ".tga", pathsize );
 				samples = R_ReadImageFromDisk( ctx, pathname, pathsize, 
 					&(pic[j]), &width, &height, &flags, j );
 				if( pic[j] )
@@ -1111,7 +1636,7 @@ static qboolean R_LoadImageFromDisk( int ctx, image_t *image, void (*bind)(int, 
 	{
 		qbyte *pic = NULL;
 
-		Q_strncatz( pathname, extension, pathsize );
+		Q_strncatz( pathname, ".tga", pathsize );
 		samples = R_ReadImageFromDisk( ctx, pathname, pathsize, &pic, &width, &height, &flags, 0 );
 
 		if( pic )
@@ -1377,9 +1902,12 @@ void R_ScreenShot( const char *filename, int x, int y, int width, int height, in
 	qboolean flipx, qboolean flipy, qboolean flipdiagonal, qboolean silent )
 {
 	size_t size, buf_size;
-	qbyte *buffer, *flipped;
+	qbyte *buffer, *flipped, *rgb, *rgba;
 	r_imginfo_t imginfo;
 	const char *extension;
+
+	if( !R_ScreenEnabled() )
+		return;
 
 	if( !COM_ValidateRelativeFilename( filename ) )
 	{
@@ -1395,8 +1923,8 @@ void R_ScreenShot( const char *filename, int x, int y, int width, int height, in
 	}
 
 	size = width * height * 3;
-	buf_size = size * 2;
-	if( size > r_screenShotBufferSize ) {
+	buf_size = width * height * 4;
+	if( buf_size > r_screenShotBufferSize ) {
 		if( r_screenShotBuffer ) {
 			R_Free( r_screenShotBuffer );
 		}
@@ -1416,15 +1944,31 @@ void R_ScreenShot( const char *filename, int x, int y, int width, int height, in
 	imginfo.height = height;
 	imginfo.samples = 3;
 	imginfo.pixels = flipped ? flipped : buffer;
+	imginfo.comp = Q_stricmp( extension, ".jpg" ) ? IMGCOMP_BGR : IMGCOMP_RGB;
 
-	if( !Q_stricmp( extension, ".jpg" ) ) {
-		imginfo.comp = IMGCOMP_RGB;
-	} else {
-		imginfo.comp = glConfig.ext.bgra ? IMGCOMP_BGR : IMGCOMP_RGB;
+	qglReadPixels( 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer );
+
+	rgb = rgba = buffer;
+	if( imginfo.comp == IMGCOMP_BGR )
+	{
+		while( ( size_t )( rgb - buffer ) < size )
+		{
+			*( rgb++ ) = rgba[2];
+			*( rgb++ ) = rgba[1];
+			*( rgb++ ) = rgba[0];
+			rgba += 4;
+		}
 	}
-
-	qglReadPixels( 0, 0, width, height, 
-		imginfo.comp == IMGCOMP_BGR ? GL_BGR_EXT : GL_RGB, GL_UNSIGNED_BYTE, buffer );
+	else
+	{
+		while( ( size_t )( rgb - buffer ) < size )
+		{
+			*( rgb++ ) = *( rgba++ );
+			*( rgb++ ) = *( rgba++ );
+			*( rgb++ ) = *( rgba++ );
+			rgba++;
+		}
+	}
 
 	if( flipped ) {
 		R_FlipTexture( buffer, flipped, width, height, 3, 
@@ -1626,14 +2170,14 @@ static void R_InitCoronaTexture( int *w, int *h, int *flags, int *samples )
 * R_GetViewportTextureSize
 */
 static void R_GetViewportTextureSize( const int viewportWidth, const int viewportHeight, 
-	const int size, int *width, int *height )
+	const int size, const int flags, int *width, int *height )
 {
 	int limit;
 	int width_, height_;
 
 	// limit the texture size to either screen resolution in case we can't use FBO
 	// or hardware limits and ensure it's a POW2-texture if we don't support such textures
-	limit = glConfig.maxTextureSize;
+	limit = flags & IT_DEPTHRB ? glConfig.maxRenderbufferSize : glConfig.maxTextureSize;
 	if( size )
 		limit = min( limit, size );
 	if( limit < 1 )
@@ -1684,7 +2228,7 @@ void R_InitViewportTexture( image_t **texture, const char *name, int id,
 		return;
 	}
 
-	R_GetViewportTextureSize( viewportWidth, viewportHeight, size, &width, &height );
+	R_GetViewportTextureSize( viewportWidth, viewportHeight, size, flags, &width, &height );
 
 	// create a new texture or update the old one
 	if( !( *texture ) || ( *texture )->width != width || ( *texture )->height != height )
@@ -1714,7 +2258,8 @@ void R_InitViewportTexture( image_t **texture, const char *name, int id,
 			t->fbo = 0;
 		}
 		if( t->flags & IT_FRAMEBUFFER ) {
-			t->fbo = RFB_RegisterObject( t->upload_width, t->upload_height );
+			t->fbo = RFB_RegisterObject( t->upload_width, t->upload_height,
+				( flags & IT_DEPTHRB ) ? qtrue : qfalse );
 			RFB_AttachTextureToObject( t->fbo, t );
 		}
 	}
@@ -1729,11 +2274,11 @@ static int R_GetPortalTextureId( const int viewportWidth, const int viewportHeig
 	int i;
 	int best = -1;
 	int realwidth, realheight;
-	int realflags = IT_PORTALMAP|IT_FRAMEBUFFER|flags;
+	int realflags = IT_PORTALMAP|IT_FRAMEBUFFER|IT_DEPTHRB|flags;
 	image_t *image;
 
 	R_GetViewportTextureSize( viewportWidth, viewportHeight, r_portalmaps_maxtexsize->integer, 
-		&realwidth, &realheight );
+		flags, &realwidth, &realheight );
 
 	for( i = 0; i < MAX_PORTAL_TEXTURES; i++ )
 	{
@@ -1778,7 +2323,7 @@ image_t *R_GetPortalTexture( int viewportWidth, int viewportHeight,
 
 	R_InitViewportTexture( &rsh.portalTextures[id], "r_portaltexture", id, 
 		viewportWidth, viewportHeight, r_portalmaps_maxtexsize->integer, 
-		IT_PORTALMAP|IT_FRAMEBUFFER|flags, 3 );
+		IT_PORTALMAP|IT_FRAMEBUFFER|IT_DEPTHRB|flags, 3 );
 
 	if( rsh.portalTextures[id] ) {
 		rsh.portalTextures[id]->framenum = frameNum;
@@ -1884,6 +2429,8 @@ static void R_InitScreenTexturesPair( const char *name, image_t **color,
 {
 	int flags;
 
+	assert( !depth || glConfig.ext.depth_texture );
+
 	flags = IT_NOCOMPRESS|IT_NOPICMIP|IT_NOMIPMAP|IT_CLAMP;
 	if( noFilter ) {
 		flags |= IT_NOFILTERING;
@@ -1892,12 +2439,12 @@ static void R_InitScreenTexturesPair( const char *name, image_t **color,
 	if( color ) {
 		R_InitViewportTexture( color, name, 0, 
 			glConfig.width, glConfig.height, 0, 
-			flags|IT_FRAMEBUFFER, samples );
+			flags | IT_FRAMEBUFFER | ( depth ? 0 : IT_DEPTHRB ), samples );
 	}
 	if( depth && *color ) {
 		R_InitViewportTexture( depth, va( "%s_depth", name ), 0,
 			glConfig.width, glConfig.height, 0, 
-			flags|IT_DEPTH, 1 );
+			flags | IT_DEPTH, 1 );
 
 		RFB_AttachTextureToObject( (*color)->fbo, *depth );
 	}
@@ -1908,11 +2455,14 @@ static void R_InitScreenTexturesPair( const char *name, image_t **color,
 */
 static void R_InitScreenTextures( void )
 {
-	R_InitScreenTexturesPair( "r_screentex", &rsh.screenTexture, 
-		&rsh.screenDepthTexture, 3, qtrue ); 
+	if( glConfig.ext.depth_texture && glConfig.ext.framebuffer_blit )
+	{
+		R_InitScreenTexturesPair( "r_screentex", &rsh.screenTexture, 
+			&rsh.screenDepthTexture, 3, qtrue ); 
 
-	R_InitScreenTexturesPair( "r_screentexcopy", &rsh.screenTextureCopy, 
-		&rsh.screenDepthTextureCopy, 3, qtrue );
+		R_InitScreenTexturesPair( "r_screentexcopy", &rsh.screenTextureCopy, 
+			&rsh.screenDepthTextureCopy, 3, qtrue );
+	}
 
 	R_InitScreenTexturesPair( "rsh.screenFxaaCopy", &rsh.screenFxaaCopy, 
 		NULL, 3, qfalse );
@@ -2012,8 +2562,7 @@ void R_InitImages( void )
 {
 	int i;
 
-	// allow any alignment
-	qglPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
+	unpackAlignment[QGL_CONTEXT_MAIN] = 4;
 	qglPixelStorei( GL_PACK_ALIGNMENT, 1 );
 
 	r_imagesPool = R_AllocPool( r_mempool, "Images" );
@@ -2287,6 +2836,7 @@ static void R_ShutdownImageLoader( void )
 static unsigned R_HandleInitLoaderCmd( void *pcmd )
 {
 	GLimp_SharedContext_MakeCurrent( gl_loader_context );
+	unpackAlignment[QGL_CONTEXT_LOADER] = 4;
 
 	return sizeof( int );
 }

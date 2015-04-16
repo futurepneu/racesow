@@ -4,8 +4,47 @@ cmake_minimum_required(VERSION 2.8)
 
 set(CMAKE_MODULE_PATH ${CMAKE_HOME_DIRECTORY}/cmake)
 
+# You can override this var with commandline option -DQFUSION_CLIENT_NAME=name
+if (NOT QFUSION_CLIENT_NAME)
+    set(QFUSION_CLIENT_NAME QFusion)
+endif()
+
+# You can override this var with commandline option -DQFUSION_SERVER_NAME=name
+if (NOT QFUSION_SERVER_NAME)
+    set(QFUSION_SERVER_NAME qfusion_server)
+endif()
+
+# You can override this var with commandline option -DQFUSION_TVSERVER_NAME=name
+if (NOT QFUSION_TVSERVER_NAME)
+    set(QFUSION_TVSERVER_NAME qfusiontv_server)
+endif()
+
+# Windows specific settings
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    set(CMAKE_INCLUDE_PATH
+        "../libsrcs/libogg"
+        "../libsrcs/libvorbis"
+        "../libsrcs/libtheora"
+        "../libsrcs/libcurl/include"
+        "../libsrcs/angelscript/sdk/angelscript"
+        "../libsrcs/zlib"
+        "../libsrcs/libfreetype"
+        "../libsrcs/libpng"
+        "../libsrcs/libjpeg"
+        "../libsrcs/libRocket/libRocket/Include"
+    )
+
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS -DCURL_STATICLIB)
+
+    set(CMAKE_LIBRARY_PATH "win32/x86/lib/debug")
+endif()
+
+# OS X specific settings
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT)") # Compile only 64-bit version
+    set(CMAKE_OSX_SYSROOT "macosx10.8")                     # With OS X 10.8 base SDK
     set(CMAKE_FRAMEWORK_PATH "mac/Frameworks")
+    set(CMAKE_MACOSX_RPATH 1)
     set(JPEG_NAMES libjpeg) # libjpeg.framework should be renamed to jpeg.framework to remove this hack
 endif()
 
@@ -17,15 +56,11 @@ find_package(ZLIB REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(JPEG REQUIRED)
 find_package(PNG REQUIRED)
-find_package(SDL REQUIRED)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-function -fvisibility=hidden -Winvalid-pch")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -D_DEBUG")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -fno-strict-aliasing -ffast-math -funroll-loops -msse2")
-
-set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+# We need SDL only on non-Windows platforms
+if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    find_package(SDL REQUIRED)
+endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     # On Linux we build angelscript from source
@@ -52,6 +87,65 @@ else()
     find_package(Rocket REQUIRED)
 endif()
 
+macro(find_windows_release_libs libs)
+    foreach (lib_name ${${libs}})
+        string(REPLACE "lib/debug" "lib/release" release_lib_name ${lib_name})
+        set(${libs}_DEBUG ${${libs}_DEBUG} debug ${lib_name})
+        set(${libs}_RELEASE ${${libs}_RELEASE} optimized ${release_lib_name})
+    endforeach()
+
+    set(${libs} ${${libs}_RELEASE} ${${libs}_DEBUG})
+endmacro()
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+
+    set(CMAKE_EXECUTABLE_SUFFIX "_x86")
+    set(CMAKE_SHARED_LIBRARY_SUFFIX "_x86")
+
+    find_windows_release_libs(ZLIB_LIBRARY)
+    find_windows_release_libs(JPEG_LIBRARIES)
+    find_windows_release_libs(PNG_LIBRARIES)
+    find_windows_release_libs(FREETYPE_LIBRARIES)
+    find_windows_release_libs(OGG_LIBRARY)
+    find_windows_release_libs(VORBIS_LIBRARIES)
+    find_windows_release_libs(THEORA_LIBRARY)
+    find_windows_release_libs(CURL_LIBRARY)
+    find_windows_release_libs(ANGELSCRIPT_LIBRARY)
+    find_windows_release_libs(LIBROCKET_LIBRARIES)
+endif()
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-function -fvisibility=hidden -Winvalid-pch")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -D_DEBUG")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -fno-strict-aliasing -ffast-math -funroll-loops -msse2")
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+
+    set(CMAKE_EXECUTABLE_SUFFIX ".x86_64${CMAKE_EXECUTABLE_SUFFIX}")
+    set(CMAKE_SHARED_LIBRARY_PREFIX "")
+    set(CMAKE_SHARED_LIBRARY_SUFFIX "_x86_64${CMAKE_SHARED_LIBRARY_SUFFIX}")
+endif()
+
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-function -fvisibility=hidden -Winvalid-pch")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -D_DEBUG")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -fno-strict-aliasing -ffast-math -funroll-loops -msse2")
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+
+    set(CMAKE_SHARED_LIBRARY_PREFIX "")
+    set(CMAKE_SHARED_LIBRARY_SUFFIX "_mac${CMAKE_SHARED_LIBRARY_SUFFIX}")
+endif()
+
+
 macro(qf_set_output_dir name dir)
     foreach (OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
         string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIGUPPERCASE)
@@ -65,29 +159,6 @@ macro(qf_set_output_dir name dir)
     set_target_properties(${name} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_HOME_DIRECTORY}/build/${dir})
 endmacro()
 
-macro(qf_add_library name)
-    add_library(${name} ${ARGN})
-
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-        set_target_properties(${name} PROPERTIES PREFIX "")
-        set_target_properties(${name} PROPERTIES SUFFIX "_x86_64${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    endif()
-
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        set_target_properties(${name} PROPERTIES PREFIX "")
-        set_target_properties(${name} PROPERTIES SUFFIX "_mac${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    endif()
-endmacro()
-
-macro(qf_add_executable name)
-    add_executable(${name} ${ARGN})
-
-    if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-        set_target_properties(${name} PROPERTIES PREFIX "")
-        set_target_properties(${name} PROPERTIES SUFFIX ".x86_64${CMAKE_EXECUTABLE_SUFFIX}")
-    endif()
-endmacro()
-
 add_subdirectory(angelwrap)
 add_subdirectory(cgame)
 add_subdirectory(cin)
@@ -98,5 +169,6 @@ add_subdirectory(ref_gl)
 add_subdirectory(snd_openal)
 add_subdirectory(snd_qf)
 add_subdirectory(tv_server)
+add_subdirectory(server)
 add_subdirectory(ui)
 add_subdirectory(client)

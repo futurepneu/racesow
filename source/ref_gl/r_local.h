@@ -347,6 +347,9 @@ extern cvar_t *r_offsetmapping;
 extern cvar_t *r_offsetmapping_scale;
 extern cvar_t *r_offsetmapping_reliefmapping;
 
+extern cvar_t *r_polygon_offset_factor;
+extern cvar_t *r_polygon_offset_units;
+
 extern cvar_t *r_shadows;
 extern cvar_t *r_shadows_alpha;
 extern cvar_t *r_shadows_nudge;
@@ -355,6 +358,8 @@ extern cvar_t *r_shadows_maxtexsize;
 extern cvar_t *r_shadows_pcf;
 extern cvar_t *r_shadows_self_shadow;
 extern cvar_t *r_shadows_dither;
+extern cvar_t *r_shadows_polygon_offset_factor;
+extern cvar_t *r_shadows_polygon_offset_units;
 
 extern cvar_t *r_outlines_world;
 extern cvar_t *r_outlines_scale;
@@ -466,7 +471,7 @@ enum
 };
 
 void		RFB_Init( void );
-int			RFB_RegisterObject( int width, int height );
+int			RFB_RegisterObject( int width, int height, qboolean depthRB );
 void		RFB_UnregisterObject( int object );
 void		RFB_TouchObject( int object );
 void		RFB_BindObject( int object );
@@ -526,6 +531,7 @@ void		R_FreeFile_( void *buffer, const char *filename, int fileline );
 #define		R_LoadFile(path,buffer) R_LoadFile_(path,buffer,__FILE__,__LINE__)
 #define		R_FreeFile(buffer) R_FreeFile_(buffer,__FILE__,__LINE__)
 
+qboolean	R_ScreenEnabled( void );
 void		R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVsync );
 void		R_EndFrame( void );
 void		R_Set2DMode( qboolean enable );
@@ -554,7 +560,7 @@ qboolean	R_ScissorForEntity( const entity_t *ent, vec3_t mins, vec3_t maxs, int 
 
 void		R_AddDebugBounds( const vec3_t mins, const vec3_t maxs );
 
-void		R_BeginStretchBatch( const shader_t *shader, float x_offset, float y_offset );
+void		R_BeginStretchBatch( const shader_t *shader, float x_offset, float y_offset, qboolean quad );
 void		R_EndStretchBatch( void );
 void		R_DrawStretchPic( int x, int y, int w, int h, float s1, float t1, float s2, float t2, 
 	const vec4_t color, const shader_t *shader );
@@ -649,6 +655,7 @@ void		R_EndRegistration( void );
 void		R_Shutdown( qboolean verbose );
 rserr_t		R_SetMode( int x, int y, int width, int height, int displayFrequency,
 				qboolean fullScreen, qboolean wideScreen );
+qboolean	R_SetWindow( void *hinstance, void *wndproc, void *parenthWnd );
 
 //
 // r_scene.c

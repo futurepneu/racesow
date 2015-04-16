@@ -85,7 +85,7 @@ static void RFB_DeleteObject( r_fbo_t *fbo )
 /*
 * RFB_RegisterObject
 */
-int RFB_RegisterObject( int width, int height )
+int RFB_RegisterObject( int width, int height, qboolean depthRB )
 {
 	int i;
 	GLuint fbID;
@@ -119,24 +119,35 @@ found:
 	fbo->width = width;
 	fbo->height = height;
 
-	qglBindFramebufferEXT( GL_FRAMEBUFFER_EXT, fbo->objectID );
+	if( depthRB )
+	{
+		int format;
 
-	qglGenRenderbuffersEXT( 1, &rbID );
-	fbo->renderBufferAttachment = rbID;
+		qglBindFramebufferEXT( GL_FRAMEBUFFER_EXT, fbo->objectID );
 
-	// setup 24bit depth buffer for render-to-texture
-	qglBindRenderbufferEXT( GL_RENDERBUFFER_EXT, fbo->renderBufferAttachment );
-	qglRenderbufferStorageEXT( GL_RENDERBUFFER_EXT, glConfig.ext.depth24 ? GL_DEPTH_COMPONENT24 : GL_DEPTH_COMPONENT16, width, height );
-	qglBindRenderbufferEXT( GL_RENDERBUFFER_EXT, 0 );
+		qglGenRenderbuffersEXT( 1, &rbID );
+		fbo->renderBufferAttachment = rbID;
 
-	// attach depth renderbuffer
-	qglFramebufferRenderbufferEXT( GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, 
-		GL_RENDERBUFFER_EXT, fbo->renderBufferAttachment );
+		// setup 24bit depth buffer for render-to-texture
+		qglBindRenderbufferEXT( GL_RENDERBUFFER_EXT, fbo->renderBufferAttachment );
+		if( glConfig.ext.depth24 )
+			format = GL_DEPTH_COMPONENT24;
+		else if( glConfig.ext.depth_nonlinear )
+			format = GL_DEPTH_COMPONENT16_NONLINEAR_NV;
+		else
+			format = GL_DEPTH_COMPONENT16;
+		qglRenderbufferStorageEXT( GL_RENDERBUFFER_EXT, format, width, height );
+		qglBindRenderbufferEXT( GL_RENDERBUFFER_EXT, 0 );
 
-	if( r_bound_framebuffer_objectID )
-		qglBindFramebufferEXT( GL_FRAMEBUFFER_EXT, r_bound_framebuffer_object->objectID );
-	else
-		qglBindFramebufferEXT( GL_FRAMEBUFFER_EXT, 0 );
+		// attach depth renderbuffer
+		qglFramebufferRenderbufferEXT( GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, 
+			GL_RENDERBUFFER_EXT, fbo->renderBufferAttachment );
+
+		if( r_bound_framebuffer_objectID )
+			qglBindFramebufferEXT( GL_FRAMEBUFFER_EXT, r_bound_framebuffer_object->objectID );
+		else
+			qglBindFramebufferEXT( GL_FRAMEBUFFER_EXT, 0 );
+	}
 
 	return i+1;
 }

@@ -31,8 +31,7 @@ cvar_t *cl_ucmdTimeNudge;
 extern cvar_t *cl_maxfps;
 
 extern unsigned	sys_frame_time;
-unsigned keys_frame_time;
-unsigned old_keys_frame_time;
+static unsigned keys_frame_time;
 
 /*
 ===============================================================================
@@ -303,7 +302,7 @@ void CL_MouseMove( usercmd_t *cmd, int mx, int my )
 		}
 	}
 
-	accelSensitivity *= CL_GameModule_SetSensitivityScale( sensitivity->value );
+	accelSensitivity *= CL_GameModule_GetSensitivityScale( sensitivity->value, zoomsens->value );
 
 	mouse_x *= accelSensitivity;
 	mouse_y *= accelSensitivity;
@@ -491,6 +490,42 @@ static float CL_KeyState( kbutton_t *key )
 	return bound( 0, val, 1 );
 }
 
+/*
+===============================================================================
+
+TOUCHSCREEN
+
+===============================================================================
+*/
+void CL_TouchEvent( int id, touchevent_t type, int x, int y, unsigned int time )
+{
+	switch( cls.key_dest )
+	{
+	case key_game:
+		CL_GameModule_TouchEvent( id, type, x, y );
+		return;
+		
+	case key_menu:
+		if( id != 0 )
+			return;
+
+		CL_UIModule_MouseSet( x, y );
+
+		switch( type )
+		{
+		case TOUCH_DOWN:
+			Key_MouseEvent( K_MOUSE1, qtrue, time );
+			break;
+		case TOUCH_UP:
+		case TOUCH_CANCEL:
+			Key_MouseEvent( K_MOUSE1, qfalse, time );
+			CL_UIModule_MouseSet( 0, 0 );
+			break;
+		}
+		return;
+	}
+}
+
 //==========================================================================
 
 cvar_t *cl_yawspeed;
@@ -595,6 +630,7 @@ static void CL_AddMovementFromKeys( short *forwardmove, short *sidemove, short *
 */
 void CL_UpdateCommandInput( void )
 {
+	static unsigned old_keys_frame_time;
 	usercmd_t *cmd = &cl.cmds[cls.ucmdHead & CMD_MASK];
 
 	if( cl.inputRefreshed )
@@ -605,6 +641,7 @@ void CL_UpdateCommandInput( void )
 	// always let the mouse refresh cl.viewangles
 	IN_MouseMove( cmd );
 	CL_AddButtonBits( &cmd->buttons );
+	CL_GameModule_TouchMove( cmd, cl.viewangles, keys_frame_time );
 
 	if( keys_frame_time )
 	{
@@ -612,7 +649,7 @@ void CL_UpdateCommandInput( void )
 
 		CL_AddAnglesFromKeys( keys_frame_time );
 		CL_AddMovementFromKeys( &cmd->forwardmove, &cmd->sidemove, &cmd->upmove, keys_frame_time );
-		IN_JoyMove( cmd );
+		IN_JoyMove( cmd, keys_frame_time );
 		old_keys_frame_time = sys_frame_time;
 	}
 
@@ -801,6 +838,9 @@ void CL_UserInputFrame( void )
 
 	// get new key events from mice or external controllers
 	IN_Commands();
+
+	// let the game handle touch events
+	CL_GameModule_TouchFrame( ( cls.key_dest == key_game ) ? qtrue : qfalse );
 
 	// process console commands
 	Cbuf_Execute();

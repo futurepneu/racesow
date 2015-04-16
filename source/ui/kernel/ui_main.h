@@ -66,7 +66,7 @@ public:
 	void forceMenuOff( void );
 	void addToServerList( const char *adr, const char *info );
 
-	void mouseMove( int dx, int dy );
+	void mouseMove( int x, int y, bool absolute );
 	void textInput( qwchar c );
 	void keyEvent( int key, bool pressed );
 
@@ -85,7 +85,8 @@ public:
 	static void PrintDocuments_Cmd( void );
 	
 	// Other static functions
-	static UI_Main *Instance( int vidWidth, int vidHeight, int protocol, const char *demoExtension );
+	static UI_Main *Instance( int vidWidth, int vidHeight, int protocol,
+		const char *demoExtension, const char *basePath );
 	static UI_Main *Get( void );
 	static void Destroy( void );
 
@@ -124,7 +125,8 @@ public:
 	unsigned int getConnectCount( void ) const { return connectCount; }
 
 private:
-	UI_Main( int vidWidth, int vidHeight, int protocol, const char *demoExtension );
+	UI_Main( int vidWidth, int vidHeight, int protocol,
+		const char *demoExtension, const char *basePath );
 
 	//// METHODS
 	bool initAS( void );

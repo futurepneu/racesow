@@ -34,7 +34,8 @@ namespace WSWUI
 		return UI_API_VERSION;
 	}
 
-	void Init( int vidWidth, int vidHeight, int protocol, const char *demoExtension )
+	void Init( int vidWidth, int vidHeight, int protocol,
+		const char *demoExtension, const char *basePath )
 	{
 		// destructor doesnt throw
 		if( ui_main ) {
@@ -45,7 +46,8 @@ namespace WSWUI
 		// constructor may throw
 		try
 		{
-			ui_main = UI_Main::Instance( vidWidth, vidHeight, protocol, demoExtension );
+			ui_main = UI_Main::Instance( vidWidth, vidHeight, protocol,
+				demoExtension, basePath );
 		}
 		catch( std::runtime_error &err )
 		{
@@ -118,7 +120,14 @@ namespace WSWUI
 	void MouseMove( int dx, int dy )
 	{
 		if( ui_main ) {
-			ui_main->mouseMove( dx, dy );
+			ui_main->mouseMove( dx, dy, false );
+		}
+	}
+
+	void MouseSet( int x, int y )
+	{
+		if( ui_main ) {
+			ui_main->mouseMove( x, y, true );
 		}
 	}
 
@@ -160,6 +169,7 @@ ui_export_t *GetUIAPI( ui_import_t *import )
 	globals.Keyup = WSWUI::Keyup;
 	globals.CharEvent = WSWUI::CharEvent;
 	globals.MouseMove = WSWUI::MouseMove;
+	globals.MouseSet = WSWUI::MouseSet;
 
 	globals.ForceMenuOff = WSWUI::ForceMenuOff;
 

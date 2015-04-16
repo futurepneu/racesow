@@ -122,6 +122,8 @@ void R_AddLightToScene( const vec3_t org, float intensity, float r, float g, flo
 */
 void R_AddPolyToScene( const poly_t *poly )
 {
+	assert( sizeof( *poly->elems ) == sizeof( elem_t ) );
+
 	if( ( rsc.numPolys < MAX_POLYS ) && poly && poly->numverts )
 	{
 		drawSurfacePoly_t *dp = &rsc.polys[rsc.numPolys];
@@ -138,6 +140,8 @@ void R_AddPolyToScene( const poly_t *poly )
 		dp->normalsArray = poly->normals;
 		dp->stArray = poly->stcoords;
 		dp->colorsArray = poly->colors;
+		dp->numElems = poly->numelems;
+		dp->elems = ( elem_t * )poly->elems;
 		dp->fogNum = poly->fognum;
 
 		// if fogNum is unset, we need to find the volume for polygon bounds
@@ -264,9 +268,7 @@ void R_RenderScene( const refdef_t *fd )
 	rn.fbColorAttachment = rn.fbDepthAttachment = NULL;
 	
 	if( !( fd->rdflags & RDF_NOWORLDMODEL ) ) {
-		// soft particles require GL_EXT_framebuffer_blit as we need to copy the depth buffer
-		// attachment into a texture we're going to read from in GLSL shader
-		if( r_soft_particles->integer && glConfig.ext.framebuffer_blit && ( rsh.screenTexture != NULL ) ) {
+		if( r_soft_particles->integer && ( rsh.screenTexture != NULL ) ) {
 			rn.fbColorAttachment = rsh.screenTexture;
 			rn.fbDepthAttachment = rsh.screenDepthTexture;
 			rn.renderFlags |= RF_SOFT_PARTICLES;

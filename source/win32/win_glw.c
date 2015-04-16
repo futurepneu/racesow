@@ -454,12 +454,8 @@ static int GLimp_InitGL( void )
 
 	stereo = ri.Cvar_Get( "cl_stereo", "0", 0 );
 
-	pfd.cStencilBits = max( 0, r_stencilbits->integer );
-
-	if( pfd.cStencilBits != 0 )
-		glConfig.stencilEnabled = qtrue;
-	else
-		glConfig.stencilEnabled = qfalse;
+	if( r_stencilbits->integer == 8 || r_stencilbits->integer == 16 )
+		pfd.cStencilBits = r_stencilbits->integer;
 
 	/*
 	** set PFD_STEREO if necessary
@@ -498,6 +494,8 @@ static int GLimp_InitGL( void )
 		return qfalse;
 	}
 	DescribePixelFormat( glw_state.hDC, pixelformat, sizeof( pfd ), &pfd );
+
+	glConfig.stencilBits = pfd.cStencilBits;
 
 	/*
 	** report if stereo is desired but unavailable
@@ -657,6 +655,22 @@ void GLimp_AppActivate( qboolean active, qboolean destroy )
 				ri.Cvar_Set( "gl_drawbuffer", "GL_NONE" );
 		}
 	}
+}
+
+/*
+** GLimp_SetWindow
+*/
+qboolean GLimp_SetWindow( void *hinstance, void *wndproc, void *parenthWnd )
+{
+	return qfalse; // surface cannot be lost
+}
+
+/*
+** GLimp_ScreenEnabled
+*/
+qboolean GLimp_ScreenEnabled( void )
+{
+	return qtrue;
 }
 
 /*
