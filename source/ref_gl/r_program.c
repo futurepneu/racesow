@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define GLSL_PROGRAMS_HASH_SIZE		256
 
 #define GLSL_CACHE_FILE_NAME		"glsl.cache"
+#define GLSL_BINARY_CACHE_FILE_NAME	"glsl.cache.bin"
 
 typedef struct
 {
@@ -99,7 +100,7 @@ typedef struct glsl_program_s
 					LightstyleColor[MAX_LIGHTMAPS],
 
 					DynamicLightsPosition[MAX_DLIGHTS],
-					DynamicLightsDiffuseAndRadius[MAX_DLIGHTS],
+					DynamicLightsDiffuseAndInvRadius[MAX_DLIGHTS],
 					NumDynamicLights,
 
 					AttrBonesIndices,
@@ -133,6 +134,8 @@ typedef struct glsl_program_s
 
 trie_t *glsl_cache_trie = NULL;
 
+static qboolean r_glslprograms_initialized;
+
 static unsigned int r_numglslprograms;
 static glsl_program_t r_glslprograms[MAX_GLSL_PROGRAMS];
 static glsl_program_t *r_glslprograms_hash[GLSL_PROGRAM_TYPE_MAXTYPE][GLSL_PROGRAMS_HASH_SIZE];
@@ -142,6 +145,10 @@ static void RF_BindAttrbibutesLocations( glsl_program_t *program );
 
 static void RF_PrecachePrograms( void );
 static void RF_StorePrecacheList( void );
+static void *RP_GetProgramBinary( int elem, int *format, unsigned *length );
+static int RP_RegisterProgramBinary( int type, const char *name, const char *deformsKey, 
+	const deformv_t *deforms, int numDeforms, r_glslfeat_t features, 
+	int binaryFormat, unsigned binaryLength, void *binary );
 
 /*
 * RP_Init
@@ -149,6 +156,10 @@ static void RF_StorePrecacheList( void );
 void RP_Init( void )
 {
 	int program;
+
+	if( r_glslprograms_initialized ) {
+		return;
+	}
 
 	memset( r_glslprograms, 0, sizeof( r_glslprograms ) );
 	memset( r_glslprograms_hash, 0, sizeof( r_glslprograms_hash ) );
@@ -176,6 +187,8 @@ void RP_Init( void )
 	}
 
 	RF_PrecachePrograms();
+
+	r_glslprograms_initialized = qtrue;
 }
 
 /*
@@ -192,17 +205,36 @@ void RP_Init( void )
 */
 static void RF_PrecachePrograms( void )
 {
-#ifdef NDEBUG
 	int version;
 	char *buffer = NULL, *data, **ptr;
 	const char *token;
 	const char *fileName;
+	int handleBin;
 
 	fileName = GLSL_CACHE_FILE_NAME;
 
 	R_LoadFile( fileName, ( void ** )&buffer );
 	if( !buffer ) {
 		return;
+	}
+
+	handleBin = 0;
+	if( glConfig.ext.get_program_binary ) {
+		fileName = GLSL_BINARY_CACHE_FILE_NAME;
+		if( ri.FS_FOpenFile( fileName, &handleBin, FS_READ ) != -1 ) {
+			unsigned hash;
+
+			version = 0;
+			hash = 0;
+
+			ri.FS_Read( &version, sizeof( version ), handleBin );
+			ri.FS_Read( &hash, sizeof( hash ), handleBin );
+			
+			if( version != GLSL_BITS_VERSION || hash != glConfig.versionHash ) {
+				ri.FS_FCloseFile( handleBin );
+				handleBin = 0;
+			}
+		}
 	}
 
 	data = buffer;
@@ -227,6 +259,10 @@ static void RF_PrecachePrograms( void )
 			r_glslfeat_t lb, hb;
 			r_glslfeat_t features;
 			char name[256];
+			void *binary = NULL;
+			int binaryFormat = 0;
+			unsigned binaryLength = 0;
+			int binaryPos = 0;
 
 			// read program type
 			token = COM_Parse( ptr );
@@ -258,6 +294,34 @@ static void RF_PrecachePrograms( void )
 			Q_strncpyz( name, token, sizeof( name ) );
 			features = (hb << 32) | lb; 
 
+			// read optional binary cache
+			token = COM_ParseExt( ptr, qfalse );
+			if( handleBin && token[0] ) {
+				binaryPos = atoi( token );
+				if( binaryPos ) {
+					ri.FS_Seek( handleBin, binaryPos, FS_SEEK_SET );
+					ri.FS_Read( &binaryFormat, sizeof( binaryFormat ), handleBin );
+					ri.FS_Read( &binaryLength, sizeof( binaryLength ), handleBin );
+					if( binaryLength ) {
+						binary = R_Malloc( binaryLength );
+						if( ri.FS_Read( binary, binaryLength, handleBin ) != (int)binaryLength ) {
+							R_Free( binary );
+							binary = NULL;
+						}
+					}
+				}
+			}
+
+			if( binary ) {
+				ri.Com_DPrintf( "Loading binary program %s...\n", name );
+
+				RP_RegisterProgramBinary( type, name, NULL, NULL, 0, features, 
+					binaryFormat, binaryLength, binary );
+
+				R_Free( binary );
+				continue;
+			}
+			
 			ri.Com_DPrintf( "Loading program %s...\n", name );
 
 			RP_RegisterProgram( type, name, NULL, NULL, 0, features );
@@ -265,7 +329,6 @@ static void RF_PrecachePrograms( void )
 	}
 
 	R_FreeFile( buffer );
-#endif
 }
 
 
@@ -277,38 +340,76 @@ static void RF_PrecachePrograms( void )
 */
 static void RF_StorePrecacheList( void )
 {
-#ifdef NDEBUG
 	unsigned int i;
-	int handle;
-	const char *fileName;
+	int handle, handleBin;
 	glsl_program_t *program;
+	unsigned dummy;
 
-	fileName = GLSL_CACHE_FILE_NAME;
-	if( ri.FS_FOpenFile( fileName, &handle, FS_WRITE ) == -1 ) {
-		Com_Printf( S_COLOR_YELLOW "Could not open %s for writing.\n", fileName );
+	handle = 0;
+	if( ri.FS_FOpenFile( GLSL_CACHE_FILE_NAME, &handle, FS_WRITE ) == -1 ) {
+		Com_Printf( S_COLOR_YELLOW "Could not open %s for writing.\n", GLSL_CACHE_FILE_NAME );
 		return;
+	}
+
+	handleBin = 0;
+	if( glConfig.ext.get_program_binary ) {
+		if( ri.FS_FOpenFile( GLSL_BINARY_CACHE_FILE_NAME, &handleBin, FS_WRITE ) == -1 ) {
+			Com_Printf( S_COLOR_YELLOW "Could not open %s for writing.\n", GLSL_BINARY_CACHE_FILE_NAME );
+		}
+		else {
+			dummy = 0;
+			ri.FS_Write( &dummy, sizeof( dummy ), handleBin );
+
+			dummy = glConfig.versionHash;
+			ri.FS_Write( &dummy, sizeof( dummy ), handleBin );
+		}
 	}
 
 	ri.FS_Printf( handle, "%s\n", rsh.applicationName );
 	ri.FS_Printf( handle, "%i\n", GLSL_BITS_VERSION );
 
 	for( i = 0, program = r_glslprograms; i < r_numglslprograms; i++, program++ ) {
-		if( !program->features ) {
-			continue;
-		}
+		void *binary = NULL;
+		int binaryFormat = 0;
+		unsigned binaryLength = 0;
+		int binaryPos = 0;
+
 		if( *program->deformsKey ) {
 			continue;
 		}
+		if( !program->features ) {
+			continue;
+		}
 
-		ri.FS_Printf( handle, "%i %i %i %s\n", 
+		if( handleBin ) {
+			binary = RP_GetProgramBinary( i + 1, &binaryFormat, &binaryLength );
+			if( binary ) {
+				binaryPos = ri.FS_Tell( handleBin );
+			}
+		}
+
+		ri.FS_Printf( handle, "%i %i %i \"%s\" %u\n", 
 			program->type, 
 			(int)(program->features & ULONG_MAX), 
 			(int)((program->features>>32) & ULONG_MAX), 
-			program->name );
+			program->name, binaryPos );
+		
+		if( binary ) {
+			ri.FS_Write( &binaryFormat, sizeof( binaryFormat ), handleBin );
+			ri.FS_Write( &binaryLength, sizeof( binaryLength ), handleBin );
+			ri.FS_Write( binary, binaryLength, handleBin );
+			R_Free( binary );
+		}
 	}
 
 	ri.FS_FCloseFile( handle );
-#endif
+	ri.FS_FCloseFile( handleBin );
+
+	if( handleBin && ri.FS_FOpenFile( GLSL_BINARY_CACHE_FILE_NAME, &handleBin, FS_UPDATE ) != -1 ) {
+		dummy = GLSL_BITS_VERSION;
+		ri.FS_Write( &dummy, sizeof( dummy ), handleBin );
+		ri.FS_FCloseFile( handleBin );
+	}
 }
 
 /*
@@ -320,14 +421,14 @@ static void RF_DeleteProgram( glsl_program_t *program )
 
 	if( program->vertexShader )
 	{
-		qglDetachObjectARB( program->object, program->vertexShader );
+		qglDetachShader( program->object, program->vertexShader );
 		qglDeleteShader( program->vertexShader );
 		program->vertexShader = 0;
 	}
 
 	if( program->fragmentShader )
 	{
-		qglDetachObjectARB( program->object, program->fragmentShader );
+		qglDetachShader( program->object, program->fragmentShader );
 		qglDeleteShader( program->fragmentShader );
 		program->fragmentShader = 0;
 	}
@@ -354,7 +455,7 @@ static int RF_CompileShader( int program, const char *programName, const char *s
 	GLhandleARB shader;
 	GLint compiled;
 
-	shader = qglCreateShaderObjectARB( (GLenum)shaderType );
+	shader = qglCreateShader( (GLenum)shaderType );
 	if( !shader )
 		return 0;
 
@@ -388,7 +489,7 @@ static int RF_CompileShader( int program, const char *programName, const char *s
 		return 0;
 	}
 
-	qglAttachObjectARB( program, shader );
+	qglAttachShader( program, shader );
 
 	return shader;
 }
@@ -521,6 +622,8 @@ static const glsl_feature_t glsl_features_rgbshadow[] =
 	{ GLSL_SHADER_COMMON_INSTANCED_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n", "_instanced" },
 	{ GLSL_SHADER_COMMON_INSTANCED_ATTRIB_TRANSFORMS, "#define APPLY_INSTANCED_TRANSFORMS\n#define APPLY_INSTANCED_ATTRIB_TRANSFORMS\n", "_instanced_va" },
 
+	{ GLSL_SHADER_RGBSHADOW_16BIT, "#define APPLY_RGB_SHADOW_16BIT\n", "_rgb16" },
+
 	{ 0, NULL, NULL }
 };
 
@@ -539,7 +642,8 @@ static const glsl_feature_t glsl_features_shadowmap[] =
 	{ GLSL_SHADER_SHADOWMAP_SHADOW2, "#define NUM_SHADOWS 2\n", "_2" },
 	{ GLSL_SHADER_SHADOWMAP_SHADOW3, "#define NUM_SHADOWS 3\n", "_3" },
 	{ GLSL_SHADER_SHADOWMAP_SHADOW4, "#define NUM_SHADOWS 4\n", "_4" },
-	{ GLSL_SHADER_SHADOWMAP_RGB_SHADOW, "#define APPLY_RGB_SHADOW\n", "_rgb" },
+	{ GLSL_SHADER_SHADOWMAP_RGB, "#define APPLY_RGB_SHADOW\n", "_rgb" },
+	{ GLSL_SHADER_SHADOWMAP_RGB_16BIT, "#define APPLY_RGB_SHADOW_16BIT\n", "_rgb16" },
 
 	{ 0, NULL, NULL }
 };
@@ -842,10 +946,6 @@ static const glsl_feature_t * const glsl_programtypes_features[] =
 
 #define QF_BUILTIN_GLSL_CONSTANTS \
 QF_GLSL_PI \
-"\n" \
-"#ifndef MAX_UNIFORM_BONES\n" \
-"#define MAX_UNIFORM_BONES " STR_TOSTR( MAX_GLSL_UNIFORM_BONES ) "\n" \
-"#endif\n" \
 "\n" \
 "#ifndef MAX_UNIFORM_INSTANCES\n" \
 "#define MAX_UNIFORM_INSTANCES " STR_TOSTR( MAX_GLSL_UNIFORM_INSTANCES ) "\n" \
@@ -1236,9 +1336,11 @@ static int R_Features2HashKey( r_glslfeat_t features )
 }
 
 /*
-* RP_RegisterProgram
+* RP_RegisterProgramBinary
 */
-int RP_RegisterProgram( int type, const char *name, const char *deformsKey, const deformv_t *deforms, int numDeforms, r_glslfeat_t features )
+static int RP_RegisterProgramBinary( int type, const char *name, const char *deformsKey, 
+	const deformv_t *deforms, int numDeforms, r_glslfeat_t features, 
+	int binaryFormat, unsigned binaryLength, void *binary )
 {
 	unsigned int i;
 	int hash;
@@ -1252,6 +1354,7 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 	char *shaderBuffers[100];
 	const char *shaderStrings[MAX_DEFINES_FEATURES+100];
 	char shaderVersion[100];
+	char maxBones[100];
 	glslParser_t parser;
 
 	if( type <= GLSL_PROGRAM_TYPE_NONE || type >= GLSL_PROGRAM_TYPE_MAXTYPE )
@@ -1306,11 +1409,24 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 	memset( &parser, 0, sizeof( parser ) );
 
 	program = r_glslprograms + r_numglslprograms++;
-	program->object = qglCreateProgramObjectARB();
+	program->object = qglCreateProgram();
 	if( !program->object )
 	{
 		error = 1;
 		goto done;
+	}
+
+	if( glConfig.ext.get_program_binary && qglProgramParameteri ) {
+		qglProgramParameteri( program->object, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE );
+	}
+
+	if( binary ) {
+		linked = 0;
+		qglProgramBinary( program->object, binaryFormat, binary, binaryLength );
+		qglGetProgramiv( program->object, GL_OBJECT_LINK_STATUS_ARB, &linked );
+		if( linked ) {
+			goto done;
+		}
 	}
 
 	Q_strncpyz( fullName, name, sizeof( fullName ) );
@@ -1373,6 +1489,9 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 	}
 #endif
 	shaderStrings[i++] = QF_BUILTIN_GLSL_CONSTANTS;
+	Q_snprintfz( maxBones, sizeof( maxBones ),
+		"#define MAX_UNIFORM_BONES %i\n", glConfig.maxGLSLBones );
+	shaderStrings[i++] = maxBones;
 	shaderStrings[i++] = QF_BUILTIN_GLSL_UNIFORMS;
 	shaderStrings[i++] = QF_GLSL_WAVEFUNCS;
 	shaderStrings[i++] = QF_GLSL_MATH;
@@ -1440,6 +1559,8 @@ int RP_RegisterProgram( int type, const char *name, const char *deformsKey, cons
 	}
 
 	// link
+	linked = 0;
+
 	qglLinkProgramARB( program->object );
 	qglGetProgramiv( program->object, GL_OBJECT_LINK_STATUS_ARB, &linked );
 	if( !linked )
@@ -1480,11 +1601,21 @@ done:
 
 	if( program->object )
 	{
-		qglUseProgramObjectARB( program->object );
+		qglUseProgram( program->object );
 		RF_GetUniformLocations( program );
 	}
 
 	return ( program - r_glslprograms ) + 1;
+}
+
+/*
+* RP_RegisterProgram
+*/
+int RP_RegisterProgram( int type, const char *name, const char *deformsKey, 
+	const deformv_t *deforms, int numDeforms, r_glslfeat_t features )
+{
+	return RP_RegisterProgramBinary( type, name, deformsKey, deforms, numDeforms, 
+		features, 0, 0, NULL );
 }
 
 /*
@@ -1493,6 +1624,47 @@ done:
 int RP_GetProgramObject( int elem )
 {
 	return r_glslprograms[elem - 1].object;
+}
+
+/*
+* RP_GetProgramBinary
+*
+* Retrieves the binary from the program object
+*/
+static void *RP_GetProgramBinary( int elem, int *format, unsigned *length )
+{
+	void *binary;
+	glsl_program_t *program = r_glslprograms + elem - 1;
+	GLenum GLFormat;
+	GLint GLlength;
+	GLint linked = 0;
+
+	if( !glConfig.ext.get_program_binary ) {
+		return NULL;
+	}
+	if( !program->object ) {
+		return NULL;
+	}
+
+	qglGetProgramiv( program->object, GL_OBJECT_LINK_STATUS_ARB, &linked );
+	if( !linked ) {
+		return NULL;
+	}
+
+	// FIXME: need real pointer to glGetProgramiv here,
+	// aliasing to glGetObjectParameterivARB doesn't work
+	qglGetProgramiv( program->object, GL_PROGRAM_BINARY_LENGTH, &GLlength );
+	if( !GLlength ) {
+		return NULL;
+	}
+
+	binary = R_Malloc( GLlength );
+	qglGetProgramBinary( program->object, GLlength, NULL, &GLFormat, binary );
+
+	*format = GLFormat;
+	*length = GLlength;
+
+	return binary;
 }
 
 /*
@@ -1782,7 +1954,8 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 			VectorScale( dl->color, colorScale, dlcolor );
 
 			qglUniform3fvARB( program->loc.DynamicLightsPosition[n], 1, dlorigin );
-			qglUniform4fARB( program->loc.DynamicLightsDiffuseAndRadius[n], dlcolor[0], dlcolor[1], dlcolor[2], dl->intensity );
+			qglUniform4fARB( program->loc.DynamicLightsDiffuseAndInvRadius[n],
+				dlcolor[0], dlcolor[1], dlcolor[2], 1.0f / dl->intensity );
 
 			n++;
 			dlightbits &= ~(1<<i);
@@ -1799,7 +1972,7 @@ unsigned int RP_UpdateDynamicLightsUniforms( int elem, const superLightStyle_t *
 			if( program->loc.DynamicLightsPosition[n] < 0 ) {
 				break;
 			}
-			qglUniform4fARB( program->loc.DynamicLightsDiffuseAndRadius[n], 0.0f, 0.0f, 0.0f, 1.0f );
+			qglUniform4fARB( program->loc.DynamicLightsDiffuseAndInvRadius[n], 0.0f, 0.0f, 0.0f, 1.0f );
 		}
 	}
 	
@@ -2033,15 +2206,15 @@ static void RF_GetUniformLocations( glsl_program_t *program )
 		int locP, locD;
 
 		locP = qglGetUniformLocationARB( program->object, va( "u_DynamicLights[%i].Position", i ) );
-		locD = qglGetUniformLocationARB( program->object, va( "u_DynamicLights[%i].DiffuseAndRadius", i ) );
+		locD = qglGetUniformLocationARB( program->object, va( "u_DynamicLights[%i].DiffuseAndInvRadius", i ) );
 
 		if( locP < 0 || locD < 0 ) {
-			program->loc.DynamicLightsPosition[i] = program->loc.DynamicLightsDiffuseAndRadius[i] = -1;
+			program->loc.DynamicLightsPosition[i] = program->loc.DynamicLightsDiffuseAndInvRadius[i] = -1;
 			break;
 		}
 
 		program->loc.DynamicLightsPosition[i] = locP;
-		program->loc.DynamicLightsDiffuseAndRadius[i] = locD;
+		program->loc.DynamicLightsDiffuseAndInvRadius[i] = locD;
 	}
 	program->loc.NumDynamicLights = qglGetUniformLocationARB( program->object, "u_NumDynamicLights" );
 
@@ -2160,13 +2333,19 @@ void RP_Shutdown( void )
 	unsigned int i;
 	glsl_program_t *program;
 
-	RF_StorePrecacheList();
+	qglUseProgram( 0 );
 
-	for( i = 0, program = r_glslprograms; i < r_numglslprograms; i++, program++ )
+	if( r_glslprograms_initialized ) {
+		RF_StorePrecacheList();
+	}
+
+	for( i = 0, program = r_glslprograms; i < r_numglslprograms; i++, program++ ) {
 		RF_DeleteProgram( program );
-
+	}
+	
 	Trie_Destroy( glsl_cache_trie );
 	glsl_cache_trie = NULL;
 
 	r_numglslprograms = 0;
+	r_glslprograms_initialized = qfalse;
 }

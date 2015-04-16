@@ -27,9 +27,8 @@
 #include "../client/client.h"
 #include "mac_glw.h"
 
-void VID_NewWindow( int width, int height );
-
 glwstate_t glw_state = { NULL, qfalse };
+cvar_t *vid_fullscreen;
 
 /**
  * Set video mode.
@@ -81,8 +80,6 @@ rserr_t GLimp_SetMode( int x, int y, int width, int height, int displayFrequency
 		Com_Printf( "Couldn't enable threaded GL engine: %d\n", (int) err );
 #endif
 
-	VID_NewWindow( width, height );
-	
 	// Restart Input ...
 	SDL_EnableKeyRepeat( SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL );
 	SDL_ShowCursor( SDL_DISABLE );
@@ -112,7 +109,9 @@ int GLimp_Init( const char *applicationName, void *hinstance, void *wndproc, voi
 	hinstance = NULL;
 	wndproc = NULL;
 	parenthWnd = NULL;
-	vid_fullscreen->flags &= ~( CVAR_LATCH_VIDEO );
+
+	vid_fullscreen = ri.Cvar_Get( "vid_fullscreen", "0", CVAR_ARCHIVE|CVAR_LATCH_VIDEO );
+
 	Com_Printf( "Display initialization\n" );
 
 	const SDL_VideoInfo *info = NULL;
@@ -150,41 +149,48 @@ void GLimp_BeginFrame( void )
 void GLimp_EndFrame( void )
 {
 	SDL_GL_SwapBuffers();
-
-	if( vid_fullscreen->modified || ( vid_fullscreen->integer && vid_multiscreen_head->modified ) )
-	{
-		Cbuf_ExecuteText( EXEC_APPEND, "vid_restart\n");
-		vid_fullscreen->modified = qfalse;
-		vid_multiscreen_head->modified = qfalse;
-	}
 }
 
 
 /**
  * TODO documentation
  */
-qboolean GLimp_GetGammaRamp( size_t stride, unsigned short *ramp )
+qboolean GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp )
 {
-	if( stride != 256 )
+	unsigned short ramp256[3*256];
+	
+	if( stride < 256 )
 	{
 		// SDL only supports gamma ramps with 256 mappings per channel
 		return qfalse;
 	}
-	return SDL_GetGammaRamp( ramp, ramp+stride, ramp+( stride<<1 ) ) == -1 ? qfalse : qtrue;
+	
+	if( SDL_GetGammaRamp( ramp256, ramp256+256, ramp256+( 256<<1 ) ) != -1 )
+	{
+		*psize = 256;
+		memcpy( ramp,          ramp256,       256*sizeof(*ramp) );
+		memcpy( ramp+  stride, ramp256+  256, 256*sizeof(*ramp) );
+		memcpy( ramp+2*stride, ramp256+2*256, 256*sizeof(*ramp) );
+	}
+	return qfalse;
 }
 
 
 /**
  * TODO documentation
  */
-void GLimp_SetGammaRamp( size_t stride, unsigned short *ramp )
+void GLimp_SetGammaRamp( size_t stride, unsigned short size, unsigned short *ramp )
 {
-	if( stride != 256 )
-	{
-		// SDL only supports gamma ramps with 256 mappings per channel
+	unsigned short ramp256[3*256];
+	
+	if( size != 256 )
 		return;
-	}
-	if( SDL_SetGammaRamp( ramp, ramp+stride, ramp+( stride<<1 ) ) == -1 )
+	
+	
+	memcpy( ramp256,       ramp         , size*sizeof(*ramp));
+	memcpy( ramp256+  256, ramp+  stride, size*sizeof(*ramp));
+	memcpy( ramp256+2*256, ramp+2*stride, size*sizeof(*ramp));
+	if( SDL_SetGammaRamp( ramp256, ramp256+256, ramp256+( 256<<1 ) ) == -1 )
 	{
 		Com_Printf( "SDL_SetGammaRamp(...) failed: ", SDL_GetError() );
 	}
@@ -198,16 +204,38 @@ void GLimp_AppActivate( qboolean active, qboolean destroy)
 {
 }
 
+/*
+** GLimp_SharedContext_Create
+*/
+void *GLimp_SharedContext_Create( void )
+{
+	return NULL;
+}
+
+/*
+** GLimp_SharedContext_MakeCurrent
+*/
+qboolean GLimp_SharedContext_MakeCurrent( void *ctx )
+{
+	return qfalse;
+}
+
+/*
+** GLimp_SharedContext_Destroy
+*/
+void GLimp_SharedContext_Destroy( void *ctx )
+{
+	(void)ctx;
+}
+
 /*****************************************************************************/
 
 /*
-   =================
-   Sys_GetClipboardData
-
-   Orginally from EzQuake
-   There should be a smarter place to put this
-   =================
- */
+* Sys_GetClipboardData
+*
+* Orginally from EzQuake
+* There should be a smarter place to put this
+*/
 char *Sys_GetClipboardData( qboolean primary )
 {
 	char* clipboard = NULL;
@@ -225,7 +253,7 @@ char *Sys_GetClipboardData( qboolean primary )
         if (myClipboardString != NULL && [myClipboardString length] > 0)
         {
 			int bytes = [myClipboardString length];
-			clipboard = Q_malloc( bytes + 1 );
+			clipboard = malloc( bytes + 1 );
 			Q_strncpyz( clipboard, (char *)[myClipboardString UTF8String], bytes + 1 );
         }
     }
@@ -242,16 +270,17 @@ qboolean Sys_SetClipboardData( char *data )
 }
 
 /*
-   =================
-   Sys_FreeClipboardData
-   =================
- */
+* Sys_FreeClipboardData
+*/
 void Sys_FreeClipboardData( char *data )
 {
-	Q_free( data );
+	free( data );
 }
 
-void	Sys_OpenURLInBrowser( const char *url )
+/*
+* Sys_OpenURLInBrowser
+*/
+void Sys_OpenURLInBrowser( const char *url )
 {
   NSString *string_url = [NSString stringWithUTF8String:url];
   NSURL *ns_url = [NSURL URLWithString:string_url];

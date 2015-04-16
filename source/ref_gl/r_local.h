@@ -36,6 +36,14 @@ typedef unsigned short elem_t;
 
 typedef vec_t instancePoint_t[8]; // quaternion for rotation + xyz pos + uniform scale
 
+enum
+{
+	QGL_CONTEXT_MAIN,
+	QGL_CONTEXT_LOADER,
+
+	NUM_QGL_CONTEXTS
+};
+
 #include "r_math.h"
 #include "r_public.h"
 #include "r_vattribs.h"
@@ -206,6 +214,7 @@ typedef struct
 	image_t			*rawYUVTextures[3];			// 8bit cinematic textures (YCbCr)
 	image_t			*noTexture;					// use for bad textures
 	image_t			*whiteTexture;
+	image_t			*whiteCubemapTexture;
 	image_t			*blackTexture;
 	image_t			*greyTexture;
 	image_t			*blankBumpTexture;
@@ -363,6 +372,7 @@ extern cvar_t *r_gamma;
 extern cvar_t *r_texturebits;
 extern cvar_t *r_texturemode;
 extern cvar_t *r_texturefilter;
+extern cvar_t *r_texturecompression;
 extern cvar_t *r_mode;
 extern cvar_t *r_nobind;
 extern cvar_t *r_picmip;
@@ -382,6 +392,8 @@ extern cvar_t *r_wallcolor;
 extern cvar_t *r_floorcolor;
 
 extern cvar_t *r_maxglslbones;
+
+extern cvar_t *r_multithreading;
 
 extern cvar_t *gl_finish;
 extern cvar_t *gl_cull;
@@ -417,6 +429,7 @@ void		R_FreeCinematic( unsigned int id );
 void		R_RunAllCinematics( void );
 void		R_TouchCinematic( unsigned int id );
 void		R_FreeUnusedCinematics( void );
+void		R_FinishLoadingImages( void );
 void		R_UploadCinematic( unsigned int id );
 image_t		*R_GetCinematicImage( unsigned int id );
 struct cinematics_s *R_GetCinematicById( unsigned int id );

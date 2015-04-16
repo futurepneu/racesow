@@ -432,7 +432,10 @@ void R_BatchSpriteSurf( const entity_t *e, const shader_t *shader, const mfog_t 
 	VectorMA( point, -radius, v_left, xyz[2] );
 
 	for( i = 0; i < 4; i++ )
+	{
+		VectorNegate( &rn.viewAxis[AXIS_FORWARD], normals[i] );
 		Vector4Copy( e->color, colors[i] );
+	}
 
 	// backend knows how to count elements for quads
 	mesh.elems = NULL;
@@ -444,6 +447,7 @@ void R_BatchSpriteSurf( const entity_t *e, const shader_t *shader, const mfog_t 
 	mesh.stArray = texcoords;
 	mesh.colorsArray[0] = colors;
 	mesh.colorsArray[1] = NULL;
+	mesh.sVectorsArray = NULL;
 
 	RB_BatchMesh( &mesh );
 }
@@ -1101,6 +1105,9 @@ static void R_SetupFrame( void )
 			rf.frameCount = 0;
 			rf.viewcluster = -1; // force R_MarkLeaves
 			rf.worldModelSequence = rsh.worldModelSequence;
+
+			// load all world images if not yet
+			R_FinishLoadingImages();
 		}
 	}
 	else
@@ -1155,13 +1162,6 @@ static void R_Clear( int bitMask )
 		bits |= GL_STENCIL_BUFFER_BIT;
 
 	bits &= bitMask;
-
-	if( rn.fbColorAttachment ) {
-		RFB_AttachTextureToObject( RFB_BoundObject(), rn.fbColorAttachment );
-	}
-	if( rn.fbDepthAttachment ) {
-		RFB_AttachTextureToObject( RFB_BoundObject(), rn.fbDepthAttachment );
-	}
 
 	if( !( rn.renderFlags & RF_SHADOWMAPVIEW ) ) {
 		RB_Clear( bits, envColor[0] / 255.0, envColor[1] / 255.0, envColor[2] / 255.0, 1 );
@@ -1477,8 +1477,10 @@ void R_PopRefInst( int clearBitMask )
 	if( !riStackSize ) {
 		return;
 	}
+
 	rn = riStack[--riStackSize];
 	R_BindRefInstFBO();
+
 	R_SetupGL( clearBitMask );
 }
 
@@ -1525,21 +1527,21 @@ static void R_UpdateHWGamma( void )
 {
 	int i, v;
 	double invGamma, div;
-	unsigned short gammaRamp[3*256];
+	unsigned short gammaRamp[3*GAMMARAMP_STRIDE];
 
 	if( !glConfig.hwGamma )
 		return;
 
 	invGamma = 1.0 / bound( 0.5, r_gamma->value, 3.0 );
-	div = (double)( 1 << 0 ) / 255.5;
+	div = (double)( 1 << 0 ) / (glConfig.gammaRampSize - 0.5);
 
-	for( i = 0; i < 256; i++ )
+	for( i = 0; i < glConfig.gammaRampSize; i++ )
 	{
 		v = ( int )( 65535.0 * pow( ( (double)i + 0.5 ) * div, invGamma ) + 0.5 );
-		gammaRamp[i] = gammaRamp[i + 256] = gammaRamp[i + 512] = ( ( unsigned short )bound( 0, v, 65535 ) );
+		gammaRamp[i] = gammaRamp[i + GAMMARAMP_STRIDE] = gammaRamp[i + 2*GAMMARAMP_STRIDE] = ( ( unsigned short )bound( 0, v, 65535 ) );
 	}
 
-	GLimp_SetGammaRamp( 256, gammaRamp );
+	GLimp_SetGammaRamp( GAMMARAMP_STRIDE, glConfig.gammaRampSize, gammaRamp );
 }
 
 /*
@@ -1557,9 +1559,9 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 #ifdef GL_ES_VERSION_2_0
 		if( glConfig.ext.multiview_draw_buffers )
 		{
-			int location = GL_MULTIVIEW_EXT;
+			int location = GL_MULTIVIEW_NV;
 			int index = ( cameraSeparation > 0 && glConfig.stereoEnabled ) ? 1 : 0;
-			qglDrawBuffersIndexedEXT( 1, &location, &index );
+			qglDrawBuffersIndexedNV( 1, &location, &index );
 		}
 #else
 		if( cameraSeparation < 0 && glConfig.stereoEnabled )
@@ -1576,11 +1578,9 @@ void R_BeginFrame( float cameraSeparation, qboolean forceClear, qboolean forceVs
 
 	if( r_clear->integer || forceClear )
 	{
-		byte_vec4_t color;
-
-		Vector4Copy( mapConfig.environmentColor, color );
-		qglClearColor( color[0]*( 1.0/255.0 ), color[1]*( 1.0/255.0 ), color[2]*( 1.0/255.0 ), 1 );
-		qglClear( GL_COLOR_BUFFER_BIT );
+		const qbyte *color = mapConfig.environmentColor;
+		RB_Clear( GL_COLOR_BUFFER_BIT, 
+			color[0]*( 1.0/255.0 ), color[1]*( 1.0/255.0 ), color[2]*( 1.0/255.0 ), 1 );
 	}
 
 	// update gamma
@@ -1677,9 +1677,6 @@ void R_EndFrame( void )
 	// properly set back again in R_BeginFrame
 	R_Set2DMode( qfalse );
 
-	// free temporary image buffers
-	R_FreeImageBuffers();
-
 	RB_EndFrame();
 
 	GLimp_EndFrame();
@@ -1690,6 +1687,7 @@ void R_EndFrame( void )
 */
 void R_AppActivate( qboolean active, qboolean destroy )
 {
+	qglFlush();
 	GLimp_AppActivate( active, destroy );
 }
 

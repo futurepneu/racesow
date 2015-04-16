@@ -138,7 +138,7 @@ static qboolean VID_CreateWindow( void )
 	wc.hInstance     = glw_state.hInstance;
 	wc.hIcon         = LoadIcon( glw_state.hInstance, MAKEINTRESOURCE( IDI_APPICON_VALUE ) );
 	wc.hCursor       = LoadCursor( NULL, IDC_ARROW );
-	wc.hbrBackground = (HBRUSH)GetStockObject( GRAY_BRUSH );
+	wc.hbrBackground = (HBRUSH)GetStockObject( BLACK_BRUSH );
 	wc.lpszMenuName  = 0;
 #ifdef WITH_UTF8
 	wc.lpszClassName = (LPCWSTR)glw_state.windowClassNameW;
@@ -550,16 +550,36 @@ fail:
 /*
 ** GLimp_UpdateGammaRamp
 */
-qboolean GLimp_GetGammaRamp( size_t stride, unsigned short *ramp )
+qboolean GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp )
 {
-	if( qwglGetDeviceGammaRamp3DFX )
+	unsigned short ramp256[3*256];
+
+	if( stride < 256 )
 	{
-		if( qwglGetDeviceGammaRamp3DFX( glw_state.hDC, ramp ) )
-			return qtrue;
+		// only supports gamma ramps with 256 mappings per channel
+		return qfalse;
 	}
 
-	if( GetDeviceGammaRamp( glw_state.hDC, ramp ) )
+	if( qwglGetDeviceGammaRamp3DFX )
+	{
+		if( qwglGetDeviceGammaRamp3DFX( glw_state.hDC, ramp256 ) )
+		{
+			*psize = 256;
+			memcpy( ramp,          ramp256,       256*sizeof(*ramp) );
+			memcpy( ramp+  stride, ramp256+  256, 256*sizeof(*ramp) );
+			memcpy( ramp+2*stride, ramp256+2*256, 256*sizeof(*ramp) );
+			return qtrue;
+		}
+	}
+
+	if( GetDeviceGammaRamp( glw_state.hDC, ramp256 ) )
+	{
+		*psize = 256;
+		memcpy( ramp,          ramp256,       256*sizeof(*ramp) );
+		memcpy( ramp+  stride, ramp256+  256, 256*sizeof(*ramp) );
+		memcpy( ramp+2*stride, ramp256+2*256, 256*sizeof(*ramp) );
 		return qtrue;
+	}
 
 	return qfalse;
 }
@@ -567,12 +587,21 @@ qboolean GLimp_GetGammaRamp( size_t stride, unsigned short *ramp )
 /*
 ** GLimp_SetGammaRamp
 */
-void GLimp_SetGammaRamp( size_t stride, unsigned short *ramp )
+void GLimp_SetGammaRamp( size_t stride, unsigned short size, unsigned short *ramp )
 {
+	unsigned short ramp256[3*256];
+
+	if( size != 256 )
+		return;
+
+	memcpy( ramp256,       ramp         , size*sizeof(*ramp));
+	memcpy( ramp256+  256, ramp+  stride, size*sizeof(*ramp));
+	memcpy( ramp256+2*256, ramp+2*stride, size*sizeof(*ramp));
+
 	if( qwglGetDeviceGammaRamp3DFX )
-		qwglSetDeviceGammaRamp3DFX( glw_state.hDC, ramp );
+		qwglSetDeviceGammaRamp3DFX( glw_state.hDC, ramp256 );
 	else
-		SetDeviceGammaRamp( glw_state.hDC, ramp );
+		SetDeviceGammaRamp( glw_state.hDC, ramp256 );
 }
 
 /*
@@ -627,5 +656,38 @@ void GLimp_AppActivate( qboolean active, qboolean destroy )
 			if( destroy )
 				ri.Cvar_Set( "gl_drawbuffer", "GL_NONE" );
 		}
+	}
+}
+
+/*
+** GLimp_SharedContext_Create
+*/
+void *GLimp_SharedContext_Create( void )
+{
+	HGLRC ctx = qwglCreateContext( glw_state.hDC );
+	if( ctx ) {
+		qwglShareLists( glw_state.hGLRC, ctx );
+	}
+	return ctx;
+}
+
+/*
+** GLimp_SharedContext_MakeCurrent
+*/
+qboolean GLimp_SharedContext_MakeCurrent( void *ctx )
+{
+	if( qwglMakeCurrent && !qwglMakeCurrent( glw_state.hDC, ctx ) ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+/*
+** GLimp_SharedContext_Destroy
+*/
+void GLimp_SharedContext_Destroy( void *ctx )
+{
+	if( qwglDeleteContext ) {
+		qwglDeleteContext( ctx );
 	}
 }

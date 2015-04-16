@@ -29,7 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 void *vorbisLibrary = NULL;
 
 int ( *qov_clear )( OggVorbis_File *vf );
-int ( *qov_open_callbacks )( void *datasource, OggVorbis_File *vf, const char *initial, long ibytes, ov_callbacks callbacks );
+int ( *qov_open_callbacks )( void *datasource, OggVorbis_File *vf, char *initial, long ibytes, ov_callbacks callbacks );
 ogg_int64_t ( *qov_pcm_total )( OggVorbis_File *vf, int i );
 vorbis_info *( *qov_info )( OggVorbis_File *vf, int link );
 long ( *qov_read )( OggVorbis_File *vf, char *buffer, int length, int bigendianp, int word, int sgned, int *bitstream );
@@ -54,7 +54,7 @@ dllfunc_t oggvorbisfuncs[] =
 #else // VORBISLIB_RUNTIME
 
 int ( *qov_clear )( OggVorbis_File *vf ) = ov_clear;
-int ( *qov_open_callbacks )( void *datasource, OggVorbis_File *vf, const char *initial, long ibytes, ov_callbacks callbacks ) = ov_open_callbacks;
+int ( *qov_open_callbacks )( void *datasource, OggVorbis_File *vf, char *initial, long ibytes, ov_callbacks callbacks ) = ov_open_callbacks;
 ogg_int64_t ( *qov_pcm_total )( OggVorbis_File *vf, int i ) = ov_pcm_total;
 vorbis_info *( *qov_info )( OggVorbis_File *vf, int link ) = ov_info;
 long ( *qov_read )( OggVorbis_File *vf, char *buffer, int length, int bigendianp, int word, int sgned, int *bitstream ) = ov_read;
@@ -206,7 +206,13 @@ void *decoder_ogg_load( const char *filename, snd_info_t *info )
 		callbacks.tell_func = NULL;
 	}
 
-	qov_open_callbacks( (void *) (qintptr) filenum, &vorbisfile, NULL, 0, callbacks );
+	if( qov_open_callbacks( (void *) (qintptr) filenum, &vorbisfile, NULL, 0, callbacks ) < 0 )
+	{
+		Com_Printf( "Could not open %s for reading\n", filename );
+		trap_FS_FCloseFile( filenum );
+		qov_clear( &vorbisfile );
+		return NULL;
+	}
 
 	if( callbacks.seek_func && !qov_seekable( &vorbisfile ) )
 	{
@@ -311,7 +317,12 @@ qboolean decoder_ogg_cont_open( snd_stream_t *stream )
 		callbacks.tell_func = NULL;
 	}
 
-	qov_open_callbacks( (void *) (qintptr) ogg_stream->filenum, &ogg_stream->vorbisfile, NULL, 0, callbacks );
+	if( qov_open_callbacks( (void *) (qintptr) ogg_stream->filenum, &ogg_stream->vorbisfile, NULL, 0, callbacks ) < 0 )
+	{
+		Com_Printf( "Couldn't open .ogg file for reading\n" );
+		trap_FS_FCloseFile( ogg_stream->filenum );
+		return qfalse;
+	}
 
 	if( callbacks.seek_func && !qov_seekable( &ogg_stream->vorbisfile ) )
 	{

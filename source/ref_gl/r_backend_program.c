@@ -53,6 +53,17 @@ static shaderpass_t r_GLSLpasses[MAX_BUILTIN_GLSLPASSES];
 
 static void RB_SetShaderpassState( int state );
 
+static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_RGBShadow( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_Shadowmap( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_Outline( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_Fog( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, r_glslfeat_t programFeatures );
+
 /*
 * RB_InitBuiltinPasses
 */
@@ -780,12 +791,21 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 
 	// handy pointers
 	base = RB_ShaderpassTex( pass );
-	normalmap = pass->images[1];
-	glossmap = pass->images[2];
-	decalmap = pass->images[3];
-	entdecalmap = pass->images[4];
+	normalmap = pass->images[1] && !pass->images[1]->missing ? pass->images[1] : rsh.blankBumpTexture;
+	glossmap = pass->images[2] && !pass->images[2]->missing ?  pass->images[2] : NULL;
+	decalmap = pass->images[3] && !pass->images[3]->missing ?  pass->images[3] : NULL;
+	entdecalmap = pass->images[4] && !pass->images[4]->missing ?  pass->images[4] : NULL;
 
-	assert( normalmap );
+	// use blank image if the normalmap is too tiny due to high picmip value
+	if( normalmap && normalmap->upload_width < 2 || normalmap->upload_height < 2 ) {
+		normalmap = rsh.blankBumpTexture;
+	}
+
+	if( normalmap == rsh.blankBumpTexture && !glossmap && !decalmap && !entdecalmap ) {
+		// render as plain Q3A shader, which is less computation-intensive
+		RB_RenderMeshGLSL_Q3AShader( pass, programFeatures );
+		return;
+	}
 
 	if( normalmap->samples == 4 )
 		offsetmappingScale = r_offsetmapping_scale->value * rb.currentShader->offsetmappingScale;
@@ -847,7 +867,7 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 
 	Matrix4_Identity( texMatrix );
 
-	RB_BindTexture( 0, base );
+	R_BindTexture( 0, base );
 
 	// convert rgbgen and alphagen to GLSL feature defines
 	programFeatures |= RB_RGBAlphaGenToProgramFeatures( &pass->rgbgen, &pass->alphagen );
@@ -857,12 +877,12 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 
 	// we only send S-vectors to GPU and recalc T-vectors as cross product
 	// in vertex shader
-	RB_BindTexture( 1, normalmap );         // normalmap
+	R_BindTexture( 1, normalmap );         // normalmap
 
 	if( glossmap && glossIntensity )
 	{
 		programFeatures |= GLSL_SHADER_MATERIAL_SPECULAR;
-		RB_BindTexture( 2, glossmap ); // gloss
+		R_BindTexture( 2, glossmap ); // gloss
 	}
 
 	if( applyDecal )
@@ -879,7 +899,7 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 				programFeatures |= GLSL_SHADER_MATERIAL_DECAL_ADD;
 		}
 
-		RB_BindTexture( 3, decalmap ); // decal
+		R_BindTexture( 3, decalmap ); // decal
 	}
 
 	if( entdecalmap )
@@ -890,11 +910,12 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 		if( entdecalmap->samples == 3 )
 			programFeatures |= GLSL_SHADER_MATERIAL_ENTITY_DECAL_ADD;
 
-		RB_BindTexture( 4, entdecalmap ); // decal
+		R_BindTexture( 4, entdecalmap ); // decal
 	}
 
 	if( offsetmappingScale > 0 )
-		programFeatures |= r_offsetmapping_reliefmapping->integer ? GLSL_SHADER_MATERIAL_RELIEFMAPPING : GLSL_SHADER_MATERIAL_OFFSETMAPPING;
+		programFeatures |= r_offsetmapping_reliefmapping->integer ? 
+			GLSL_SHADER_MATERIAL_RELIEFMAPPING : GLSL_SHADER_MATERIAL_OFFSETMAPPING;
 
 	if( rb.currentModelType == mod_brush )
 	{
@@ -905,7 +926,7 @@ static void RB_RenderMeshGLSL_Material( const shaderpass_t *pass, r_glslfeat_t p
 
 			// bind lightmap textures and set program's features for lightstyles
 			for( i = 0; i < MAX_LIGHTMAPS && lightStyle->lightmapStyles[i] != 255; i++ )
-				RB_BindTexture( i+4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] );
+				R_BindTexture( i+4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] );
 
 			programFeatures |= ( i * GLSL_SHADER_MATERIAL_LIGHTSTYLE0 );
 
@@ -1029,6 +1050,7 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, r_glslfeat_t
 	image_t *portaltexture[2];
 	qboolean frontPlane;
 	mat4_t texMatrix;
+	const image_t *dudvmap, *normalmap;
 
 	if( !rb.currentPortalSurface ) {
 		return;
@@ -1044,7 +1066,10 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, r_glslfeat_t
 		}
 	}
 
-	if( pass->images[0] != rsh.blankBumpTexture )
+	dudvmap = pass->images[0] && !pass->images[0]->missing ? pass->images[0] : rsh.blankBumpTexture;
+	normalmap = pass->images[1] && !pass->images[1]->missing ? pass->images[1] : rsh.blankBumpTexture;
+
+	if( dudvmap != rsh.blankBumpTexture )
 		programFeatures |= GLSL_SHADER_DISTORTION_DUDV;
 	if( portaltexture[0] != rsh.blackTexture )
 		programFeatures |= GLSL_SHADER_DISTORTION_REFLECTION;
@@ -1061,7 +1086,7 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, r_glslfeat_t
 
 	Matrix4_Identity( texMatrix );
 
-	RB_BindTexture( 0, pass->images[0] );  // dudvmap
+	R_BindTexture( 0, dudvmap );
 	
 	// convert rgbgen and alphagen to GLSL feature defines
 	programFeatures |= RB_RGBAlphaGenToProgramFeatures( &pass->rgbgen, &pass->alphagen );
@@ -1071,16 +1096,16 @@ static void RB_RenderMeshGLSL_Distortion( const shaderpass_t *pass, r_glslfeat_t
 	// set shaderpass state (blending, depthwrite, etc)
 	RB_SetShaderpassState( pass->flags );
 
-	if( pass->images[1] )
+	if( normalmap != rsh.blankBumpTexture )
 	{
 		// eyeDot
 		programFeatures |= GLSL_SHADER_DISTORTION_EYEDOT;
 
-		RB_BindTexture( 1, pass->images[1] ); // normalmap
+		R_BindTexture( 1, normalmap );
 	}
 
-	RB_BindTexture( 2, portaltexture[0] );           // reflection
-	RB_BindTexture( 3, portaltexture[1] );           // refraction
+	R_BindTexture( 2, portaltexture[0] );           // reflection
+	R_BindTexture( 3, portaltexture[1] );           // refraction
 
 	// update uniforms
 	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_DISTORTION, NULL,
@@ -1123,7 +1148,11 @@ static void RB_RenderMeshGLSL_ShadowmapArray( const shaderpass_t *pass, r_glslfe
 	}
 	if( !glConfig.ext.shadow ) {
 		// pack depth into RGB triplet of the colorbuffer
-		programFeatures |= GLSL_SHADER_SHADOWMAP_RGB_SHADOW;
+		programFeatures |= GLSL_SHADER_SHADOWMAP_RGB;
+		if( !glConfig.ext.rgb8_rgba8 ) {
+			// pack depth into RGB565 triplet
+			programFeatures |= GLSL_SHADER_SHADOWMAP_RGB_16BIT;
+		}
 	}
 
 	// update uniforms
@@ -1137,7 +1166,7 @@ static void RB_RenderMeshGLSL_ShadowmapArray( const shaderpass_t *pass, r_glslfe
 		group = shadowGroups[i];
 		shadowmap = group->shadowmap;
 
-		RB_BindTexture( i, shadowmap );
+		R_BindTexture( i, shadowmap );
 
 		if( glConfig.ext.shadow ) {
 			qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_COMPARE_R_TO_TEXTURE_ARB );
@@ -1164,7 +1193,7 @@ static void RB_RenderMeshGLSL_ShadowmapArray( const shaderpass_t *pass, r_glslfe
 	RB_DrawElementsReal();
 
 	for( i--; i >= 0; i-- ) {
-		RB_SelectTextureUnit( i );
+		R_SelectTextureUnit( i );
 		if( glConfig.ext.shadow ) {
 			qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_NONE );
 		}
@@ -1178,6 +1207,10 @@ static void RB_RenderMeshGLSL_RGBShadow( const shaderpass_t *pass, r_glslfeat_t 
 {
 	int program;
 	mat4_t texMatrix;
+
+	if( !glConfig.ext.rgb8_rgba8 ) {
+		programFeatures |= GLSL_SHADER_RGBSHADOW_16BIT;
+	}
 
 	Matrix4_Identity( texMatrix );
 
@@ -1461,7 +1494,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 		}
 	}
 
-	RB_BindTexture( 0, image );
+	R_BindTexture( 0, image );
 
 	// convert rgbgen and alphagen to GLSL feature defines
 	programFeatures |= RB_RGBAlphaGenToProgramFeatures( &pass->rgbgen, &pass->alphagen );
@@ -1485,7 +1518,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 	RB_SetShaderpassState( state );
 
 	if( programFeatures & GLSL_SHADER_COMMON_SOFT_PARTICLE ) {
-		RB_BindTexture( 3, rsh.screenDepthTextureCopy );
+		R_BindTexture( 3, rsh.screenDepthTextureCopy );
 	}
 
 	if( isLightmapped ) {
@@ -1493,7 +1526,7 @@ static void RB_RenderMeshGLSL_Q3AShader( const shaderpass_t *pass, r_glslfeat_t 
 
 		// bind lightmap textures and set program's features for lightstyles
 		for( i = 0; i < MAX_LIGHTMAPS && lightStyle->lightmapStyles[i] != 255; i++ )
-			RB_BindTexture( i+4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] ); // lightmap
+			R_BindTexture( i+4, rsh.worldBrushModel->lightmapImages[lightStyle->lightmapNum[i]] ); // lightmap
 		programFeatures |= ( i * GLSL_SHADER_Q3_LIGHTSTYLE0 );
 	}
 
@@ -1557,7 +1590,7 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, r_glslfeat_t p
 
 	Matrix4_Identity( texMatrix );
 
-	RB_BindTexture( 0, base );
+	R_BindTexture( 0, base );
 
 	RB_VertexTCCelshadeMatrix( reflectionMatrix );
 
@@ -1578,24 +1611,31 @@ static void RB_RenderMeshGLSL_Celshade( const shaderpass_t *pass, r_glslfeat_t p
 	// set shaderpass state (blending, depthwrite, etc)
 	RB_SetShaderpassState( pass->flags );
 
-	// bind white texture for shadow map view
-#define CELSHADE_BIND(tmu,tex,feature,canAdd) \
-	if( tex ) { \
+	// replacement images are there to ensure that the entity is still
+	// properly colored despite real images still being loaded in a separate thread
+#define CELSHADE_BIND(tmu,tex,feature,canAdd,replacement) \
+	if( tex && !tex->missing ) { \
+		image_t *btex = tex; \
 		if( rb.renderFlags & RF_SHADOWMAPVIEW ) { \
-			tex = rsh.whiteTexture; \
+			btex = tex->flags & IT_CUBEMAP ? rsh.whiteCubemapTexture : rsh.whiteTexture; \
 		} else {\
-			programFeatures |= feature; \
-			if( canAdd && tex->samples == 3 ) programFeatures |= ((feature) << 1); \
+			btex = tex->loaded ? tex : replacement; \
+			if( btex ) { \
+				programFeatures |= feature; \
+				if( canAdd && btex->samples == 3 ) programFeatures |= ((feature) << 1); \
+			} \
 		} \
-		RB_BindTexture(tmu, tex); \
+		if( btex ) { \
+			R_BindTexture( tmu, btex ); \
+		} \
 	}
 
-	CELSHADE_BIND( 1, shade, 0, qfalse );
-	CELSHADE_BIND( 2, diffuse, GLSL_SHADER_CELSHADE_DIFFUSE, qfalse );
-	CELSHADE_BIND( 3, decal, GLSL_SHADER_CELSHADE_DECAL, qtrue );
-	CELSHADE_BIND( 4, entdecal, GLSL_SHADER_CELSHADE_ENTITY_DECAL, qtrue );
-	CELSHADE_BIND( 5, stripes, GLSL_SHADER_CELSHADE_STRIPES, qtrue );
-	CELSHADE_BIND( 6, light, GLSL_SHADER_CELSHADE_CEL_LIGHT, qtrue );
+	CELSHADE_BIND( 1, shade, 0, qfalse, rsh.whiteCubemapTexture );
+	CELSHADE_BIND( 2, diffuse, GLSL_SHADER_CELSHADE_DIFFUSE, qfalse, NULL );
+	CELSHADE_BIND( 3, decal, GLSL_SHADER_CELSHADE_DECAL, qtrue, NULL );
+	CELSHADE_BIND( 4, entdecal, GLSL_SHADER_CELSHADE_ENTITY_DECAL, qtrue, rsh.whiteTexture );
+	CELSHADE_BIND( 5, stripes, GLSL_SHADER_CELSHADE_STRIPES, qtrue, NULL );
+	CELSHADE_BIND( 6, light, GLSL_SHADER_CELSHADE_CEL_LIGHT, qtrue, NULL );
 
 #undef CELSHADE_BIND
 
@@ -1665,7 +1705,7 @@ static void RB_RenderMeshGLSL_FXAA( const shaderpass_t *pass, r_glslfeat_t progr
 	// set shaderpass state (blending, depthwrite, etc)
 	RB_SetShaderpassState( pass->flags );
 
-	RB_BindTexture( 0, image );
+	R_BindTexture( 0, image );
 
 	// update uniforms
 	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_FXAA, NULL,
@@ -1692,9 +1732,9 @@ static void RB_RenderMeshGLSL_YUV( const shaderpass_t *pass, r_glslfeat_t progra
 	// set shaderpass state (blending, depthwrite, etc)
 	RB_SetShaderpassState( pass->flags );
 
-	RB_BindTexture( 0, pass->images[0] );
-	RB_BindTexture( 1, pass->images[1] );
-	RB_BindTexture( 2, pass->images[2] );
+	R_BindTexture( 0, pass->images[0] );
+	R_BindTexture( 1, pass->images[1] );
+	R_BindTexture( 2, pass->images[2] );
 
 	// update uniforms
 	program = RP_RegisterProgram( GLSL_PROGRAM_TYPE_YUV, NULL,
@@ -1978,13 +2018,13 @@ int RB_BindProgram( int program )
 	rb.currentProgram = program;
 	if( !program ) {
 		rb.currentProgramObject = 0;
-		qglUseProgramObjectARB( 0 );
+		qglUseProgram( 0 );
 		return 0;
 	}
 
 	object = RP_GetProgramObject( program );
 	if( object ) {
-		qglUseProgramObjectARB( object );
+		qglUseProgram( object );
 	}
 	rb.currentProgramObject = object;
 	rb.dirtyUniformState = qtrue;

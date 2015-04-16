@@ -93,13 +93,13 @@ extern "C" {
 #define HAVE_WSIPX
 #endif
 
-#define MUMBLE_SUPPORT
-
 #define LIB_DIRECTORY "libs"
 #define LIB_SUFFIX ".dll"
 
 #define VID_INITFIRST
 
+#define MUMBLE_SUPPORT
+#define OPENAL_RUNTIME
 #define VORBISFILE_LIBNAME "libvorbisfile.dll"
 
 #ifdef NDEBUG
@@ -111,21 +111,11 @@ extern "C" {
 #define OSNAME "Windows"
 
 #ifdef _M_IX86
-#if defined __FreeBSD__
-#define CPUSTRING "i386"
-#define ARCH "freebsd_i386"
-#else
 #define CPUSTRING "x86"
 #define ARCH "x86"
-#endif
 #elif defined ( __x86_64__ ) || defined( _M_AMD64 )
-#if defined __FreeBSD__
-#define CPUSTRING "x86_64"
-#define ARCH "freebsd_x86_64"
-#else
 #define CPUSTRING "x64"
 #define ARCH "x64"
-#endif
 #elif defined ( _M_ALPHA )
 #define CPUSTRING "axp"
 #define ARCH	  "axp"
@@ -141,6 +131,13 @@ extern "C" {
 
 #ifdef _MSC_VER
 #define HAVE___CDECL
+#endif
+
+#if defined ( __GNUC__ )
+#include <alloca.h>
+#elif defined ( _MSC_VER )
+#include <malloc.h>
+#define HAVE__ALLOCA
 #endif
 
 // wsw : aiwa : 64bit integers and integer-pointer types
@@ -176,8 +173,8 @@ typedef UINT_PTR socket_handle_t;
 
 #ifndef __ANDROID__
 #define MUMBLE_SUPPORT
+#define OPENAL_RUNTIME
 #endif
-
 #define VORBISFILE_LIBNAME "libvorbisfile.so"
 
 #if defined ( __FreeBSD__ )
@@ -239,6 +236,8 @@ typedef UINT_PTR socket_handle_t;
 
 #define VAR( x ) # x
 
+#include <alloca.h>
+
 // wsw : aiwa : 64bit integers and integer-pointer types
 #include <stdint.h>
 typedef int64_t qint64;
@@ -269,11 +268,11 @@ typedef int socket_handle_t;
 #define HAVE_STRCASECMP
 #endif
 
-#define MUMBLE_SUPPORT
-
 #define LIB_DIRECTORY "libs"
 #define LIB_SUFFIX ".dylib"
 
+#define MUMBLE_SUPPORT
+#define OPENAL_RUNTIME
 #define VORBISFILE_LIBNAME "libvorbisfile.dylib"
 
 //Mac OSX has universal binaries, no need for cpu dependency
@@ -283,6 +282,8 @@ typedef int socket_handle_t;
 #define ARCH "mac"
 
 #define VAR( x ) # x
+
+#include <alloca.h>
 
 #include <stdint.h>
 typedef int64_t qint64;
@@ -297,6 +298,14 @@ typedef int socket_handle_t;
 #define SOCKET_ERROR (-1)
 #define INVALID_SOCKET (-1)
 
+#endif
+
+//==============================================
+
+#if (defined __i386__ || defined __x86_64__) && defined __GNUC__
+#define HAVE__BUILTIN_ATOMIC
+#elif (defined _WIN32)
+#define HAVE__INTERLOCKED_API
 #endif
 
 //==============================================
@@ -341,6 +350,12 @@ typedef int socket_handle_t;
 #endif
 #endif
 
+#ifdef HAVE__ALLOCA
+#ifndef alloca
+#define alloca _alloca
+#endif
+#endif
+
 #if ( defined ( _M_IX86 ) || defined ( __i386__ ) || defined ( __ia64__ ) ) && !defined ( C_ONLY )
 #define id386
 #else
@@ -368,17 +383,17 @@ typedef int socket_handle_t;
 #endif
 
 #if defined ( __GNUC__ )
-#define ALIGN( x )   __attribute__( ( aligned( x ) ) )
-#define NOINLINE     __attribute__((noinline))
-#define NAKED
+#define ATTRIBUTE_ALIGNED( x ) __attribute__( ( aligned( x ) ) )
+#define ATTRIBUTE_NOINLINE     __attribute__((noinline))
+#define ATTRIBUTE_NAKED
 #elif defined ( _MSC_VER )
-#define ALIGN( x )   __declspec( align( x ) )
-#define NOINLINE
-#define NAKED        __declspec( naked )
+#define ATTRIBUTE_ALIGNED( x ) __declspec( align( x ) )
+#define ATTRIBUTE_NOINLINE
+#define ATTRIBUTE_NAKED        __declspec( naked )
 #else
-#define ALIGN( x )
-#define NOINLINE
-#define NAKED
+#define ATTRIBUTE_ALIGNED( x )
+#define ATTRIBUTE_NOINLINE
+#define ATTRIBUTE_NAKED
 #endif
 
 #ifdef HAVE___STRTOI64

@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "../qcommon/qcommon.h"
 #include "../qcommon/sys_threads.h"
 #include <pthread.h>
+#include <sched.h>
 
 struct qthread_s {
 	pthread_t t;
@@ -106,4 +107,20 @@ void Sys_Thread_Join( qthread_t *thread )
 	if( thread ) {
 		pthread_join( thread->t, NULL );
 	}
+}
+
+/*
+* Sys_Thread_Yield
+*/
+void Sys_Thread_Yield( void )
+{
+	sched_yield();
+}
+
+/*
+* Sys_Atomic_Add
+*/
+int Sys_Atomic_Add( volatile int *value, int add, qmutex_t *mutex )
+{
+	return __sync_fetch_and_add( value, add ) + add;
 }

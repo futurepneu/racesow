@@ -139,6 +139,8 @@ extern vec4_t color_table[MAX_S_COLORS];
 #define clamp_low( a, low ) ( ( a ) = ( a ) < ( low ) ? ( low ) : ( a ) )
 #define clamp_high( a, high ) ( ( a ) = ( a ) > ( high ) ? ( high ) : ( a ) )
 
+#define ALIGN( x, a ) ( ( ( x ) + ( ( size_t )( a ) - 1 ) ) & ~( ( size_t )( a ) - 1 ) )
+
 #define random()	( ( rand() & 0x7fff ) / ( (float)0x7fff ) )  // 0..1
 #define brandom( a, b )	   ( ( a )+random()*( ( b )-( a ) ) )                // a..b
 #define crandom()	brandom( -1, 1 )                           // -1..1
@@ -153,7 +155,7 @@ int	Q_log2( int val );
 
 int Q_bitcount( int v );
 
-#define NEARESTEXPOF2(x)  ((int)floor( ( log( max( (x), 1 ) ) - log( 1.5 ) ) / log( 2 ) + 1 ))
+#define ISPOWOF2(x) ( !( ( x ) & ( ( x ) - 1 ) ) )
 
 #define SQRTFAST( x ) ( ( x ) * Q_RSqrt( x ) ) // jal : //The expression a * rsqrt(b) is intended as a higher performance alternative to a / sqrt(b). The two expressions are comparably accurate, but do not compute exactly the same value in every case. For example, a * rsqrt(a*a + b*b) can be just slightly greater than 1, in rare cases.
 

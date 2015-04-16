@@ -113,6 +113,12 @@ QGL_EXTERN	const char				*(*qglGetGLWExtensionsString)( void );
 #define GL_FLOAT											0x1406
 #endif
 
+#ifndef GL_UNSIGNED_SHORT_4_4_4_4
+#define GL_UNSIGNED_SHORT_4_4_4_4							0x8033
+#define GL_UNSIGNED_SHORT_5_5_5_1							0x8034
+#define GL_UNSIGNED_SHORT_5_6_5								0x8363
+#endif
+
 #define GL_TEXTURE0_ARB										0x84C0
 #define GL_MAX_TEXTURE_UNITS_ARB							0x84E2
 
@@ -132,6 +138,13 @@ QGL_EXTERN	const char				*(*qglGetGLWExtensionsString)( void );
 #define GL_NUM_COMPRESSED_TEXTURE_FORMATS_ARB				0x86A2
 #define GL_COMPRESSED_TEXTURE_FORMATS_ARB					0x86A3
 #endif /* GL_ARB_texture_compression */
+
+/* GL_OES_compressed_ETC1_RGB8_texture */
+#ifndef GL_OES_compressed_ETC1_RGB8_texture
+#define GL_OES_compressed_ETC1_RGB8_texture
+
+#define GL_ETC1_RGB8_OES									0x8D64
+#endif /* GL_OES_compressed_ETC1_RGB8_texture */
 
 /* GL_EXT_texture_filter_anisotropic */
 #ifndef GL_EXT_texture_filter_anisotropic
@@ -396,7 +409,7 @@ typedef unsigned int GLhandleARB;
 #define GL_RENDERBUFFER_STENCIL_SIZE_EXT					0x8D55
 #endif /* GL_EXT_framebuffer_object */
 
-/* GL_EXT_framebuffer_object */
+/* GL_EXT_framebuffer_blit */
 #ifndef GL_EXT_framebuffer_blit
 #define GL_EXT_framebuffer_blit
 
@@ -437,16 +450,24 @@ typedef unsigned short GLhalfARB;
 #endif
 #endif /* GL_ARB_half_float_vertex */
 
-/* GL_EXT_multiview_draw_buffers */
-#ifndef GL_EXT_multiview_draw_buffers
-#define GL_EXT_multiview_draw_buffers
+/* GL_NV_multiview_draw_buffers */
+#ifndef GL_NV_multiview_draw_buffers
+#define GL_NV_multiview_draw_buffers
 
-#define GL_COLOR_ATTACHMENT_EXT								0x90F0
-#define GL_MULTIVIEW_EXT									0x90F1
-#define GL_DRAW_BUFFER_EXT									0x0C01
-#define GL_READ_BUFFER_EXT									0x0C02
-#define GL_MAX_MULTIVIEW_BUFFERS_EXT						0x90F2
-#endif /* GL_EXT_multiview_draw_buffers */
+#define GL_COLOR_ATTACHMENT_NV								0x90F0
+#define GL_MULTIVIEW_NV										0x90F1
+#define GL_DRAW_BUFFER_NV									0x0C01
+#define GL_READ_BUFFER_NV									0x0C02
+#define GL_MAX_MULTIVIEW_BUFFERS_NV							0x90F2
+#endif /* GL_NV_multiview_draw_buffers */
+
+/* GL_ARB_get_program_binary */
+#ifndef GL_ARB_get_program_binary
+#define GL_PROGRAM_BINARY_RETRIEVABLE_HINT					0x8257
+#define GL_PROGRAM_BINARY_LENGTH							0x8741
+#define GL_NUM_PROGRAM_BINARY_FORMATS						0x87FE
+#define GL_PROGRAM_BINARY_FORMATS							0x87FF
+#endif /* GL_ARB_get_program_binary */
 
 #endif // QGL_H
 
@@ -467,6 +488,7 @@ QGL_WGL(BOOL, wglSwapBuffers, (HDC));
 QGL_WGL(HGLRC, wglCreateContext, (HDC));
 QGL_WGL(BOOL, wglDeleteContext, (HGLRC));
 QGL_WGL(BOOL, wglMakeCurrent, (HDC, HGLRC));
+QGL_WGL(BOOL, wglShareLists, (HGLRC, HGLRC));
 
 // GLX Functions
 QGL_GLX(void *, glXGetProcAddressARB, (const GLubyte *procName));
@@ -484,6 +506,7 @@ QGL_GLX(const char *, glXQueryExtensionsString, (Display *dpy, int screen));
 QGL_EGL(void *, eglGetProcAddress, (const char *procname));
 QGL_EGL(EGLBoolean, eglChooseConfig, (EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config));
 QGL_EGL(EGLContext, eglCreateContext, (EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list));
+QGL_EGL(EGLSurface, eglCreatePbufferSurface, (EGLDisplay dpy, EGLConfig config, const EGLint *attrib_list));
 QGL_EGL(EGLSurface, eglCreateWindowSurface, (EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list));
 QGL_EGL(EGLBoolean, eglDestroyContext, (EGLDisplay dpy, EGLContext ctx));
 QGL_EGL(EGLBoolean, eglDestroySurface, (EGLDisplay dpy, EGLSurface surface));
@@ -558,6 +581,7 @@ QGL_EXT(void, glBufferDataARB, (GLenum target, GLsizeiptrARB size, const GLvoid 
 QGL_EXT(void, glBufferSubDataARB, (GLenum target, GLintptrARB offset, GLsizeiptrARB size, const GLvoid *data));
 #else
 QGL_FUNC(void, glActiveTexture, (GLenum ));
+QGL_FUNC_OPT(void, glDrawRangeElements, (GLenum, GLuint, GLuint, GLsizei, GLenum, const GLvoid *));
 QGL_FUNC(void, glBindBuffer, (GLenum target, GLuint buffer));
 QGL_FUNC(void, glDeleteBuffers, (GLsizei n, const GLuint *buffers));
 QGL_FUNC(void, glGenBuffers, (GLsizei n, GLuint *buffers));
@@ -565,6 +589,7 @@ QGL_FUNC(void, glBufferData, (GLenum target, GLsizeiptrARB size, const GLvoid *d
 QGL_FUNC(void, glBufferSubData, (GLenum target, GLintptrARB offset, GLsizeiptrARB size, const GLvoid *data));
 #ifndef qglActiveTextureARB
 #define qglActiveTextureARB qglActiveTexture
+#define qglDrawRangeElementsEXT qglDrawRangeElements
 #define qglBindBufferARB qglBindBuffer
 #define qglDeleteBuffersARB qglDeleteBuffers
 #define qglGenBuffersARB qglGenBuffers
@@ -575,7 +600,6 @@ QGL_FUNC(void, glBufferSubData, (GLenum target, GLintptrARB offset, GLsizeiptrAR
 
 #ifndef GL_ES_VERSION_2_0
 QGL_EXT(void, glDeleteObjectARB, (GLhandleARB obj));
-QGL_EXT(GLhandleARB, glGetHandleARB, (GLenum pname));
 QGL_EXT(void, glDetachObjectARB, (GLhandleARB containerObj, GLhandleARB attachedObj));
 QGL_EXT(GLhandleARB, glCreateShaderObjectARB, (GLenum shaderType));
 QGL_EXT(void, glShaderSourceARB, (GLhandleARB shaderObj, GLsizei count, const GLcharARB **string, const GLint *length));
@@ -604,7 +628,6 @@ QGL_EXT(void, glUniform4ivARB, (GLint location, GLsizei count, const GLint *valu
 QGL_EXT(void, glUniformMatrix2fvARB, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value));
 QGL_EXT(void, glUniformMatrix3fvARB, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value));
 QGL_EXT(void, glUniformMatrix4fvARB, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value));
-QGL_EXT(void, glGetObjectParameterfvARB, (GLhandleARB obj, GLenum pname, GLfloat *params));
 QGL_EXT(void, glGetObjectParameterivARB, (GLhandleARB obj, GLenum pname, GLint *params));
 QGL_EXT(void, glGetInfoLogARB, (GLhandleARB obj, GLsizei maxLength, GLsizei *length, GLcharARB *infoLog));
 QGL_EXT(void, glGetAttachedObjectsARB, (GLhandleARB containerObj, GLsizei maxCount, GLsizei *count, GLhandleARB *obj));
@@ -613,14 +636,19 @@ QGL_EXT(void, glGetActiveUniformARB, (GLhandleARB programObj, GLuint index, GLsi
 QGL_EXT(void, glGetUniformfvARB, (GLhandleARB programObj, GLint location, GLfloat *params));
 QGL_EXT(void, glGetUniformivARB, (GLhandleARB programObj, GLint location, GLint *params));
 QGL_EXT(void, glGetShaderSourceARB, (GLhandleARB obj, GLsizei maxLength, GLsizei *length, GLcharARB *source));
-#ifndef qglDeleteProgram
-#define qglDeleteProgram qglDeleteObjectARB
-#define qglDeleteShader qglDeleteObjectARB
-#define qglGetProgramiv qglGetObjectParameterivARB
-#define qglGetShaderiv qglGetObjectParameterivARB
-#define qglGetProgramInfoLog qglGetInfoLogARB
-#define qglGetShaderInfoLog qglGetInfoLogARB
-#endif
+
+QGL_EXT(void, glDeleteProgram, (GLhandleARB programObj));
+QGL_EXT(void, glDeleteShader, (GLhandleARB shaderObj));
+QGL_EXT(void, glDetachShader, (GLhandleARB programObj, GLhandleARB shaderObj));
+QGL_EXT(GLhandleARB, glCreateShader, (GLenum shaderType));
+QGL_EXT(GLhandleARB, glCreateProgram, (void));
+QGL_EXT(void, glAttachShader, (GLhandleARB programObj, GLhandleARB shaderObj));
+QGL_EXT(void, glUseProgram, (GLhandleARB programObj));
+QGL_EXT(void, glGetProgramiv, (GLhandleARB programObj, GLenum pname, GLint *params));
+QGL_EXT(void, glGetShaderiv, (GLhandleARB shaderObj, GLenum pname, GLint *params));
+QGL_EXT(void, glGetProgramInfoLog, (GLhandleARB programObj, GLsizei maxLength, GLsizei *length, GLcharARB *infoLog));
+QGL_EXT(void, glGetShaderInfoLog, (GLhandleARB shaderObj, GLsizei maxLength, GLsizei *length, GLcharARB *infoLog));
+QGL_EXT(void, glGetAttachedShaders, (GLhandleARB programObj, GLsizei maxCount, GLsizei *count, GLhandleARB *shaders));
 #else
 QGL_FUNC(void, glDeleteProgram, (GLhandleARB programObj));
 QGL_FUNC(void, glDeleteShader, (GLhandleARB shaderObj));
@@ -662,15 +690,10 @@ QGL_FUNC(void, glGetActiveUniform, (GLhandleARB programObj, GLuint index, GLsize
 QGL_FUNC(void, glGetUniformfv, (GLhandleARB programObj, GLint location, GLfloat *params));
 QGL_FUNC(void, glGetUniformiv, (GLhandleARB programObj, GLint location, GLint *params));
 QGL_FUNC(void, glGetShaderSource, (GLhandleARB obj, GLsizei maxLength, GLsizei *length, GLcharARB *source));
-#ifndef qglDetachObjectARB
-#define qglDetachObjectARB qglDetachShader
-#define qglCreateShaderObjectARB qglCreateShader
+#ifndef qglShaderSourceARB
 #define qglShaderSourceARB qglShaderSource
 #define qglCompileShaderARB qglCompileShader
-#define qglCreateProgramObjectARB qglCreateProgram
-#define qglAttachObjectARB qglAttachShader
 #define qglLinkProgramARB qglLinkProgram
-#define qglUseProgramObjectARB qglUseProgram
 #define qglValidateProgramARB qglValidateProgram
 #define qglUniform1fARB qglUniform1f
 #define qglUniform2fARB qglUniform2f
@@ -691,7 +714,6 @@ QGL_FUNC(void, glGetShaderSource, (GLhandleARB obj, GLsizei maxLength, GLsizei *
 #define qglUniformMatrix2fvARB qglUniformMatrix2fv
 #define qglUniformMatrix3fvARB qglUniformMatrix3fv
 #define qglUniformMatrix4fvARB qglUniformMatrix4fv
-#define qglGetAttachedObjectsARB qglGetAttachedShaders
 #define qglGetUniformLocationARB qglGetUniformLocation
 #define qglGetActiveUniformARB qglGetActiveUniform
 #define qglGetUniformfvARB qglGetUniformfv
@@ -797,14 +819,33 @@ QGL_FUNC(void, glGenerateMipmap, (GLenum));
 
 #ifndef GL_ES_VERSION_2_0
 QGL_EXT(void, glBlitFramebufferEXT, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum));
+#else
+QGL_FUNC_OPT(void, glBlitFramebuffer, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum));
+QGL_EXT(void, glBlitFramebufferANGLE, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum));
+QGL_EXT(void, glBlitFramebufferNV, (GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum));
+#ifndef qglBlitFramebufferEXT
+#define qglBlitFramebufferEXT qglBlitFramebuffer
+#endif
 #endif
 
 #ifdef GL_ES_VERSION_2_0
-QGL_EXT(void, glReadBufferIndexedEXT, (GLenum, GLint));
-QGL_EXT(void, glDrawBuffersIndexedEXT, (GLint, const GLenum *, const GLint *));
+QGL_EXT(void, glReadBufferIndexedNV, (GLenum, GLint));
+QGL_EXT(void, glDrawBuffersIndexedNV, (GLint, const GLenum *, const GLint *));
 #endif
 
 QGL_EXT(void, glSwapInterval, (int interval));
+
+#ifndef GL_ES_VERSION_2_0
+QGL_EXT(void, glProgramParameteri, (GLuint program, GLenum pname, GLint value));
+QGL_EXT(void, glGetProgramBinary, (GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, GLvoid *binary));
+QGL_EXT(void, glProgramBinary, (GLuint program, GLenum binaryFormat, const GLvoid *binary, GLsizei length));
+#else
+QGL_EXT(void, glGetProgramBinaryOES, (GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, GLvoid *binary));
+QGL_EXT(void, glProgramBinaryOES, (GLuint program, GLenum binaryFormat, const GLvoid *binary, GLsizei length));
+QGL_FUNC_OPT(void, glProgramParameteri, (GLuint program, GLenum pname, GLint value));
+QGL_FUNC_OPT(void, glGetProgramBinary, (GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, GLvoid *binary));
+QGL_FUNC_OPT(void, glProgramBinary, (GLuint program, GLenum binaryFormat, const GLvoid *binary, GLsizei length));
+#endif
 
 // WGL_EXT Functions
 QGL_WGL_EXT(const char *, wglGetExtensionsStringEXT, (void));

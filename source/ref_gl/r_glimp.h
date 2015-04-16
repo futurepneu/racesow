@@ -86,6 +86,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define MAX_GLSL_UNIFORM_BONES			100
 #define MAX_GLSL_UNIFORM_INSTANCES		40
 
+#define GAMMARAMP_STRIDE				4096
+
 extern cvar_t *r_stencilbits;
 extern cvar_t *gl_drawbuffer;
 extern cvar_t *gl_driver;
@@ -158,6 +160,7 @@ typedef struct
 				,texture_compression
 				,vertex_buffer_object
 				,GLSL
+				,GLSL_core
 				,GLSL130
 				,depth_texture
 				,framebuffer_object
@@ -176,6 +179,8 @@ typedef struct
 				,framebuffer_blit
 				,depth24
 				,multiview_draw_buffers
+				,get_program_binary
+				,rgb8_rgba8
 				;
 	union {
 		char	shadow, shadow_samplers;
@@ -196,6 +201,7 @@ typedef struct
 	const char		*extensionsString;
 	const char		*glwExtensionsString;
 	const char		*shadingLanguageVersionString;
+	unsigned		versionHash;
 
 	int				version;
 	int				shadingLanguageVersion;
@@ -208,7 +214,8 @@ typedef struct
 	qboolean		stencilEnabled;
 
 	qboolean		hwGamma;
-	unsigned short	orignalGammaRamp[3*256];
+	unsigned short	gammaRampSize;
+	unsigned short	originalGammaRamp[3*GAMMARAMP_STRIDE];
 
 	int				maxTextureSize
 					,maxTextureUnits
@@ -241,7 +248,11 @@ void	    GLimp_Shutdown( void );
 rserr_t		GLimp_SetMode( int x, int y, int width, int height, int displayFrequency,
 				qboolean fullscreen, qboolean wideScreen );
 void	    GLimp_AppActivate( qboolean active, qboolean destroy );
-qboolean	GLimp_GetGammaRamp( size_t stride, unsigned short *ramp );
-void		GLimp_SetGammaRamp( size_t stride, unsigned short *ramp );
+qboolean	GLimp_GetGammaRamp( size_t stride, unsigned short *psize, unsigned short *ramp );
+void		GLimp_SetGammaRamp( size_t stride, unsigned short   size, unsigned short *ramp );
+
+void		*GLimp_SharedContext_Create( void );
+qboolean	GLimp_SharedContext_MakeCurrent( void *ctx );
+void		GLimp_SharedContext_Destroy( void *ctx );
 
 #endif // R_GLIMP_H

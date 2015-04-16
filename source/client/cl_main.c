@@ -1789,6 +1789,8 @@ void CL_SetClientState( int state )
 	case CA_CONNECTING:
 		Con_Close();
 		CL_UIModule_ForceMenuOff();
+		CL_SoundModule_StopBackgroundTrack();
+		CL_SoundModule_Clear();
 		CL_SetKeyDest( key_game );
 		//SCR_UpdateScreen();
 		break;
@@ -1798,7 +1800,7 @@ void CL_SetClientState( int state )
 		//SCR_UpdateScreen();
 		break;
 	case CA_ACTIVE:
-	case CA_CINEMATIC:	
+	case CA_CINEMATIC:
 		FTLIB_TouchAllFonts();
 		re.EndRegistration();
 		CL_SoundModule_EndRegistration();
@@ -2973,6 +2975,8 @@ void CL_Init( void )
 	if( dedicated->integer )
 		return; // nothing running on the client
 
+	cl_initialized = qtrue;
+
 	// all archived variables will now be loaded
 
 	Con_Init();
@@ -3024,8 +3028,6 @@ void CL_Init( void )
 	ML_Init();
 
 	CL_Mumble_Init();
-
-	cl_initialized = qtrue;
 }
 
 /*
@@ -3060,7 +3062,10 @@ void CL_Shutdown( void )
 	NET_CloseSocket( &cls.socket_udp6 );
 	// TOCHECK: Shouldn't we close the TCP socket too?
 	if( cls.servername )
+	{
 		Mem_ZoneFree( cls.servername );
+		cls.servername = NULL;
+	}
 
 	CL_UIModule_Shutdown();
 	CL_GameModule_Shutdown();

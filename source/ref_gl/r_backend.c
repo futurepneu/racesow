@@ -21,13 +21,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_local.h"
 #include "r_backend_local.h"
 
-ALIGN( 16 ) vec4_t batchVertsArray[MAX_BATCH_VERTS];
-ALIGN( 16 ) vec4_t batchNormalsArray[MAX_BATCH_VERTS];
-ALIGN( 16 ) vec4_t batchSVectorsArray[MAX_BATCH_VERTS];
-ALIGN( 16 ) vec2_t batchSTCoordsArray[MAX_BATCH_VERTS];
-ALIGN( 16 ) vec2_t batchLMCoordsArray[MAX_LIGHTMAPS][MAX_BATCH_VERTS];
-ALIGN( 16 ) byte_vec4_t batchColorsArray[MAX_LIGHTMAPS][MAX_BATCH_VERTS];
-ALIGN( 16 ) elem_t batchElements[MAX_BATCH_ELEMENTS];
+ATTRIBUTE_ALIGNED( 16 ) vec4_t batchVertsArray[MAX_BATCH_VERTS];
+ATTRIBUTE_ALIGNED( 16 ) vec4_t batchNormalsArray[MAX_BATCH_VERTS];
+ATTRIBUTE_ALIGNED( 16 ) vec4_t batchSVectorsArray[MAX_BATCH_VERTS];
+ATTRIBUTE_ALIGNED( 16 ) vec2_t batchSTCoordsArray[MAX_BATCH_VERTS];
+ATTRIBUTE_ALIGNED( 16 ) vec2_t batchLMCoordsArray[MAX_LIGHTMAPS][MAX_BATCH_VERTS];
+ATTRIBUTE_ALIGNED( 16 ) byte_vec4_t batchColorsArray[MAX_LIGHTMAPS][MAX_BATCH_VERTS];
+ATTRIBUTE_ALIGNED( 16 ) elem_t batchElements[MAX_BATCH_ELEMENTS];
 
 rbackend_t rb;
 
@@ -137,24 +137,12 @@ void RB_StatsMessage( char *msg, size_t size )
 */
 static void RB_SetGLDefaults( void )
 {
-	int i;
-
-	qglClearColor( 1, 0, 0.5, 0.5 );
-
 	if( glConfig.stencilEnabled )
 	{
 		qglStencilMask( ( GLuint ) ~0 );
 		qglStencilFunc( GL_EQUAL, 128, 0xFF );
 		qglStencilOp( GL_KEEP, GL_KEEP, GL_INCR );
 	}
-
-	// properly disable multitexturing at startup
-	for( i = glConfig.maxTextureUnits-1; i >= 0; i-- )
-	{
-		RB_SelectTextureUnit( i );
-		qglDisable( GL_TEXTURE_2D );
-	}
-	qglEnable( GL_TEXTURE_2D );
 
 	qglDisable( GL_CULL_FACE );
 	qglFrontFace( GL_CCW );
@@ -168,97 +156,37 @@ static void RB_SetGLDefaults( void )
 	qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 #endif
 	qglFrontFace( GL_CCW );
-
-	rb.gl.state = 0;
-	rb.gl.frontFace = qfalse;
-	rb.gl.currentTMU = -1;
-	rb.gl.faceCull = 0;
-	rb.gl.polygonOffset[0] = rb.gl.polygonOffset[1] = 0;
-	memset( rb.gl.currentTextures, 0, sizeof( rb.gl.currentTextures ) );
 }
 
-/*
-* RB_SelectTextureUnit
-*/
-void RB_SelectTextureUnit( int tmu )
-{
-	if( tmu == rb.gl.currentTMU )
-		return;
-
-	rb.gl.currentTMU = tmu;
-
-	qglActiveTextureARB( tmu + GL_TEXTURE0_ARB );
-#ifndef GL_ES_VERSION_2_0
-	qglClientActiveTextureARB( tmu + GL_TEXTURE0_ARB );
-#endif
-}
-
-/*
-* RB_BindTexture
-*/
-void RB_BindTexture( int tmu, const image_t *tex )
-{
-	GLuint texnum;
-
-	assert( tex != NULL );
-
-	if( r_nobind->integer && rsh.noTexture && tex->texnum != 0 )  // performance evaluation option
-		tex = rsh.noTexture;
-
-	RB_SelectTextureUnit( tmu );
-
-	texnum = tex->texnum;
-	if( rb.gl.currentTextures[tmu] == texnum )
-		return;
-
-	rb.gl.anyTexturesBound = 1;
-	rb.gl.currentTextures[tmu] = texnum;
-	if( tex->flags & IT_CUBEMAP )
-		qglBindTexture( GL_TEXTURE_CUBE_MAP_ARB, texnum );
-	else
-		qglBindTexture( GL_TEXTURE_2D, texnum );
-}
-
-/*
-* RB_AllocTextureNum
-*/
-void RB_AllocTextureNum( image_t *tex )
-{
-	qglGenTextures( 1, &tex->texnum );
-}
-
-/*
-* RB_FreeTextureNum
-*/
-void RB_FreeTextureNum( image_t *tex )
-{
-	qglDeleteTextures( 1, &tex->texnum );
-	tex->texnum = 0;
-
-	// Ensures that the RB_BindTexture call that may follow will work
-	if( rb.gl.anyTexturesBound ) {
-		rb.gl.anyTexturesBound = 0;
-		memset( rb.gl.currentTextures, 0, sizeof( rb.gl.currentTextures ) );
-	}
-}
 
 /*
 * RB_DepthRange
 */
-void RB_DepthRange( float depthmin, float depthmax )
+void RB_DepthRange( float depthmin, float depthmax, float depthoffset )
 {
-	rb.gl.depthmin = bound( 0, depthmin, 1 );
-	rb.gl.depthmax = bound( 0, depthmax, 1 );
-	qglDepthRange( rb.gl.depthmin, rb.gl.depthmax );
+	clamp( depthmin, 0.0f, 1.0f );
+	clamp( depthmax, 0.0f, 1.0f );
+	if( ( rb.gl.depthmin == depthmin ) && ( rb.gl.depthmax == depthmax ) && ( rb.gl.depthoffset == depthoffset ) )
+		return;
+
+	rb.gl.depthmin = depthmin;
+	rb.gl.depthmax = depthmax;
+	rb.gl.depthoffset = depthoffset;
+
+	depthmax -= depthoffset;
+	clamp( depthmax, 0.0f, 1.0f );
+
+	qglDepthRange( depthmin, depthmax );
 }
 
 /*
 * RB_GetDepthRange
 */
-void RB_GetDepthRange( float* depthmin, float *depthmax )
+void RB_GetDepthRange( float* depthmin, float *depthmax, float *depthoffset )
 {
 	*depthmin = rb.gl.depthmin;
 	*depthmax = rb.gl.depthmax;
+	*depthoffset = rb.gl.depthoffset;
 }
 
 /*
@@ -586,8 +514,7 @@ void RB_Viewport( int x, int y, int w, int h )
 */
 void RB_Clear( int bits, float r, float g, float b, float a )
 {
-	// this is required for glClear(GL_DEPTH_BUFFER_BIT) to work
-	if( bits & GL_DEPTH_BUFFER_BIT )
+	if( bits & (GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT) )
 		RB_SetState( GLSTATE_DEPTHWRITE );
 
 	if( bits & GL_STENCIL_BUFFER_BIT )
@@ -598,7 +525,7 @@ void RB_Clear( int bits, float r, float g, float b, float a )
 
 	qglClear( bits );
 
-	RB_DepthRange( 0, 1 );
+	RB_DepthRange( 0.0f, 1.0f, 0.0f );
 }
 
 /*
@@ -1162,16 +1089,11 @@ void RB_DrawElementsReal( void )
 			for( i = 0; i < numInstances; i++ ) {
 				RB_SetInstanceData( 1, rb.drawInstances + i );
 
-#ifndef GL_ES_VERSION_2_0
-				if( glConfig.ext.draw_range_elements )
-				{
+				if( glConfig.ext.draw_range_elements ) {
 					qglDrawRangeElementsEXT( rb.primitive, 
 						firstVert, firstVert + numVerts - 1, numElems, 
 						GL_UNSIGNED_SHORT, (GLvoid *)(firstElem * sizeof( elem_t )) );
-				}
-				else
-#endif
-				{
+				} else {
 					qglDrawElements( rb.primitive, numElems, GL_UNSIGNED_SHORT,
 						(GLvoid *)(firstElem * sizeof( elem_t )) );
 				}
@@ -1183,16 +1105,11 @@ void RB_DrawElementsReal( void )
 	else {
 		numInstances = 1;
 
-#ifndef GL_ES_VERSION_2_0
-		if( glConfig.ext.draw_range_elements )
-		{
+		if( glConfig.ext.draw_range_elements ) {
 			qglDrawRangeElementsEXT( rb.primitive, 
 				firstVert, firstVert + numVerts - 1, numElems, 
 				GL_UNSIGNED_SHORT, (GLvoid *)(firstElem * sizeof( elem_t )) );
-		}
-		else
-#endif
-		{
+		} else {
 			qglDrawElements( rb.primitive, numElems, GL_UNSIGNED_SHORT,
 				(GLvoid *)(firstElem * sizeof( elem_t )) );
 		}
@@ -1321,6 +1238,22 @@ void RB_SetCamera( const vec3_t cameraOrigin, const mat3_t cameraAxis )
 void RB_SetRenderFlags( int flags )
 {
 	rb.renderFlags = flags;
+}
+
+/*
+* RB_Finish
+*/
+void RB_Finish( void )
+{
+	qglFinish();
+}
+	
+/*
+* RB_Flush
+*/
+void RB_Flush( void )
+{
+	qglFlush();
 }
 
 /*

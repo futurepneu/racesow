@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // r_register.c
 #include "r_local.h"
+#include "../qalgo/hash.h"
 
 glconfig_t glConfig;
 
@@ -96,6 +97,7 @@ cvar_t *r_gamma;
 cvar_t *r_texturebits;
 cvar_t *r_texturemode;
 cvar_t *r_texturefilter;
+cvar_t *r_texturecompression;
 cvar_t *r_picmip;
 cvar_t *r_skymip;
 cvar_t *r_nobind;
@@ -119,6 +121,7 @@ cvar_t *gl_drawbuffer;
 cvar_t *gl_driver;
 cvar_t *gl_finish;
 cvar_t *gl_cull;
+cvar_t *r_multithreading;
 
 static qboolean	r_verbose;
 
@@ -191,7 +194,6 @@ static const gl_extension_func_t gl_ext_draw_range_elements_EXT_funcs[] =
 static const gl_extension_func_t gl_ext_GLSL_ARB_funcs[] =
 {
 	 GL_EXTENSION_FUNC(DeleteObjectARB)
-	,GL_EXTENSION_FUNC(GetHandleARB)
 	,GL_EXTENSION_FUNC(DetachObjectARB)
 	,GL_EXTENSION_FUNC(CreateShaderObjectARB)
 	,GL_EXTENSION_FUNC(ShaderSourceARB)
@@ -220,7 +222,6 @@ static const gl_extension_func_t gl_ext_GLSL_ARB_funcs[] =
 	,GL_EXTENSION_FUNC(UniformMatrix2fvARB)
 	,GL_EXTENSION_FUNC(UniformMatrix3fvARB)
 	,GL_EXTENSION_FUNC(UniformMatrix4fvARB)
-	,GL_EXTENSION_FUNC(GetObjectParameterfvARB)
 	,GL_EXTENSION_FUNC(GetObjectParameterivARB)
 	,GL_EXTENSION_FUNC(GetInfoLogARB)
 	,GL_EXTENSION_FUNC(GetAttachedObjectsARB)
@@ -240,8 +241,27 @@ static const gl_extension_func_t gl_ext_GLSL_ARB_funcs[] =
 	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
 };
 
+/* GL_ARB_GLSL_core (meta extension) */
+static const gl_extension_func_t gl_ext_GLSL_core_ARB_funcs[] =
+{
+	 GL_EXTENSION_FUNC(DeleteProgram)
+	,GL_EXTENSION_FUNC(DeleteShader)
+	,GL_EXTENSION_FUNC(DetachShader)
+	,GL_EXTENSION_FUNC(CreateShader)
+	,GL_EXTENSION_FUNC(CreateProgram)
+	,GL_EXTENSION_FUNC(AttachShader)
+	,GL_EXTENSION_FUNC(UseProgram)
+	,GL_EXTENSION_FUNC(GetProgramiv)
+	,GL_EXTENSION_FUNC(GetShaderiv)
+	,GL_EXTENSION_FUNC(GetProgramInfoLog)
+	,GL_EXTENSION_FUNC(GetShaderInfoLog)
+	,GL_EXTENSION_FUNC(GetAttachedShaders)
+
+	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
+};
+
 /* GL_ARB_GLSL130 (meta extension) */
-static const gl_extension_func_t gl_ext_GLSL_ARB130_funcs[] =
+static const gl_extension_func_t gl_ext_GLSL130_ARB_funcs[] =
 {
 	GL_EXTENSION_FUNC(BindFragDataLocation)
 
@@ -261,6 +281,16 @@ static const gl_extension_func_t gl_ext_draw_instanced_ARB_funcs[] =
 static const gl_extension_func_t gl_ext_instanced_arrays_ARB_funcs[] =
 {
 	 GL_EXTENSION_FUNC(VertexAttribDivisorARB)
+
+	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
+};
+
+/* GL_ARB_get_program_binary */
+static const gl_extension_func_t gl_ext_get_program_binary_ARB_funcs[] =
+{
+	 GL_EXTENSION_FUNC(ProgramParameteri)
+	,GL_EXTENSION_FUNC(GetProgramBinary)
+	,GL_EXTENSION_FUNC(ProgramBinary)
 
 	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
 };
@@ -298,11 +328,36 @@ static const gl_extension_func_t gl_ext_framebuffer_blit_EXT_funcs[] =
 
 #else // GL_ES_VERSION_2_0
 
-/* GL_EXT_multiview_draw_buffers */
-static const gl_extension_func_t gl_ext_multiview_draw_buffers_EXT_funcs[] =
+/* GL_ANGLE_framebuffer_blit */
+static const gl_extension_func_t gl_ext_framebuffer_blit_ANGLE_funcs[] =
 {
-	 GL_EXTENSION_FUNC(ReadBufferIndexedEXT)
-	,GL_EXTENSION_FUNC(DrawBuffersIndexedEXT)
+	GL_EXTENSION_FUNC(BlitFramebufferANGLE)
+
+	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
+};
+
+/* GL_NV_framebuffer_blit */
+static const gl_extension_func_t gl_ext_framebuffer_blit_NV_funcs[] =
+{
+	GL_EXTENSION_FUNC(BlitFramebufferNV)
+
+	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
+};
+
+/* GL_OES_get_program_binary */
+static const gl_extension_func_t gl_ext_get_program_binary_OES_funcs[] =
+{
+	 GL_EXTENSION_FUNC(GetProgramBinaryOES)
+	,GL_EXTENSION_FUNC(ProgramBinaryOES)
+
+	,GL_EXTENSION_FUNC_EXT(NULL,NULL)
+};
+
+/* GL_NV_multiview_draw_buffers */
+static const gl_extension_func_t gl_ext_multiview_draw_buffers_NV_funcs[] =
+{
+	 GL_EXTENSION_FUNC(ReadBufferIndexedNV)
+	,GL_EXTENSION_FUNC(DrawBuffersIndexedNV)
 };
 
 #endif // GL_ES_VERSION_2_0
@@ -347,23 +402,9 @@ static const gl_extension_func_t glx_ext_swap_control_SGI_funcs[] =
 static const gl_extension_t gl_extensions_decl[] =
 {
 #ifndef GL_ES_VERSION_2_0
+	// extensions required by meta-extension gl_ext_GLSL
 	 GL_EXTENSION( ARB, multitexture, true, true, &gl_ext_multitexture_ARB_funcs )
 	,GL_EXTENSION( ARB, vertex_buffer_object, true, true, &gl_ext_vertex_buffer_object_ARB_funcs )
-	,GL_EXTENSION( EXT, draw_range_elements, true, false, &gl_ext_draw_range_elements_EXT_funcs )
-	,GL_EXTENSION( EXT, framebuffer_object, true, true, &gl_ext_framebuffer_object_EXT_funcs )
-	,GL_EXTENSION_EXT( EXT, framebuffer_blit, 1, true, false, &gl_ext_framebuffer_blit_EXT_funcs, framebuffer_object )
-	,GL_EXTENSION_EXT( ARB, texture_compression, 0, false, false, NULL, _extMarker )
-	,GL_EXTENSION( EXT, texture_edge_clamp, true, true, NULL )
-	,GL_EXTENSION( ARB, texture_cube_map, false, false, NULL )
-	,GL_EXTENSION( EXT, bgra, true, false, NULL )
-	,GL_EXTENSION( ARB, depth_texture, false, false, NULL )
-	,GL_EXTENSION_EXT( ARB, shadow, 1, false, false, NULL, depth_texture )
-	,GL_EXTENSION( ARB, texture_non_power_of_two, false, false, NULL )
-	,GL_EXTENSION( ARB, draw_instanced, true, false, &gl_ext_draw_instanced_ARB_funcs )
-	,GL_EXTENSION( ARB, instanced_arrays, false, false, &gl_ext_instanced_arrays_ARB_funcs )
-	,GL_EXTENSION( ARB, half_float_vertex, false, false, NULL )
-
-	// extensions required by meta-extension gl_ext_GLSL
 	,GL_EXTENSION_EXT( ARB, vertex_shader, 1, true, true, NULL, multitexture )
 	,GL_EXTENSION_EXT( ARB, fragment_shader, 1, true, true, NULL, vertex_shader )
 	,GL_EXTENSION_EXT( ARB, shader_objects, 1, true,true,  NULL, fragment_shader )
@@ -371,23 +412,43 @@ static const gl_extension_t gl_extensions_decl[] =
 
 	// meta GLSL extensions
 	,GL_EXTENSION_EXT( \0, GLSL, 1, true, true, &gl_ext_GLSL_ARB_funcs, shading_language_100 )
-	,GL_EXTENSION_EXT( \0, GLSL130, 1, false, false, &gl_ext_GLSL_ARB130_funcs, GLSL )
+	,GL_EXTENSION_EXT( \0, GLSL_core, 1, true, false, &gl_ext_GLSL_core_ARB_funcs, GLSL )
+	,GL_EXTENSION_EXT( \0, GLSL130, 1, false, false, &gl_ext_GLSL130_ARB_funcs, GLSL )
+
+	,GL_EXTENSION( EXT, draw_range_elements, true, false, &gl_ext_draw_range_elements_EXT_funcs )
+	,GL_EXTENSION( EXT, framebuffer_object, true, true, &gl_ext_framebuffer_object_EXT_funcs )
+	,GL_EXTENSION_EXT( EXT, framebuffer_blit, 1, true, false, &gl_ext_framebuffer_blit_EXT_funcs, framebuffer_object )
+	,GL_EXTENSION( ARB, texture_compression, false, false, NULL )
+	,GL_EXTENSION( EXT, texture_edge_clamp, true, true, NULL )
+	,GL_EXTENSION( SGIS, texture_edge_clamp, true, true, NULL )
+	,GL_EXTENSION( ARB, texture_cube_map, false, false, NULL )
+	,GL_EXTENSION( ARB, depth_texture, false, false, NULL )
+	,GL_EXTENSION_EXT( ARB, shadow, 1, false, false, NULL, depth_texture )
+	,GL_EXTENSION( ARB, texture_non_power_of_two, false, false, NULL )
+	,GL_EXTENSION( ARB, draw_instanced, true, false, &gl_ext_draw_instanced_ARB_funcs )
+	,GL_EXTENSION( ARB, instanced_arrays, false, false, &gl_ext_instanced_arrays_ARB_funcs )
+	,GL_EXTENSION( ARB, half_float_vertex, false, false, NULL )
+	,GL_EXTENSION_EXT( ARB, get_program_binary, 0, false, false, &gl_ext_get_program_binary_ARB_funcs, _extMarker )
 
 	// memory info
 	,GL_EXTENSION( NVX, gpu_memory_info, true, false, NULL )
 	,GL_EXTENSION( ATI, meminfo, true, false, NULL )
 
 #else
-	 GL_EXTENSION( OES, depth_texture, false, false, NULL )
+	 GL_EXTENSION( NV, framebuffer_blit, true, false, &gl_ext_framebuffer_blit_NV_funcs )
+	,GL_EXTENSION( ANGLE, framebuffer_blit, true, false, &gl_ext_framebuffer_blit_ANGLE_funcs )
+	,GL_EXTENSION( OES, depth_texture, false, false, NULL )
 	,GL_EXTENSION_EXT( EXT, shadow_samplers, 1, false, false, NULL, depth_texture )
 	,GL_EXTENSION( OES, texture_npot, false, false, NULL )
 	,GL_EXTENSION( OES, vertex_half_float, false, false, NULL )
+	,GL_EXTENSION( OES, get_program_binary, false, false, &gl_ext_get_program_binary_OES_funcs )
 	,GL_EXTENSION( OES, depth24, true, false, NULL )
-	,GL_EXTENSION( EXT, multiview_draw_buffers, true, false, &gl_ext_multiview_draw_buffers_EXT_funcs )
-	,GL_EXTENSION( NV, multiview_draw_buffers, true, false, &gl_ext_multiview_draw_buffers_EXT_funcs )
+	,GL_EXTENSION( NV, multiview_draw_buffers, true, false, &gl_ext_multiview_draw_buffers_NV_funcs )
+	,GL_EXTENSION( OES, rgb8_rgba8, false, false, NULL )
 #endif
 
 	,GL_EXTENSION( EXT, texture_filter_anisotropic, true, false, NULL )
+	,GL_EXTENSION( EXT, bgra, true, false, NULL )
 
 #ifdef GLX_VERSION
 	,GL_EXTENSION( GLX_SGI, swap_control, true, false, &glx_ext_swap_control_SGI_funcs )
@@ -431,7 +492,7 @@ static qboolean R_RegisterGLExtensions( void )
 
 		cvar = ri.Cvar_Get( name, extension->cvar_default ? extension->cvar_default : "0", cvar_flags );
 		if( !cvar->integer )
-			goto non_avail;
+			continue;
 
 		// an alternative extension of higher priority is available so ignore this one
 		var = &(GLINF_FROM( &glConfig.ext, extension->offset ));
@@ -451,7 +512,7 @@ static qboolean R_RegisterGLExtensions( void )
 
 			Q_snprintfz( name, sizeof( name ), "%s_%s", extension->prefix, extension->name );
 			if( !strstr( extstring, name ) )
-				goto non_avail;
+				continue;
 		}
 
 		// initialize function pointers
@@ -480,16 +541,24 @@ static qboolean R_RegisterGLExtensions( void )
 					*(func2->pointer) = NULL;
 				} while( (++func2)->name && func2 != func );
 
-				goto non_avail;
+				continue;
 			}
 		}
 
 		// mark extension as available
 		*var = qtrue;
-		continue;
 
-non_avail:
-		if( extension->mandatory ) {
+	}
+
+	for( i = 0, extension = gl_extensions_decl; i < num_gl_extensions; i++, extension++ )
+	{
+		if( !extension->mandatory ) {
+			continue;
+		}
+		
+		var = &(GLINF_FROM( &glConfig.ext, extension->offset ));
+
+		if( !*var ) {
 			Sys_Error( "R_RegisterGLExtensions: '%s_%s' is not available, aborting\n", 
 				extension->prefix, extension->name );
 			return qfalse;
@@ -614,6 +683,7 @@ static void R_FinalizeGLExtensions( void )
 	glConfig.ext.multitexture = qtrue;
 	glConfig.ext.vertex_buffer_object = qtrue;
 	glConfig.ext.framebuffer_object = qtrue;
+	glConfig.ext.texture_compression = qtrue;
 	glConfig.ext.texture_edge_clamp = qtrue;
 	glConfig.ext.texture_cube_map = qtrue;
 	glConfig.ext.vertex_shader = qtrue;
@@ -621,15 +691,21 @@ static void R_FinalizeGLExtensions( void )
 	glConfig.ext.shader_objects = qtrue;
 	glConfig.ext.shading_language_100 = qtrue;
 	glConfig.ext.GLSL = qtrue;
-	if( glConfig.version >= 300 ) {
+	glConfig.ext.GLSL_core = qtrue;
+	if( glConfig.version >= 300 )
+	{
+		glConfig.ext.draw_range_elements = qtrue;
 		glConfig.ext.depth_texture = qtrue;
 		glConfig.ext.shadow = qtrue;
 		glConfig.ext.texture_non_power_of_two = qtrue;
 		glConfig.ext.draw_instanced = qtrue;
 		glConfig.ext.instanced_arrays = qtrue;
 		glConfig.ext.half_float_vertex = qtrue;
+		glConfig.ext.framebuffer_blit = qtrue;
+		glConfig.ext.get_program_binary = qtrue;
 		glConfig.ext.depth24 = qtrue;
 		glConfig.ext.GLSL130 = qtrue;
+		glConfig.ext.rgb8_rgba8 = qtrue;
 	}
 #endif
 
@@ -640,6 +716,25 @@ static void R_FinalizeGLExtensions( void )
 
 	ri.Cvar_Get( "gl_max_texture_size", "0", CVAR_READONLY );
 	ri.Cvar_ForceSet( "gl_max_texture_size", va( "%i", glConfig.maxTextureSize ) );
+
+	/* GL_ARB_GLSL_core (meta extension) */
+#ifndef GL_ES_VERSION_2_0
+	if( !glConfig.ext.GLSL_core )
+	{
+		qglDeleteProgram = qglDeleteObjectARB;
+		qglDeleteShader = qglDeleteObjectARB;
+		qglDetachShader = qglDetachObjectARB;
+		qglCreateShader = qglCreateShaderObjectARB;
+		qglCreateProgram = qglCreateProgramObjectARB;
+		qglAttachShader = qglAttachObjectARB;
+		qglUseProgram = qglUseProgramObjectARB;
+		qglGetProgramiv = qglGetObjectParameterivARB;
+		qglGetShaderiv = qglGetObjectParameterivARB;
+		qglGetProgramInfoLog = qglGetInfoLogARB;
+		qglGetShaderInfoLog = qglGetInfoLogARB;
+		qglGetAttachedShaders = qglGetAttachedObjectsARB;
+	}
+#endif
 
 	/* GL_ARB_texture_cube_map */
 	glConfig.maxTextureCubemapSize = 0;
@@ -653,14 +748,37 @@ static void R_FinalizeGLExtensions( void )
 	qglGetIntegerv( GL_MAX_TEXTURE_UNITS_ARB, &glConfig.maxTextureUnits );
 	clamp( glConfig.maxTextureUnits, 1, MAX_TEXTURE_UNITS );
 
+	/* GL_EXT_framebuffer_object */
+#ifndef GL_ES_VERSION_2_0
+	glConfig.ext.depth24 = glConfig.ext.framebuffer_object;
+	glConfig.ext.rgb8_rgba8 = glConfig.ext.framebuffer_object;
+#endif
+
 	/* GL_EXT_texture_filter_anisotropic */
 	glConfig.maxTextureFilterAnisotropic = 0;
 	if( strstr( glConfig.extensionsString, "GL_EXT_texture_filter_anisotropic" ) )
 		qglGetIntegerv( GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &glConfig.maxTextureFilterAnisotropic );
 
-	/* GL_OES_depth24 */
-#ifndef GL_ES_VERSION_2_0
-	glConfig.ext.depth24 = glConfig.ext.framebuffer_object;
+	/* GL_EXT_framebuffer_blit */
+#ifdef GL_ES_VERSION_2_0
+	if( glConfig.ext.framebuffer_blit && !qglBlitFramebufferEXT )
+	{
+		if( qglBlitFramebufferNV )
+			qglBlitFramebufferEXT = qglBlitFramebufferNV;
+		else if( qglBlitFramebufferANGLE )
+			qglBlitFramebufferEXT = qglBlitFramebufferANGLE;
+		else
+			glConfig.ext.framebuffer_blit = qfalse;
+	}
+#endif
+
+	/* GL_ARB_get_program_binary */
+#ifdef GL_ES_VERSION_2_0
+	if( glConfig.version < 300 )
+	{
+		qglGetProgramBinary = qglGetProgramBinaryOES;
+		qglProgramBinary = qglProgramBinaryOES;
+	}
 #endif
 
 	/* GL_EXT_multiview_draw_buffers */
@@ -668,7 +786,7 @@ static void R_FinalizeGLExtensions( void )
 	if( glConfig.ext.multiview_draw_buffers )
 	{
 		val = 0;
-		qglGetIntegerv( GL_MAX_MULTIVIEW_BUFFERS_EXT, &val );
+		qglGetIntegerv( GL_MAX_MULTIVIEW_BUFFERS_NV, &val );
 		if( val <= 1 )
 			glConfig.stereoEnabled = qfalse;
 	}
@@ -692,15 +810,17 @@ static void R_FinalizeGLExtensions( void )
 	glConfig.maxVaryingFloats = 0;
 	glConfig.maxVertexUniformComponents = glConfig.maxFragmentUniformComponents = 0;
 
-	qglGetIntegerv( GL_MAX_VARYING_FLOATS_ARB, &glConfig.maxVaryingFloats );
 	qglGetIntegerv( GL_MAX_VERTEX_ATTRIBS_ARB, &glConfig.maxVertexAttribs );
 #ifdef GL_ES_VERSION_2_0
-	qglGetIntegerv( GL_MAX_VERTEX_UNIFORM_COMPONENTS_ARB, &glConfig.maxVertexUniformComponents );
-	qglGetIntegerv( GL_MAX_FRAGMENT_UNIFORM_COMPONENTS_ARB, &glConfig.maxFragmentUniformComponents );
+	qglGetIntegerv( GL_MAX_VARYING_VECTORS, &glConfig.maxVaryingFloats );
+	qglGetIntegerv( GL_MAX_VERTEX_UNIFORM_VECTORS, &glConfig.maxVertexUniformComponents );
+	qglGetIntegerv( GL_MAX_FRAGMENT_UNIFORM_VECTORS, &glConfig.maxFragmentUniformComponents );
+	glConfig.maxVaryingFloats *= 4;
 	glConfig.maxVertexUniformComponents *= 4;
 	glConfig.maxFragmentUniformComponents *= 4;
 #else
 	qglGetIntegerv( GL_MAX_VERTEX_UNIFORM_COMPONENTS_ARB, &glConfig.maxVertexUniformComponents );
+	qglGetIntegerv( GL_MAX_VARYING_FLOATS_ARB, &glConfig.maxVaryingFloats );
 	qglGetIntegerv( GL_MAX_FRAGMENT_UNIFORM_COMPONENTS_ARB, &glConfig.maxFragmentUniformComponents );
 #endif
 
@@ -756,6 +876,37 @@ static void R_FinalizeGLExtensions( void )
 	if( r_lighting_maxlmblocksize->integer > glConfig.maxTextureSize / 4 &&
 		!(glConfig.maxTextureSize / 4 < min(QF_LIGHTMAP_WIDTH,QF_LIGHTMAP_HEIGHT)*2) )
 		ri.Cvar_ForceSet( "r_lighting_maxlmblocksize", va( "%i", glConfig.maxTextureSize / 4 ) );
+}
+
+/*
+* R_FillStartupBackgroundColor
+*
+* Fills the window with a color during the initialization.
+*/
+static void R_FillStartupBackgroundColor( void )
+{
+	qglClearColor( 0.1, 0.09, 0.12, 1.0 );
+	GLimp_BeginFrame();
+	if( glConfig.stereoEnabled )
+	{
+#ifdef GL_ES_VERSION_2_0
+		int location = GL_MULTIVIEW_NV;
+		int index = 1;
+		qglDrawBuffersIndexedNV( 1, &location, &index );
+		qglClear( GL_COLOR_BUFFER_BIT );
+		index = 0;
+		qglDrawBuffersIndexedNV( 1, &location, &index );
+#else
+		qglDrawBuffer( GL_BACK_LEFT );
+		qglClear( GL_COLOR_BUFFER_BIT );
+		qglDrawBuffer( GL_BACK_RIGHT );
+		qglClear( GL_COLOR_BUFFER_BIT );
+		qglDrawBuffer( GL_BACK );
+#endif
+	}
+	qglClear( GL_COLOR_BUFFER_BIT );
+	qglFinish();
+	GLimp_EndFrame();
 }
 
 static void R_Register( const char *screenshotsPrefix )
@@ -843,6 +994,7 @@ static void R_Register( const char *screenshotsPrefix )
 	r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
 	r_texturemode = ri.Cvar_Get( "r_texturemode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
 	r_texturefilter = ri.Cvar_Get( "r_texturefilter", "4", CVAR_ARCHIVE );
+	r_texturecompression = ri.Cvar_Get( "r_texturecompression", "0", CVAR_ARCHIVE | CVAR_LATCH_VIDEO );
 	r_stencilbits = ri.Cvar_Get( "r_stencilbits", "8", CVAR_ARCHIVE|CVAR_LATCH_VIDEO );
 
 	r_screenshot_jpeg = ri.Cvar_Get( "r_screenshot_jpeg", "1", CVAR_ARCHIVE );
@@ -867,6 +1019,8 @@ static void R_Register( const char *screenshotsPrefix )
 	r_wallcolor->modified = r_floorcolor->modified = qtrue;
 
 	r_maxglslbones = ri.Cvar_Get( "r_maxglslbones", STR_TOSTR( MAX_GLSL_UNIFORM_BONES ), CVAR_LATCH_VIDEO );
+
+	r_multithreading = ri.Cvar_Get( "r_multithreading", "0", CVAR_ARCHIVE|CVAR_LATCH_VIDEO );
 
 	gl_finish = ri.Cvar_Get( "gl_finish", "0", CVAR_ARCHIVE );
 	gl_cull = ri.Cvar_Get( "gl_cull", "1", 0 );
@@ -927,6 +1081,42 @@ static void R_GfxInfo_f( void )
 }
 
 /*
+* R_GLVersionHash
+*/
+static unsigned R_GLVersionHash( const char *vendorString, 
+	const char *rendererString, const char *versionString )
+{
+	qbyte *tmp;
+	size_t csize;
+	size_t tmp_size, pos;
+	unsigned hash;
+
+	tmp_size = strlen( vendorString ) + strlen( rendererString ) +
+		strlen( versionString ) + 1;
+
+	pos = 0;
+	tmp = R_Malloc( tmp_size );
+
+	csize = strlen( vendorString );
+	memcpy( tmp + pos, vendorString, csize );
+	pos += csize;
+
+	csize = strlen( rendererString );
+	memcpy( tmp + pos, rendererString, csize );
+	pos += csize;
+
+	csize = strlen( versionString );
+	memcpy( tmp + pos, versionString, csize );
+	pos += csize;
+
+	hash = COM_SuperFastHash( tmp, tmp_size, tmp_size );
+
+	R_Free( tmp );
+
+	return hash;
+}
+
+/*
 * R_Init
 */
 rserr_t R_Init( const char *applicationName, const char *screenshotPrefix,
@@ -937,8 +1127,6 @@ rserr_t R_Init( const char *applicationName, const char *screenshotPrefix,
 	const char *dllname;
 	qgl_initerr_t initerr;
 	int i;
-	char renderer_buffer[1024];
-	char vendor_buffer[1024];
 	rserr_t err;
 	GLenum glerr;
 
@@ -989,7 +1177,7 @@ init_qgl:
 		return err;
 	}
 
-	glConfig.hwGamma = GLimp_GetGammaRamp( 256, glConfig.orignalGammaRamp );
+	glConfig.hwGamma = GLimp_GetGammaRamp( GAMMARAMP_STRIDE, &glConfig.gammaRampSize, glConfig.originalGammaRamp );
 	if( glConfig.hwGamma )
 		r_gamma->modified = qtrue;
 
@@ -1010,11 +1198,8 @@ init_qgl:
 	if( !glConfig.glwExtensionsString ) glConfig.glwExtensionsString = "";
 	if( !glConfig.shadingLanguageVersionString ) glConfig.shadingLanguageVersionString = "";
 
-	Q_strncpyz( renderer_buffer, glConfig.rendererString, sizeof( renderer_buffer ) );
-	Q_strlwr( renderer_buffer );
-
-	Q_strncpyz( vendor_buffer, glConfig.vendorString, sizeof( vendor_buffer ) );
-	Q_strlwr( vendor_buffer );
+	glConfig.versionHash = R_GLVersionHash( glConfig.vendorString, glConfig.rendererString,
+		glConfig.versionString );
 
 	memset( &rsh, 0, sizeof( rsh ) );
 	memset( &rf, 0, sizeof( rf ) );
@@ -1033,6 +1218,8 @@ init_qgl:
 		QGL_Shutdown();
 		return rserr_unknown;
 	}
+
+	R_FillStartupBackgroundColor();
 
 	R_TextureMode( r_texturemode->string );
 
@@ -1184,12 +1371,6 @@ void R_Shutdown( qboolean verbose )
 
 	R_StopAviDemo();
 
-	// destroy compiled GLSL programs
-	RP_Shutdown();
-
-	// shutdown rendering backend
-	RB_Shutdown();
-
 	// free shaders, models, etc.
 
 	R_DestroyVolatileAssets();
@@ -1208,9 +1389,15 @@ void R_Shutdown( qboolean verbose )
 
 	RFB_Shutdown();
 
+	// shutdown rendering backend
+	RB_Shutdown();
+
+	// destroy compiled GLSL programs
+	RP_Shutdown();
+
 	// restore original gamma
 	if( glConfig.hwGamma )
-		GLimp_SetGammaRamp( 256, glConfig.orignalGammaRamp );
+		GLimp_SetGammaRamp( GAMMARAMP_STRIDE, glConfig.gammaRampSize, glConfig.originalGammaRamp );
 
 	// shut down OS specific OpenGL stuff like contexts, etc.
 	GLimp_Shutdown();

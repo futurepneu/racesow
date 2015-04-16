@@ -48,12 +48,8 @@ void RB_LoadObjectMatrix( const mat4_t m );
 void RB_LoadModelviewMatrix( const mat4_t m );
 void RB_LoadProjectionMatrix( const mat4_t m );
 
-void RB_BindTexture( int tmu, const image_t *tex );
-void RB_AllocTextureNum( image_t *tex );
-void RB_FreeTextureNum( image_t *tex );
-
-void RB_DepthRange( float depthmin, float depthmax );
-void RB_GetDepthRange( float* depthmin, float *depthmax );
+void RB_DepthRange( float depthmin, float depthmax, float depthoffset );
+void RB_GetDepthRange( float* depthmin, float *depthmax, float *depthoffset );
 void RB_Cull( int cull );
 void RB_SetState( int state );
 void RB_FrontFace( qboolean front );
@@ -82,6 +78,9 @@ void RB_EndBatch( void );
 void RB_DrawElements( int firstVert, int numVerts, int firstElem, int numElems );
 void RB_DrawElementsInstanced( int firstVert, int numVerts, int firstElem, int numElems, 
 	int numInstances, instancePoint_t *instances );
+
+void RB_Finish( void );
+void RB_Flush( void );
 
 // shader
 void RB_BindShader( const entity_t *e, const struct shader_s *shader, const struct mfog_s *fog );
