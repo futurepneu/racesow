@@ -128,7 +128,7 @@ const float pm_failedwjbouncefactor = 0.1f;
 #define VectorScale2D( in, scale, out ) ( ( out )[0] = ( in )[0]*( scale ), ( out )[1] = ( in )[1]*( scale ) )
 #define DotProduct2D( x, y )	       ( ( x )[0]*( y )[0]+( x )[1]*( y )[1] )
 
-static vec_t VectorNormalize2D( vec3_t v ) // ByMiK : normalize horizontally (don't affect Z value)
+static float VectorNormalize2D( vec3_t v ) // ByMiK : normalize horizontally (don't affect Z value)
 {
 	float length, ilength;
 	length = v[0]*v[0] + v[1]*v[1];
@@ -378,6 +378,7 @@ static void PM_StepSlideMove( void )
 	vec3_t down_o, down_v;
 	trace_t	trace;
 	float down_dist, up_dist;
+	float start_s; // racesow
 	vec3_t up, down;
 	int blocked;
 
@@ -433,8 +434,12 @@ static void PM_StepSlideMove( void )
 	}
 
 	// racesow - Preserve speed when sliding up ramps
-	if( ISWALKABLEPLANE( &trace.plane ) )
-		VectorCopy( start_v, pml.velocity );
+	start_s = sqrt( start_v[0]*start_v[0] + start_v[1]*start_v[1] );
+	if( start_s && ISWALKABLEPLANE( &trace.plane ) )
+	{
+		VectorNormalize2D( pml.velocity );
+		VectorScale2D( pml.velocity, start_s, pml.velocity );
+	}
 	// !racesow
 
 	// wsw : jal : The following line is what produces the ramp sliding.
@@ -1056,8 +1061,7 @@ static void PM_CheckJump( void )
 	pm->groundentity = -1;
 
 	// racesow - Clip against the ground when jumping if moving that direction
-	if( pml.velocity[0] * pml.groundplane.normal[0] + pml.velocity[1] * pml.groundplane.normal[1] > 0 )
-		GS_ClipVelocity( pml.velocity, pml.groundplane.normal, pml.velocity, PM_OVERBOUNCE );
+	RS_ClipRampVelocity( pml.velocity, pml.groundplane.normal, pml.velocity, PM_OVERBOUNCE );
 	// racesow
 
 	//if( gs.module == GS_MODULE_GAME ) GS_Printf( "upvel %f\n", pml.velocity[2] );
@@ -1120,8 +1124,7 @@ static void PM_CheckDash( void )
 		pm->groundentity = -1;
 
 		// racesow - Clip against the ground when jumping if moving that direction
-		if( pml.velocity[0] * pml.groundplane.normal[0] + pml.velocity[1] * pml.groundplane.normal[1] > 0 )
-			GS_ClipVelocity( pml.velocity, pml.groundplane.normal, pml.velocity, PM_OVERBOUNCE );
+		RS_ClipRampVelocity( pml.velocity, pml.groundplane.normal, pml.velocity, PM_OVERBOUNCE );
 		// racesow
 
 		if( pml.velocity[2] <= 0.0f )

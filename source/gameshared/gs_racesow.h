@@ -14,6 +14,7 @@ typedef struct rs_racetime_s
 	int milli;
 } rs_racetime_t;
 
+void RS_ClipRampVelocity(vec3_t in, vec3_t normal, vec3_t out, float overbounce);
 void RS_ResetPjState(int playerNum);
 void RS_ResetPsState(int playerNum);
 qboolean RS_QueryPjState(int playerNum);

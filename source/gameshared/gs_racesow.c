@@ -14,6 +14,17 @@ static int ps_plasma[MAX_CLIENTS] = {0};
 static int ps_grenades[MAX_CLIENTS] = {0};
 
 /**
+ * RS_ClipRampVelocity
+ * Force clip velocity against the ground when jumping/dashing on a ramp. This
+ * ensures each jump/dash on a ramp will gain speed.
+ */
+void RS_ClipRampVelocity(vec3_t in, vec3_t normal, vec3_t out, float overbounce)
+{
+	if( normal[2] > 0 && in[2] < 0 && in[0] * normal[0] + in[1] * normal[1] > 0 )
+		GS_ClipVelocity( in, normal, out, overbounce );
+}
+
+/**
  * RS_ResetPjState
  * Fully reset the prejump state for a given player
  * @param playerNum the player's client number
