@@ -1056,12 +1056,12 @@ static void PM_CheckJump( void )
 	}
 	else
 	{
-		pm->playerState->pmove.pm_time = 150;
 		module_PredictedEvent( pm->playerState->POVnum, EV_JUMP, 0 );
 		pml.velocity[2] = pml.jumpPlayerSpeed;
 	}
 
 	// remove wj count
+	pm->playerState->pmove.pm_time = 250 >> 3;
 	pm->playerState->pmove.pm_flags &= ~PMF_JUMPPAD_TIME;
 	PM_ClearDash();
 	PM_ClearWallJump();
