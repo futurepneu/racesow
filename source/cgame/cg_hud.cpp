@@ -106,6 +106,11 @@ static const char *customWeaponSelectPic;
 
 //=============================================================================
 
+static int CG_GetPMTime( const void *parameter )
+{
+	return cg.predictedPlayerState.pmove.pm_time;
+}
+
 static int CG_GetStatEnemyTeam( const void *parameter )
 {
 	return ( ( cg.predictedPlayerState.stats[STAT_TEAM] == TEAM_ALPHA ) ? TEAM_BETA :
@@ -489,7 +494,8 @@ static const reference_numeric_t cg_numeric_references[] =
 {
 	// stats
 	{ "HEALTH", CG_GetStatValue, (void *)STAT_HEALTH },
-	{ "ARMOR", CG_GetStatValue, (void *)STAT_ARMOR },
+	{ "ARMOR", CG_GetPMTime, NULL },
+	// { "ARMOR", CG_GetStatValue, (void *)STAT_ARMOR },
 	{ "WEAPON_ITEM", CG_GetStatValue, (void *)STAT_WEAPON },
 	{ "PENDING_WEAPON", CG_GetStatValue, (void *)STAT_PENDING_WEAPON },
 
