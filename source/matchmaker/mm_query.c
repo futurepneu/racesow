@@ -335,6 +335,14 @@ stat_query_t *StatQuery_CreateRootQuery( const char *str, qboolean get )
 
 	return query;
 }
+
+int StatQuery_Header( stat_query_t *query, const char *key, const char *value )
+{
+	if( !query->req )
+		return -1;
+
+	return wswcurl_header( query->req, key, value );
+}
 // !racesow
 
 void StatQuery_DestroyQuery( stat_query_t *query )
@@ -643,6 +651,7 @@ void StatQuery_Init( void )
 	// populate API structure
 	sq_export.CreateQuery = StatQuery_CreateQuery;
 	sq_export.CreateRootQuery = StatQuery_CreateRootQuery; // racesow
+	sq_export.Header = StatQuery_Header; // racesow
 	sq_export.DestroyQuery = StatQuery_DestroyQuery;
 	sq_export.SetCallback = StatQuery_SetCallback;
 	sq_export.Send = StatQuery_Send;
