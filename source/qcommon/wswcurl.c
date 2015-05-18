@@ -183,6 +183,18 @@ int wswcurl_set_postfields( wswcurl_req *req, const char *fields, size_t size )
 	return 0;
 }
 
+// racesow
+int wswcurl_customrequest( wswcurl_req *req, const char *method )
+{
+	if ( !req )
+		return -1;
+
+	curl_easy_setopt( req->curl, CURLOPT_CUSTOMREQUEST, method );
+
+	return 0;
+}
+// !racesow
+
 void wswcurl_urlencode( const char *src, char *dst, size_t size )
 {
 	char *curl_esc;

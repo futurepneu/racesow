@@ -88,6 +88,10 @@ int wswcurl_formadd_raw(wswcurl_req *req, const char *field, void *data, size_t 
  */
 int wswcurl_set_postfields( wswcurl_req *req, const char *fields, size_t size );
 /**
+ * Set custom HTTP method for the request.
+ */
+int wswcurl_customrequest( wswcurl_req *req, const char *method );
+/**
  * Converts the given null-terminated string to an URL encoded null-terminated string.
  */
 void wswcurl_urlencode( const char *src, char *dst, size_t size );

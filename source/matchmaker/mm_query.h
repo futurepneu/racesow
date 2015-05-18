@@ -31,6 +31,7 @@ typedef struct stat_query_api_s
 	stat_query_t *( *CreateQuery )( const char *str, qboolean get );
 	stat_query_t *( *CreateRootQuery )( const char *str, qboolean get ); // racesow
 	int ( *Header )( stat_query_t *query, const char *key, const char *value ); // racesow
+	int ( *CustomRequest )( stat_query_t *query, const char *method ); // racesow
 	// this is automatically called after calling users callback function so you rarely need to call this yourself
 	void ( *DestroyQuery )( stat_query_t *query );
 	void ( *SetCallback )( stat_query_t *query, void (*callback_fn)( stat_query_t *, qboolean, void *), void *customp );

@@ -343,6 +343,14 @@ int StatQuery_Header( stat_query_t *query, const char *key, const char *value )
 
 	return wswcurl_header( query->req, key, value );
 }
+
+int StatQuery_CustomRequest( stat_query_t *query, const char *method )
+{
+	if( !query->req )
+		return -1;
+
+	return wswcurl_customrequest( query->req, method );
+}
 // !racesow
 
 void StatQuery_DestroyQuery( stat_query_t *query )
@@ -652,6 +660,7 @@ void StatQuery_Init( void )
 	sq_export.CreateQuery = StatQuery_CreateQuery;
 	sq_export.CreateRootQuery = StatQuery_CreateRootQuery; // racesow
 	sq_export.Header = StatQuery_Header; // racesow
+	sq_export.CustomRequest = StatQuery_CustomRequest; // racesow
 	sq_export.DestroyQuery = StatQuery_DestroyQuery;
 	sq_export.SetCallback = StatQuery_SetCallback;
 	sq_export.Send = StatQuery_Send;
