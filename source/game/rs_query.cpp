@@ -8,17 +8,15 @@
 
 static stat_query_api_t *rs_sqapi;
 
-cvar_t *sv_mm_authkey;
 cvar_t *rs_statsEnabled;
 cvar_t *rs_statsUrl;
-cvar_t *rs_statsId;
+cvar_t *rs_statsToken;
 
 void RS_InitQuery( void )
 {
-	sv_mm_authkey = trap_Cvar_Get( "sv_mm_authkey", "", CVAR_ARCHIVE );
 	rs_statsEnabled = trap_Cvar_Get( "rs_statsEnabled", "0", CVAR_ARCHIVE );
 	rs_statsUrl = trap_Cvar_Get( "rs_statsUrl", "", CVAR_ARCHIVE );
-	rs_statsId = trap_Cvar_Get( "rs_statsId", "", CVAR_ARCHIVE );
+	rs_statsToken = trap_Cvar_Get( "rs_statsToken", "", CVAR_ARCHIVE );
 	rs_sqapi = trap_GetStatQueryAPI();
 	if( !rs_sqapi )
 		trap_Cvar_ForceSet( rs_statsEnabled->name, "0" );
@@ -66,18 +64,7 @@ static char *RS_ParseRace( cJSON *record )
  */
 static void RS_SignQuery( stat_query_t *query )
 {
-	int uTime = (int)time( NULL );
-	unsigned char digest[SHA256_DIGEST_SIZE];
-	char *digest64, *message = va( "%d|%s", uTime, sv_mm_authkey->string );
-	size_t outlen;
-
-	// Make the auth token
-	sha256( (const unsigned char*)message, strlen( message ), digest );
-	digest64 = (char*)base64_encode( digest, (size_t)SHA256_DIGEST_SIZE, &outlen );
-
-	rs_sqapi->SetField( query, "uTime", va( "%d", uTime ) );
-	rs_sqapi->SetField( query, "sToken", va( "%d.%s", rs_statsId->integer, digest64 ) );
-	free( digest64 );
+	rs_sqapi->Header( query, "Authorization", va( "Token %s", rs_statsToken->string ) );
 }
 
 /**
@@ -176,16 +163,26 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 
 	if( rs_sqapi->GetStatus( query ) != 200 )
 	{
-		G_Printf( "%sError:%s Failed to query map.\nDisabling statistics reporting.", 
+		G_Printf( "%sError:%s Failed to query map.\nDisabling statistics reporting.\n", 
 					S_COLOR_RED, S_COLOR_WHITE );
 		trap_Cvar_ForceSet( rs_statsEnabled->name, "0" );
 		return;
 	}
 
-	// We assume the response is properly formed
+
 	data = (cJSON*)rs_sqapi->GetRoot( query );
-	authmap.id = cJSON_GetObjectItem( data, "id" )->valueint;
-	G_Printf( "Map id: %d\n", authmap.id );
+
+	node = cJSON_GetObjectItem( data, "id" );
+	if( !node || node->type != cJSON_Number )
+	{
+		G_Printf( "%sError:%s Failed to query map.\nDisabling statistics reporting.\n", 
+					S_COLOR_RED, S_COLOR_WHITE );
+		trap_Cvar_ForceSet( rs_statsEnabled->name, "0" );
+		return;
+	}
+
+	authmap.id = node->valueint;
+	G_Printf( "RS_AuthMap: Success, map id: %d\n", authmap.id );
 
 	// Check for a world record
 	node = cJSON_GetObjectItem( data, "record" );
@@ -206,8 +203,11 @@ void RS_AuthMap( void )
 	if( !rs_statsEnabled->integer )
 		return;
 
+	G_Printf( "RS_AuthMap: Querying Map %s\n", authmap.b64name );
+
 	// Form the query
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/map/%s", rs_statsUrl->string, authmap.b64name ), qtrue );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/maps/%s", rs_statsUrl->string, authmap.b64name ), qtrue );
+	rs_sqapi->SetField( query, "record", "" );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
 
 	RS_SignQuery( query );
