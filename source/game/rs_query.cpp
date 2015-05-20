@@ -6,11 +6,20 @@
 #include "../qalgo/base64.h"
 #include "../qalgo/sha2.h"
 
+static const int RS_MAPLIST_ITEMS = 50;		// Number of results per page in maplist
+static const int RS_MAPLIST_TAGLEN = 150;	// Maximum number of chars for tags in maplist
+
 static stat_query_api_t *rs_sqapi;
 
 cvar_t *rs_statsEnabled;
 cvar_t *rs_statsUrl;
 cvar_t *rs_statsToken;
+
+// Helper function to set object fields
+static void rs_setString( cJSON *parent, const char *key, const char *value )
+{
+	cJSON_AddItemToObject( parent, key, cJSON_CreateString( value ) );
+}
 
 void RS_InitQuery( void )
 {
@@ -28,30 +37,51 @@ void RS_ShutdownQuery( void )
 
 /**
  * Parse a race record from a database query into a race string
+ * "racetime cp1 cp2 cp3... cpN"
  * @param  record The json object of the record
  * @return        String representing the race
  */
 static char *RS_ParseRace( cJSON *record )
 {
 	static char args[1024];
-	cJSON *node;
+	cJSON *node, *leaf;
 	std::vector<int> argv;
-	int cpNum, cpTime;
-
-	// Parse the world record into a string to hand to angelscript
-	// "racetime cp1 cp2 cp3... cpN"
-	argv.push_back( cJSON_GetObjectItem( record, "time" )->valueint );
-	node = cJSON_GetObjectItem( record, "checkpoints" )->child;
-	for( ; node; node=node->next )
-	{
-		cpNum = cJSON_GetObjectItem( node, "number" )->valueint;
-		cpTime = cJSON_GetObjectItem( node, "time" )->valueint;
-		if( cpNum + 1 >= (int)argv.size() )
-			argv.resize( cpNum + 2 );
-		argv[cpNum + 1] = cpTime;
-	}
+	int cpNum;
 
 	memset( args, 0, sizeof( args ) );
+
+	// Send an empty string if we don't have a time
+	node = cJSON_GetObjectItem( record, "time" );
+	if( !node || node->type != cJSON_Number )
+		return args;
+
+	Q_strncatz( args, va( "%d ", node->valueint ), sizeof( args ) - 1 );
+
+	// We're done if there are no checkpoints
+	node = cJSON_GetObjectItem( record, "checkpoints" );
+	if( !node || node->type != cJSON_Object )
+		return args;
+
+	for( node = node->child; node; node = node->next )
+	{
+		// Get the cp's index
+		leaf = cJSON_GetObjectItem( node, "number" );
+		if( !leaf || leaf->type != cJSON_Number )
+			continue;
+
+		// Make sure the cp array is large enough
+		cpNum = leaf->valueint;
+		if( cpNum >= (int)argv.size() )
+			argv.resize( cpNum + 1);
+
+		// Get the cp's time
+		leaf = cJSON_GetObjectItem( node, "time" );
+		if( !leaf || leaf->type != cJSON_Number )
+			continue;
+
+		argv[cpNum] = leaf->valueint;
+	}
+
 	for(std::vector<int>::iterator it = argv.begin(); it != argv.end(); ++it)
 		Q_strncatz( args, va( "%d ", *it ), sizeof( args ) - 1 );
 
@@ -75,50 +105,70 @@ static void RS_SignQuery( stat_query_t *query )
  */
 void RS_AuthNick_Done( stat_query_t *query, qboolean success, void *customp )
 {
-	static char simpName[MAX_NAME_CHARS];
 	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
-	cJSON *data;
-	int playerNum;
+	cJSON *data, *node;
+	int playerNum, status;
 
 	// Did they disconnect?
 	playerNum = (int)( player->client - game.clients );
 	if( playerNum < 0 || playerNum >= gs.maxclients )
-		return;
-
-	if( rs_sqapi->GetStatus( query ) != 200 )
 	{
-		// Query failed, give them benefit of the doubt
-		player->failTime = 0;
-		player->nickStatus = QSTATUS_SUCCESS;
+		G_Printf( "RS_AuthNick: Client disconnected\n" );
 		return;
 	}
 
-	data = ((cJSON*)rs_sqapi->GetRoot( query ))->child;
+	data = (cJSON*)rs_sqapi->GetRoot( query );
+	status = rs_sqapi->GetStatus( query );
+
+	if( !data || status != 200 )
+	{
+		// Query failed, give them benefit of the doubt
+		G_Printf( "RS_AuthNick: Query for %s failed with status %d\n", player->last, status );
+		player->failTime = 0;
+		player->nickStatus = QSTATUS_FAILED;
+		return;
+	}
+
+	// Innocent until proven guilty
+	player->failTime = 0;
+	player->thinkTime = 0;
+	player->nickStatus = QSTATUS_SUCCESS;
 
 	// Did they change name before the query returned?
-	Q_strncpyz( simpName, COM_RemoveColorTokens( player->client->netname ), sizeof( simpName ) );
-	if( Q_stricmp( simpName, data->string ) )
+	if( Q_stricmp( player->last, COM_RemoveColorTokens( player->client->netname ) ) )
 	{
+		G_Printf( "RS_AuthNick: %s nick changed since last query, reissuing query\n", player->last );
 		RS_PlayerUserinfoChanged( player, NULL );
 		return;
 	}
 
-	// Update players latest nick
-	Q_strncpyz( player->last, simpName, sizeof( player->last ) );
-
-	// Is it protected?
-	if( data->type == cJSON_True )
+	// Check for a valid "results" entry in the response JSON
+	data = cJSON_GetObjectItem( data, "results" );
+	if( !data || data->type != cJSON_Array )
 	{
-		player->failTime = game.realtime + ( 1000 * RS_NICK_TIMEOUT );
-		player->thinkTime = game.realtime;
-		player->nickStatus = QSTATUS_SUCCESS;
+		G_Printf( "RS_AuthNick: Failed, query for %s got an unexpected response\n", player->last );
 		return;
 	}
 
-	// Not protected, deactivate the timer
-	player->failTime = 0;
-	player->thinkTime = 0;
-	player->nickStatus = QSTATUS_SUCCESS;
+	// Look through the "results" array for any player with a different username
+	// There should only be one result in the array
+	for( data = data->child; data; data = data->next )
+	{
+		if( data->type != cJSON_Object )
+			continue;
+
+		node = cJSON_GetObjectItem( data, "id" );
+		if( node && node->type == cJSON_Number && node->valueint != player->id )
+		{
+			// Nick belongs to someone else
+			G_Printf( "RS_AuthNick: Success, %s is protected\n", player->last );
+			player->failTime = game.realtime + ( 1000 * RS_NICK_TIMEOUT );
+			player->thinkTime = game.realtime;
+			return;
+		}
+	}
+
+	G_Printf( "RS_AuthNick: Success, %s is validated\n", player->last );
 }
 
 /**
@@ -139,9 +189,16 @@ void RS_AuthNick( rs_authplayer_t *player, char *nick )
 	if( player->nickStatus == QSTATUS_PENDING )
 		return;
 
+	G_Printf( "RS_AuthNick: %s\n", nick );
+
+	// Issue a query for players with simplified name matching nick
 	b64name = (char*)base64_encode( (unsigned char *)nick, strlen( nick ), NULL );
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/nick/%s", rs_statsUrl->string, b64name ), qtrue );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/players/", rs_statsUrl->string ), qtrue );
+	rs_sqapi->SetField( query, "simplified", b64name );
 	free( b64name );
+
+	// Set this as last attempted nick
+	Q_strncpyz( player->last, nick, sizeof( player->last ) );
 
 	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_AuthNick_Done, (void*)player );
@@ -160,15 +217,16 @@ void RS_AuthNick( rs_authplayer_t *player, char *nick )
 void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 {
 	cJSON *data, *node;
+	int status;
 
-	if( rs_sqapi->GetStatus( query ) != 200 )
+	status = rs_sqapi->GetStatus( query );
+	if( status < 200 || status > 299 )
 	{
 		G_Printf( "%sError:%s Failed to query map.\nDisabling statistics reporting.\n", 
 					S_COLOR_RED, S_COLOR_WHITE );
 		trap_Cvar_ForceSet( rs_statsEnabled->name, "0" );
 		return;
 	}
-
 
 	data = (cJSON*)rs_sqapi->GetRoot( query );
 
@@ -186,7 +244,7 @@ void RS_AuthMap_Done( stat_query_t *query, qboolean success, void *customp )
 
 	// Check for a world record
 	node = cJSON_GetObjectItem( data, "record" );
-	if( node->type != cJSON_Object )
+	if( !node || node->type != cJSON_Object )
 		return;
 
 	G_Gametype_ScoreEvent( NULL, "rs_loadmap", RS_ParseRace( node ) );
@@ -206,11 +264,12 @@ void RS_AuthMap( void )
 	G_Printf( "RS_AuthMap: Querying Map %s\n", authmap.b64name );
 
 	// Form the query
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/maps/%s", rs_statsUrl->string, authmap.b64name ), qtrue );
-	rs_sqapi->SetField( query, "record", "" );
+	// Must be a PATCH request to create the map if needed
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/maps/%s/?record", rs_statsUrl->string, authmap.b64name ), qfalse );
 	rs_sqapi->SetCallback( query, RS_AuthMap_Done, NULL );
 
 	RS_SignQuery( query );
+	rs_sqapi->CustomRequest( query, "PATCH" );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -221,6 +280,16 @@ void RS_AuthMap( void )
  */
 void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 {
+	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
+	int status = rs_sqapi->GetStatus( query );
+
+	if( status < 200 || status > 299 )
+	{
+		G_Printf( "RS_ReportRace: Failed for %s with status %d\n", player->login, status );
+		return;
+	}
+
+	G_Printf( "RS_ReportRace: Success %s\n", player->login);
 }
 
 /**
@@ -234,6 +303,7 @@ void RS_ReportRace_Done( stat_query_t *query, qboolean success, void *customp )
 void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum, bool oneliner )
 {
 	stat_query_t *query;
+	cJSON *data, *checkpoints, *checkpoint;
 	int i;
 
 	if( !rs_statsEnabled->integer )
@@ -242,27 +312,51 @@ void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum, bool
 	if( !player->id )
 		return;
 
-	// Use cJSON to format the checkpoint array
-	cJSON *arr = cJSON_CreateArray();
-	for( i = 0; i < cpNum; i++ )
-		cJSON_AddItemToArray( arr, cJSON_CreateNumber( cp[i] ) );
-
 	// Form the query
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/race/", rs_statsUrl->string ), qfalse );
-	rs_sqapi->SetField( query, "pid", va( "%d", player->id ) );
-	rs_sqapi->SetField( query, "mid", va( "%d", authmap.id ) );
-	rs_sqapi->SetField( query, "time", va( "%d", rtime ) );
-	if( oneliner )
-		rs_sqapi->SetField( query, "co", "1" );  // new record made: Clear Oneliner.
-	else
-		rs_sqapi->SetField( query, "co", "0" );
-	rs_sqapi->SetField( query, "checkpoints", cJSON_Print( arr ) );
+	G_Printf( "RS_ReportRace: Reporting %s %d\n", player->login, rtime );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/races/%d;%d/", rs_statsUrl->string, authmap.id, player->id ), qfalse );
+
+	data = cJSON_CreateObject();
+	rs_setString( data, "time", va( "%d", rtime ) );
+	rs_setString( data, "playtime_add", va( "%lu", player->mapTime ) );
+	rs_setString( data, "races_add", va( "%d", player->mapRaces ) );
+
+	checkpoints = cJSON_CreateArray();
+	for( i = 0; i < cpNum; ++i )
+	{
+		checkpoint = cJSON_CreateObject();
+		rs_setString( checkpoint, "number", va( "%d", i ) );
+		rs_setString( checkpoint, "time", va( "%d", cp[i] ) );
+		cJSON_AddItemToArray( checkpoints, checkpoint );
+	}
+	cJSON_AddItemToObject( data, "checkpoints", checkpoints );
+
+	// Reset map playtime
+	player->mapTime = 0;
+	player->mapRaces = 0;
 
 	RS_SignQuery( query );
+	rs_sqapi->CustomRequest( query, "PATCH" );
 	rs_sqapi->SetCallback( query, RS_ReportRace_Done, (void*)player );
-	rs_sqapi->Send( query );
+	rs_sqapi->SendJson( query, (stat_query_section_t *)data );
+	cJSON_Delete( data );
 	query = NULL;
-	cJSON_Delete( arr );
+}
+
+/**
+ * Callback for report map
+ * @return void
+ */
+void RS_ReportMap_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	int status = rs_sqapi->GetStatus( query );
+	if( status < 200 || status > 299 )
+	{
+		G_Printf( "RS_ReportMap: Failed with status %d\n", status );
+		return;
+	}
+
+	G_Printf( "RS_ReportMap: Success\n" );
 }
 
 /**
@@ -273,9 +367,9 @@ void RS_ReportRace( rs_authplayer_t *player, int rtime, int *cp, int cpNum, bool
  */
 void RS_ReportMap( const char *tags, const char *oneliner, bool force )
 {
-	char tagset[1024], *token, *b64tags;
+	char tagset[1024], *token;
 	stat_query_t *query;
-	cJSON *arr = cJSON_CreateArray();
+	stat_query_section_t *section;
 
 	if( !rs_statsEnabled->integer )
 		return;
@@ -285,36 +379,48 @@ void RS_ReportMap( const char *tags, const char *oneliner, bool force )
 		return;
 	}
 
-	// Make the taglist
-	Q_strncpyz( tagset, ( tags ? tags : "" ), sizeof( tagset ) );
-	token = strtok( tagset, " " );
-	while( token != NULL )
-	{
-		cJSON_AddItemToArray( arr, cJSON_CreateString( token ) );
-		token = strtok( NULL, " " );
-	}
-	token = cJSON_Print( arr );
-	b64tags = (char*)base64_encode( (unsigned char *)token, strlen( token ), NULL );
-
 	// Form the query
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/map/%s", rs_statsUrl->string, authmap.b64name ), qfalse );
-	rs_sqapi->SetField( query, "playTime", va( "%d", authmap.playTime ) );
-	rs_sqapi->SetField( query, "races", va( "%d", authmap.races ) );
-	rs_sqapi->SetField( query, "tags", b64tags );
-	free( b64tags );
+	G_Printf( "RS_ReportMap: Reporting\n" );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/maps/%s/", rs_statsUrl->string, authmap.b64name ), qfalse );
+	rs_sqapi->SetField( query, "playtime_add", va( "%d", authmap.playTime ) );
+	rs_sqapi->SetField( query, "races_add", va( "%d", authmap.races ) );
 	if( oneliner )
 		rs_sqapi->SetField( query, "oneliner", oneliner );
-	else
-		rs_sqapi->SetField( query, "oneliner", "" );
+
+	// Make the taglist
+	section = rs_sqapi->CreateArray( query, 0, "tags_add" );
+	Q_strncpyz( tagset, ( tags ? tags : "" ), sizeof( tagset ) );
+	for( token = strtok( tagset, " " ); token != NULL; token = strtok( NULL, " " ) )
+	{
+		rs_sqapi->AddArrayString( section, token );
+	}
 
 	// Reset the fields
 	authmap.playTime = 0;
 	authmap.races = 0;
 
 	RS_SignQuery( query );
+	rs_sqapi->CustomRequest( query, "PATCH" );
+	rs_sqapi->SetCallback( query, RS_ReportMap_Done, NULL );
 	rs_sqapi->Send( query );
-	cJSON_Delete( arr );
 	query = NULL;
+}
+
+/**
+ * Callback for report player
+ * @return void
+ */
+void RS_ReportPlayer_Done( stat_query_t *query, qboolean success, void *customp )
+{
+	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
+	int status = rs_sqapi->GetStatus( query );
+	if( status < 200 || status > 299 )
+	{
+		G_Printf( "RS_ReportPlayer: Failed for %s with status %d\n", player->login, status );
+		return;
+	}
+
+	G_Printf( "RS_ReportPlayer: Success %s\n", player->login );
 }
 
 /**
@@ -334,19 +440,21 @@ void RS_ReportPlayer( rs_authplayer_t *player )
 		return;
 
 	// Form the query
+	G_Printf( "RS_ReportPlayer: Reporting %s\n", player->login );
 	b64name = (char*)base64_encode( (unsigned char *)player->login, strlen( player->login ), NULL );
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/player/%s", rs_statsUrl->string, b64name ), qfalse );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/players/%s/", rs_statsUrl->string, b64name ), qfalse );
 	free( b64name );
 
-	rs_sqapi->SetField( query, "mid", va( "%d", authmap.id ) );
-	rs_sqapi->SetField( query, "playTime", va( "%d", player->playTime ) );
-	rs_sqapi->SetField( query, "races", va( "%d", player->races ) );
+	rs_sqapi->SetField( query, "playtime_add", va( "%lu", player->playTime ) );
+	rs_sqapi->SetField( query, "races_add", va( "%d", player->playRaces ) );
 
 	// reset the fields
 	player->playTime = 0;
-	player->races = 0;
+	player->playRaces = 0;
 
 	RS_SignQuery( query );
+	rs_sqapi->CustomRequest( query, "PATCH" );
+	rs_sqapi->SetCallback( query, RS_ReportPlayer_Done, (void*)player );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -359,28 +467,26 @@ void RS_ReportPlayer( rs_authplayer_t *player )
  */
 void RS_ReportNick_Done( stat_query_t *query, qboolean success, void *customp )
 {
+	int playerNum, status;
 	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
-	int playerNum = (int)( player->client - game.clients );
 	cJSON *data = (cJSON*)rs_sqapi->GetRoot( query );
 
-	// invalid response?
-	if( !data || rs_sqapi->GetStatus( query ) != 200 )
-	{
-		G_PrintMsg( &game.edicts[ playerNum + 1 ],
-					"%sError: %sFailed to update nickname.\n",
-					S_COLOR_RED, S_COLOR_WHITE );
+	playerNum = (int)( player->client - game.clients );
+	status = rs_sqapi->GetStatus( query );
 
-		if( data && data->child )
-			G_PrintMsg( &game.edicts[ playerNum + 1 ],
-						"%sError: %s%s\n",
-						S_COLOR_RED, S_COLOR_WHITE, data->child->valuestring );
+	// Status code is enough to determine success
+	if( !data || status < 200 || status > 299 )
+	{
+		G_Printf( "RS_ReportNick: Failed, could not update %s\n", player->login );
+		G_PrintMsg( &game.edicts[ playerNum + 1 ],
+					"%sError: %sThat name is already taken.\n",
+					S_COLOR_RED, S_COLOR_WHITE );
 
 		return;
 	}
 
-	G_PrintMsg( &game.edicts[ playerNum + 1 ],
-				"%sSuccessfully updated your nickname to %s\n",
-				S_COLOR_WHITE, data->child->string );
+	G_Printf( "RS_ReportNick: Success, updated %s\n", player->login );
+	G_PrintMsg( &game.edicts[ playerNum + 1 ], "%sSuccessfully updated your nickname\n", S_COLOR_WHITE );
 }
 
 /**
@@ -401,13 +507,15 @@ void RS_ReportNick( rs_authplayer_t *player, const char *nick )
 		return;
 
 	// Form the query
+	G_Printf( "RS_ReportNick: Updating %s's protectednick to %s\n", player->login, nick );
 	b64name = (char*)base64_encode( (unsigned char *)player->login, strlen( player->login ), NULL );
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/nick/%s", rs_statsUrl->string, b64name ), qfalse );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/players/%s/", rs_statsUrl->string, b64name ), qfalse );
 	free( b64name );
 
-	rs_sqapi->SetField( query, "nick", nick );
+	rs_sqapi->SetField( query, "simplified", nick );
 
 	RS_SignQuery( query );
+	rs_sqapi->CustomRequest( query, "PATCH" );
 	rs_sqapi->SetCallback( query, RS_ReportNick_Done, (void*)player );
 	rs_sqapi->Send( query );
 	query = NULL;
@@ -423,32 +531,48 @@ void RS_QueryPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 {
 	rs_authplayer_t *player = ( rs_authplayer_t* )customp;
 	cJSON *data, *node;
-	int playerNum;
+	int playerNum, status;
 
 	// Did they disconnect?
 	playerNum = (int)( player->client - game.clients );
 	if( playerNum < 0 || playerNum >= gs.maxclients )
+	{
+		G_Printf( "RS_QueryPlayer: Client disconnected\n" );
 		return;
+	}
 
 	RS_PlayerReset( player );
-	if( rs_sqapi->GetStatus( query ) != 200 )
+	status = rs_sqapi->GetStatus( query );
+	data = (cJSON*)rs_sqapi->GetRoot( query );
+
+	if( status < 200 || status > 299 )
 	{
-		G_PrintMsg( NULL, "%sError:%s %s%s failed to authenticate as %s\n", 
-					S_COLOR_RED, S_COLOR_WHITE, player->client->netname, S_COLOR_WHITE, player->login );
+		G_Printf( "RS_QueryPlayer: Failed, query for %s failed with status %d\n", player->login, status );
+		G_PrintMsg( NULL, "%sError:%s Failed to authenticate %s\n", S_COLOR_RED, S_COLOR_WHITE, player->login );
 		player->status = QSTATUS_FAILED;
 		return;
 	}
 
-	data = (cJSON*)rs_sqapi->GetRoot( query );
+	G_Printf( "RS_QueryPlayer: Success, %s authenticated\n", player->login );
 	player->status = QSTATUS_SUCCESS;
-	player->id = cJSON_GetObjectItem( data, "id" )->valueint;
-	player->admin = cJSON_GetObjectItem( data, "admin" )->type == cJSON_True;
-	Q_strncpyz( player->nick, cJSON_GetObjectItem( data, "simplified" )->valuestring, sizeof( player->nick ) );
+
+	node = cJSON_GetObjectItem( data, "id" );
+	if( node && node->type == cJSON_Number )
+		player->id = node->valueint;
+
+	node = cJSON_GetObjectItem( data, "admin" );
+	if( node && node->type == cJSON_True )
+		player->admin = true;
+
+	node = cJSON_GetObjectItem( data, "simplified" );
+	if( node && node->type == cJSON_String )
+		Q_strncpyz( player->nick, node->valuestring, sizeof( player->nick ) );
 
 	// Update protected nick
 	RS_PlayerUserinfoChanged( player, NULL );
 
 	// Notify of login
+	// TODO - Delay these, atm player doesn't see because they print while still connecting
 	G_PrintMsg( NULL, "%s%s authenticated as %s\n", player->client->netname, S_COLOR_WHITE, player->login );
 	if( player->admin )
 		G_PrintMsg( &game.edicts[ playerNum + 1 ], "You are an admin. Player id: %d\n", player->id );
@@ -457,8 +581,9 @@ void RS_QueryPlayer_Done( stat_query_t *query, qboolean success, void *customp )
 
 	// Check for a world record
 	node = cJSON_GetObjectItem( data, "record" );
-	if( node->type != cJSON_Object )
+	if( !node || node->type != cJSON_Object )
 		return;
+
 	G_Gametype_ScoreEvent( player->client, "rs_loadplayer", RS_ParseRace( node ) );
 }
 
@@ -475,13 +600,15 @@ void RS_QueryPlayer( rs_authplayer_t *player )
 		return;
 
 	// Form the query and query parameters
+	// This has to be a PATCH request, since we are potentially creating a
+	// new model.
+	G_Printf( "RS_QueryPlayer: Querying player %s\n", player->login );
 	b64name = (char*)base64_encode( (unsigned char *)player->login, strlen( player->login ), NULL );
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/player/%s", rs_statsUrl->string, b64name ), qtrue );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/players/%s/?mid=%d", rs_statsUrl->string, b64name, authmap.id ), qfalse );
 	free( b64name );
 
-	rs_sqapi->SetField( query, "mid", va( "%d", authmap.id ) );
-
 	RS_SignQuery( query );
+	rs_sqapi->CustomRequest( query, "PATCH" );
 	rs_sqapi->SetCallback( query, RS_QueryPlayer_Done, (void*)player );
 	rs_sqapi->Send( query );
 	player->status = QSTATUS_PENDING;
@@ -672,7 +799,7 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit, int cmd)
 
 	// Form the query
 	if( cmd == RS_MAP_TOP)
-		url = va( "%s/api/race", rs_statsUrl->string );
+		url = va( "%s/api/races", rs_statsUrl->string );
 	else if( cmd == RS_MAP_TOPOLD )
 		url = va( "%s/oldapi/race", rs_statsUrl->string );
 	else if( cmd == RS_MAP_TOPALL )
@@ -695,56 +822,94 @@ void RS_QueryTop( gclient_t *client, const char* mapname, int limit, int cmd)
 	query = NULL;
 }
 
+typedef struct 
+{
+	gclient_t *client;			/**< Client who requested maps */
+	int page;					/**< page number requested */
+} rs_querymap_cbdata_t;
+
+static char *rs_querymap_tagstring( cJSON *tags )
+{
+	static char tag_string[RS_MAPLIST_TAGLEN];
+	cJSON* tag;
+
+	memset( tag_string, 0, sizeof( tag_string ) );
+
+	if( !tags || tags->type != cJSON_Array )
+		return tag_string;
+
+	for( tag = tags->child; tag && strlen( tag_string ) < sizeof( tag_string ) - 1; tag = tag->next )
+	{
+		if( tag->type != cJSON_String )
+			continue;
+
+		Q_strncatz( tag_string, tag->valuestring, sizeof( tag_string ) - 1 );
+		Q_strncatz( tag_string, " ", sizeof( tag_string ) - 1 );
+	}
+
+	return tag_string;
+}
+
 void RS_QueryMaps_Done( stat_query_t *query, qboolean success, void *customp )
 {
 	edict_t *ent;
-	int playerNum, start, i, j;
-	cJSON *data, *node, *tag;
-	static char tag_string[1024];
+	gclient_t *client;
+	int page, playerNum, status, i;
+	cJSON *data, *node;
 
-	gclient_t *client = (gclient_t *)customp;
+	// Unpack and free cbdata ASAP
+	rs_querymap_cbdata_t *cbdata = (rs_querymap_cbdata_t *)customp;
+	client = cbdata->client;
+	page = cbdata->page;
+	G_Free( cbdata );
+
 	playerNum = (int)( client - game.clients );
+	ent = &game.edicts[ playerNum + 1 ];
+	status = rs_sqapi->GetStatus( query );
 
 	if( playerNum < 0 || playerNum >= gs.maxclients )
-		return;
-
-	ent = &game.edicts[ playerNum + 1 ];
-
-	if( rs_sqapi->GetStatus( query ) != 200 )
 	{
+		G_Printf( "RS_QueryMaps: Client disconnected\n" );
+		return;
+	}
+
+	if( status < 200 || status > 299 )
+	{
+		G_Printf( "RS_QueryMaps: Failed with status %d\n", status );
 		G_PrintMsg( ent, "%sError:%s Maplist query failed\n", 
 					S_COLOR_RED, S_COLOR_WHITE );
 		return;
 	}
 
-	// We assume the response is properly formed
 	data = (cJSON*)rs_sqapi->GetRoot( query );
-	start = cJSON_GetObjectItem( data, "start" )->valueint;
-
-	node = cJSON_GetObjectItem( data, "maps" )->child;
-	for( i = 0; node != NULL; i++, node=node->next )
+	data = cJSON_GetObjectItem( data, "results" );
+	if( !data || data->type != cJSON_Array )
 	{
-		// Clear tag string
-		memset( tag_string, 0, sizeof( tag_string ) );
-		tag = cJSON_GetObjectItem( node, "tags" )->child;
+		G_Printf( "RS_QueryMaps: Failed, unexpected response\n" );
+		return;
+	}
 
-		// Form a string of max 20 tags
-		for( j = 0; tag != NULL && j < 20 ; j++, tag=tag->next )
-			Q_strncatz( tag_string, va( "%s%s", ( j == 0 ? "" : ", " ), tag->valuestring ),
-						sizeof( tag_string ) - 1 );
+	G_Printf( "RS_QueryMaps: Success\n", status );
+	i = ( page - 1 ) * RS_MAPLIST_ITEMS;
+	data = data->child;
+	while( data )
+	{
+		node = cJSON_GetObjectItem( data, "name" );
+		if( node && node->type == cJSON_String )
+			G_PrintMsg( ent, "%s# %d%s: %-25s %s\n",
+				S_COLOR_ORANGE, i + 1, S_COLOR_WHITE, node->valuestring,
+				rs_querymap_tagstring( cJSON_GetObjectItem( data, "tags" ) ) );
 
-		// Print the row
-		G_PrintMsg( ent, "%s# %d%s: %-25s %s\n",
-						S_COLOR_ORANGE, start + i + 1, S_COLOR_WHITE,
-						cJSON_GetObjectItem( node, "name" )->valuestring, tag_string );
+		data = data->next;
+		++i;
 	}
 }
 
 void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int page )
 {
 	stat_query_t *query;
-	char tagset[1024], *token, *b64tags, *b64pattern;
-	cJSON *arr = cJSON_CreateArray();
+	rs_querymap_cbdata_t *cbdata;
+	char tagset[1024], *token, *b64pattern;
 	int	playerNum = (int)( client - game.clients );
 
 	if( !rs_statsEnabled->integer )
@@ -754,102 +919,115 @@ void RS_QueryMaps( gclient_t *client, const char *pattern, const char *tags, int
 		return;
 	}
 
-	// Make the pattern
-	b64pattern = (char*)base64_encode( (unsigned char *)pattern, strlen( pattern ), NULL );
-	// Make the taglist
-	Q_strncpyz( tagset, tags, sizeof( tagset ) );
-	token = strtok( tagset, " " );
-	while( token != NULL )
-	{
-		cJSON_AddItemToArray( arr, cJSON_CreateString( token ) );
-		token = strtok( NULL, " " );
-	}
-	token = cJSON_Print( arr );
-	b64tags = (char*)base64_encode( (unsigned char *)token, strlen( token ), NULL );
+	G_Printf( "RS_QueryMaps: %s\n", client->netname );
 
-	// which page to display?
-	page = page == 0 ? 0 : page - 1;
+	// Make callback data
+	cbdata = (rs_querymap_cbdata_t *)G_Malloc( sizeof( rs_querymap_cbdata_t ) );
+	cbdata->client = client;
+	cbdata->page = page < 1 ? 1 : page;
 
 	// Form the query
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/map/", rs_statsUrl->string ), qtrue );
-	rs_sqapi->SetField( query, "pattern", b64pattern );
-	rs_sqapi->SetField( query, "tags", b64tags );
-	rs_sqapi->SetField( query, "start", va( "%d", page * RS_MAPLIST_ITEMS ) );
-	rs_sqapi->SetField( query, "limit", va( "%d", RS_MAPLIST_ITEMS ) );
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/maps/", rs_statsUrl->string ), qtrue );
+	rs_sqapi->SetField( query, "page", va( "%d", cbdata->page ) );
+
+	// Map pattern
+	if( pattern )
+	{
+		b64pattern = (char*)base64_encode( (unsigned char *)pattern, strlen( pattern ), NULL );
+		rs_sqapi->SetField( query, "pattern", b64pattern );
+		free( b64pattern );
+	}
+
+	// Map tags
+	if( tags )
+	{
+		Q_strncpyz( tagset, tags, sizeof( tagset ) );
+		for( token = strtok( tagset, " " ); token != NULL; token = strtok( NULL, " " ) )
+		{
+			rs_sqapi->SetField( query, "t", token );
+		}
+	}
 
 	RS_SignQuery( query );
-	rs_sqapi->SetCallback( query, RS_QueryMaps_Done, (void*)client );
+	rs_sqapi->SetCallback( query, RS_QueryMaps_Done, (void*)cbdata );
 	rs_sqapi->Send( query );
-	free( b64pattern );
-	free( b64tags );
 	query = NULL;
-	cJSON_Delete( arr );
 }
 
 void RS_QueryRandmap_Done( stat_query_t *query, qboolean success, void *customp )
 {
+	cJSON *data, *node;
 	char *mapname;
 	char **votedata = (char**)customp;
-	cJSON *data = (cJSON*)rs_sqapi->GetRoot( query );
+	int status = rs_sqapi->GetStatus( query );
+	data = (cJSON*)rs_sqapi->GetRoot( query );
 
 	// invalid response?
-	if( !data || rs_sqapi->GetStatus( query ) != 200 )
+	if( status < 200 || status > 299 )
 	{
+		G_Printf( "RS_QueryRandmap: Failed with status %d\n", status );
 		G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
 		G_CallVotes_Reset();
 		return;
 	}
 
 	// Did we get any results?
-	int count = cJSON_GetObjectItem( data, "count" )->valueint;
-	if( !count )
+	data = cJSON_GetObjectItem( data, "results" );
+	if( !data || data->type != cJSON_Array )
 	{
+		G_Printf( "RS_QueryRandmap: Failed, no results\n" );
 		G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
 		G_CallVotes_Reset();
 		return;
 	}
 
-	cJSON *map = cJSON_GetObjectItem( cJSON_GetObjectItem( data, "maps" )->child, "name" );
-
-	// do we have the map or is it the current map?
-	if( !trap_ML_FilenameExists( map->valuestring ) || !Q_stricmp( map->valuestring, level.mapname ) )
+	for( data = data->child; data; data = data->next )
 	{
-		G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
-		G_CallVotes_Reset();
+		if( data->type != cJSON_Object )
+			continue;
+
+		node = cJSON_GetObjectItem( data, "name" );
+		if( !node || node->type != cJSON_String )
+			continue;
+
+		// do we have the map or is it the current map?
+		if( !trap_ML_FilenameExists( node->valuestring ) || !Q_stricmp( node->valuestring, level.mapname ) )
+			continue;
+
+		// Found a map, set vote data and return
+		// mapname will be freed by G_CallVotes_Reset() in g_callvotes.cpp
+		mapname = (char *)G_Malloc( MAX_STRING_CHARS );
+		Q_strncpyz( mapname, node->valuestring, MAX_STRING_CHARS );
+		*votedata = mapname;
+		G_PrintMsg( NULL, "Randmap picked: %s\n", mapname );
 		return;
 	}
 
-	// allocate memory for the mapname and store it
-	mapname = ( char * ) G_Malloc( MAX_STRING_CHARS );
-	Q_strncpyz( mapname, map->valuestring, MAX_STRING_CHARS );
-
-	// Point callvote data to the mapname. It can safely be freed by G_CallVotes_Reset() in g_callvotes.cpp
-	*votedata = mapname;
-	G_PrintMsg( NULL, "Randmap picked: %s\n", mapname );
+	G_PrintMsg( NULL, "Invalid map picked, vote canceled\n" );
+	G_CallVotes_Reset();
 }
 
+/**
+ * Fetch a page from maplist in random order for the callvote
+ * @param tags Argv from the callvote command
+ * @param data Data store for the callvote
+ */
 void RS_QueryRandmap( char* tags[], void *data )
 {
 	stat_query_t *query;
-	char *b64tags;
-	cJSON *arr = cJSON_CreateArray();
-
-	// Format the tags
-	while( *tags )
-		cJSON_AddItemToArray( arr, cJSON_CreateString( *tags++ ) );
-	b64tags = cJSON_Print( arr );
-	b64tags = (char*)base64_encode( (unsigned char *)b64tags, strlen( b64tags ), NULL );
 
 	// Form the query
-	query = rs_sqapi->CreateRootQuery( va( "%s/api/map/", rs_statsUrl->string ), qtrue );
-	rs_sqapi->SetField( query, "pattern", "" );
-	rs_sqapi->SetField( query, "tags", b64tags );
-	rs_sqapi->SetField( query, "rand", "1" );
-	
+	query = rs_sqapi->CreateRootQuery( va( "%s/api/maps/", rs_statsUrl->string ), qtrue );
+	rs_sqapi->SetField( query, "rand", "" );
+
+	// Map tags
+	while( *tags )
+	{
+		rs_sqapi->SetField( query, "t", *tags++ );
+	}
+
 	RS_SignQuery( query );
 	rs_sqapi->SetCallback( query, RS_QueryRandmap_Done, data );
 	rs_sqapi->Send( query );
 	query = NULL;
-	free( b64tags );
-	cJSON_Delete( arr );
 }

@@ -1,5 +1,3 @@
-#define RS_MAPLIST_ITEMS 20
-
 extern cvar_t *rs_grenade_minKnockback;
 extern cvar_t *rs_grenade_maxKnockback;
 extern cvar_t *rs_grenade_splash;

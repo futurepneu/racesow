@@ -4,6 +4,14 @@
 rs_authmap_t authmap;
 rs_authplayer_t *authplayers;
 
+// Helper function to add game.frametime to millis / seconds counters
+static void rolltime(unsigned int *millis, unsigned long int *seconds)
+{
+	*millis += game.frametime;
+	*seconds += *millis / 1000;
+	*millis %= 1000;
+}
+
 void RS_InitAuth( void )
 {
 	authplayers = ( rs_authplayer_t* )G_Malloc( gs.maxclients * sizeof( authplayers[0] ) );
@@ -35,11 +43,13 @@ void RS_ThinkAuth( void )
 
 		if( player->client->team != TEAM_SPECTATOR )
 		{
-			player->playTime += game.frametime;
+			rolltime( &player->playMillis, &player->playTime );
+			rolltime( &player->mapMillis, &player->mapTime );
+
 			// If map's playtime hasn't been updated yet with elapsed time since previous frame, do it now
 			if( !maptime )
 			{
-				authmap.playTime += game.frametime;
+				rolltime( &authmap.playMillis, &authmap.playTime );
 				maptime = true; // maptime is only updated once for >0 players
 			}
 		}
@@ -126,7 +136,6 @@ bool RS_SetName( gclient_t *client, const char *name )
  */
 void RS_Playtime ( gclient_t *client ) {
 	rs_authplayer_t *player;
-	static char simpNew[MAX_NAME_CHARS];
 
 	int playerNum = (int)( client - game.clients );
 	if( playerNum < 0 && playerNum >= gs.maxclients ) {
@@ -151,7 +160,9 @@ static void RS_PlayerInfo( rs_authplayer_t *player )
 	G_Printf( "id: %d\n", player->id );
 	G_Printf( "failTime: %d\n", player->failTime );
 	G_Printf( "playTime: %d\n", player->playTime );
-	G_Printf( "races: %d\n", player->races );
+	G_Printf( "mapTime: %d\n", player->mapTime );
+	G_Printf( "playRaces: %d\n", player->playRaces );
+	G_Printf( "mapRaces: %d\n", player->mapRaces );
 }
 
 /**
@@ -216,8 +227,12 @@ void RS_PlayerReset( rs_authplayer_t *player )
 	player->id = 0;
 	player->status = QSTATUS_NONE;
 	player->admin = false;
+	player->playMillis = 0;
 	player->playTime = 0;
-	player->races = 0;
+	player->mapMillis = 0;
+	player->mapTime = 0;
+	player->playRaces = 0;
+	player->mapRaces = 0;
 	player->nick[0] = '\0';
 }
 

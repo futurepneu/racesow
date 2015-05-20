@@ -13,8 +13,9 @@ typedef struct rs_authmap_s
 {
 	char *b64name;				/**< Base64 encoded name of the map */
 	int id;						/**< database id of the map */
-	int playTime;				/**< time playing the map in milliseconds */
-	int races;					/**< number of races finished */
+	int races;					/**< number of races finished since last map report */
+	unsigned int playMillis;	/**< milliseconds carry for playTime */
+	unsigned long int playTime;	/**< time playing the map in seconds */
 } rs_authmap_t;
 
 typedef struct rs_authplayer_s
@@ -27,10 +28,14 @@ typedef struct rs_authplayer_s
 	char last[MAX_NAME_CHARS];	/**< The last nickname the player tried to use */
 	bool admin;					/**< has admin privleges */
 	int id;						/**< database id for player, 0 for unauthenticated */
-	int races;					/**< number of races finished */
+	int mapRaces;				/**< number of races finished since last race report */
+	int playRaces;				/**< number of races finished since last player report*/
 	unsigned int failTime;		/**< realtime to rename the player */
 	unsigned int thinkTime;		/**< realtime for next protectednick think */
-	unsigned int playTime;		/**< time spent playing the map in milliseconds */
+	unsigned int playMillis;	/**< milliseconds carry for playTime */
+	unsigned int mapMillis;		/**< milliseconds carry for mapTime */
+	unsigned long int playTime;	/**< time spent playing overall in seconds */
+	unsigned long int mapTime;	/**< time spent playing on the map in seconds */
 } rs_authplayer_t;
 
 extern rs_authmap_t authmap;

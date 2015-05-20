@@ -2603,7 +2603,8 @@ static void objectRSPlayer_setNick( asstring_t *nick, rs_authplayer_t *self )
 
 static void objectRSPlayer_incrementRace( rs_authplayer_t *self )
 {
-	self->races++;
+	self->playRaces++;
+	self->mapRaces++;
 	authmap.races++;
 }
 
@@ -2648,7 +2649,9 @@ static const asProperty_t rsplayer_Properties[] =
 	{ ASLIB_PROPERTY_DECL(int, id), ASLIB_FOFFSET(rs_authplayer_t, id) },
 	{ ASLIB_PROPERTY_DECL(int, failTime), ASLIB_FOFFSET(rs_authplayer_t, failTime) },
 	{ ASLIB_PROPERTY_DECL(int, playTime), ASLIB_FOFFSET(rs_authplayer_t, playTime) },
-	{ ASLIB_PROPERTY_DECL(int, races), ASLIB_FOFFSET(rs_authplayer_t, races) },
+	{ ASLIB_PROPERTY_DECL(int, mapTime), ASLIB_FOFFSET(rs_authplayer_t, mapTime) },
+	{ ASLIB_PROPERTY_DECL(int, playRaces), ASLIB_FOFFSET(rs_authplayer_t, playRaces) },
+	{ ASLIB_PROPERTY_DECL(int, mapRaces), ASLIB_FOFFSET(rs_authplayer_t, mapRaces) },
 
 	ASLIB_PROPERTY_NULL
 };
