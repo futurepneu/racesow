@@ -37,6 +37,7 @@ typedef struct stat_query_api_s
 	void ( *SetCallback )( stat_query_t *query, void (*callback_fn)( stat_query_t *, qboolean, void *), void *customp );
 	// you may or may not be allowed to call this directly
 	void ( *Send )( stat_query_t *query );
+	void ( *SendJson )( stat_query_t *query, stat_query_section_t *data ); // racesow
 
 	// argument for POST/GET request
 	// note that nothing is encoded in StatQuery atm, so pre-encode or watch what you put in here!

@@ -451,6 +451,42 @@ void StatQuery_Send( stat_query_t *query )
 	wswcurl_start( query->req );
 }
 
+// racesow
+void StatQuery_PrepareJson( stat_query_t *query, stat_query_section_t *data )
+{
+	char *json_text;
+	size_t jsonSize;
+
+	if( query->url || !query->req )
+	{
+		Com_Printf( "StatQuery: PrepareJson called for GET request\n" );
+		return;
+	}
+
+
+	json_text = cJSON_Print( (cJSON *)data );
+	jsonSize = strlen( json_text );
+
+	// set the json field to POST request
+	wswcurl_set_postfields( query->req, json_text, jsonSize );
+	wswcurl_header( query->req, "Content-Type", "application/json" );
+	wswcurl_header( query->req, "Content-Length", va( "%u", jsonSize ) );
+}
+
+void StatQuery_SendJson( stat_query_t *query, stat_query_section_t *data )
+{
+	if( query->url )
+	{
+		Com_Printf( "StatQuery: SendJson called for GET request\n" );
+		return;
+	}
+
+	StatQuery_PrepareJson( query, data );
+	wswcurl_stream_callbacks( query->req, NULL, StatQuery_CallbackGeneric, NULL, (void*)query );
+	wswcurl_start( query->req );
+}
+// !racesow
+
 void StatQuery_SetField( stat_query_t *query, const char *name, const char *value )
 {
 	if( query->req )
@@ -664,6 +700,7 @@ void StatQuery_Init( void )
 	sq_export.DestroyQuery = StatQuery_DestroyQuery;
 	sq_export.SetCallback = StatQuery_SetCallback;
 	sq_export.Send = StatQuery_Send;
+	sq_export.SendJson = StatQuery_SendJson; // racesow
 	sq_export.SetField = StatQuery_SetField;
 	sq_export.GetRoot = StatQuery_GetRoot;
 	sq_export.GetSection = StatQuery_GetSection;
