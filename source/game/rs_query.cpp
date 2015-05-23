@@ -401,7 +401,8 @@ void RS_ReportMap( const char *tags, const char *oneliner, bool force )
 
 	RS_SignQuery( query );
 	rs_sqapi->CustomRequest( query, "PATCH" );
-	rs_sqapi->SetCallback( query, RS_ReportMap_Done, NULL );
+	// TODO - this segfaults if the callback is called after the mapchange occurs
+	// rs_sqapi->SetCallback( query, RS_ReportMap_Done, NULL );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
@@ -454,7 +455,8 @@ void RS_ReportPlayer( rs_authplayer_t *player )
 
 	RS_SignQuery( query );
 	rs_sqapi->CustomRequest( query, "PATCH" );
-	rs_sqapi->SetCallback( query, RS_ReportPlayer_Done, (void*)player );
+	// TODO - this segfaults if the callback is called after the mapchange occurs
+	// rs_sqapi->SetCallback( query, RS_ReportPlayer_Done, (void*)player );
 	rs_sqapi->Send( query );
 	query = NULL;
 }
