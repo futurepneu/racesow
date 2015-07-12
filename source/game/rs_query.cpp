@@ -594,12 +594,12 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 			indent = 16 + (strlen(name) - strlen(simplified));
 
 			// Print the row; oldtime is printed with grey rank and date
-			G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%2d. %s%-*s %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s(%s) %s%s%s\n",
+			G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%2d. %s%-*s %s%02d:%02d.%03d %s+[%02d:%02d.%03d] %s(%s) %s%s%s\n",
 				( oldtime ? S_COLOR_GREY : S_COLOR_WHITE ), i + 1, S_COLOR_WHITE,
 				indent, name,
-				S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
+				S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli,
 				S_COLOR_YELLOW,
-				( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli / 10,
+				( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli,
 				( oldtime ? S_COLOR_GREY : S_COLOR_WHITE ), cJSON_GetObjectItem( curnode, "created" )->valuestring,
 				S_COLOR_YELLOW, ( oldtime && firstoldtime ? oldoneliner : !oldtime && firstnewtime ? oneliner : "" ), S_COLOR_GREEN );
 
@@ -644,12 +644,12 @@ void RS_QueryTop_Done( stat_query_t *query, qboolean success, void *customp )
 			indent = 16 + (strlen(name) - strlen(simplified));
 
 			// Print the row
-			G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%2d. %-*s %s%02d:%02d.%02d %s+[%02d:%02d.%02d] %s(%s) %s%s%s\n",
+			G_PrintMsg( &game.edicts[ playerNum + 1 ], "%s%2d. %-*s %s%02d:%02d.%03d %s+[%02d:%02d.%03d] %s(%s) %s%s%s\n",
 				S_COLOR_WHITE, i + 1,
 				indent, name,
-				S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli / 10,
+				S_COLOR_GREEN, ( racetime.hour * 60 ) + racetime.min, racetime.sec, racetime.milli,
 				S_COLOR_YELLOW,
-				( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli / 10,
+				( timediff.hour * 60 ) + timediff.min, timediff.sec, timediff.milli,
 				S_COLOR_WHITE, cJSON_GetObjectItem( node, "created" )->valuestring,
 				S_COLOR_YELLOW, ( i == 0 ? oneliner : "" ), S_COLOR_GREEN );
 		}
