@@ -645,9 +645,9 @@ static int SCR_DrawPlayerTab( const char **ptrptr, int team, int x, int y, int p
 				shader = cgs.imagePrecache[i];
 			break;
 
-		case 't': // is a race time. Convert time into MM:SS:mm
+		case 't': // is a race time. Convert time into MM:SS.mmm
 			{
-				// racesow - 2 decimal time precision
+				// racesow - 3 decimal time precision
 				unsigned int milli;
 				rs_racetime_t t;
 
@@ -658,9 +658,9 @@ static int SCR_DrawPlayerTab( const char **ptrptr, int team, int x, int y, int p
 				{
 					RS_Racetime( milli, &t );
 					if( t.hour )
-						Q_snprintfz( string, sizeof( string ), va( "%i:%02i:%02i.%02i", t.hour, t.min, t.sec, t.milli / 10 ) );
+						Q_snprintfz( string, sizeof( string ), va( "%i:%02i:%02i.%03i", t.hour, t.min, t.sec, t.milli ) );
 					else
-						Q_snprintfz( string, sizeof( string ), va( "%02i:%02i.%02i", t.min, t.sec, t.milli / 10 ) );
+						Q_snprintfz( string, sizeof( string ), va( "%02i:%02i.%03i", t.min, t.sec, t.milli ) );
 				}
 				// !racesow
 			}
