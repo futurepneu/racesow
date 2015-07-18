@@ -437,8 +437,15 @@ static void PM_StepSlideMove( void )
 	start_s = sqrt( start_v[0]*start_v[0] + start_v[1]*start_v[1] );
 	if( start_s && ISWALKABLEPLANE( &trace.plane ) )
 	{
-		VectorNormalize2D( pml.velocity );
-		VectorScale2D( pml.velocity, start_s, pml.velocity );
+		if( trace.plane.normal[2] >= 1.0f - SLIDEMOVE_PLANEINTERACT_EPSILON )
+		{
+			VectorCopy( start_v, pml.velocity );
+		}
+		else
+		{
+			VectorNormalize2D( pml.velocity );
+			VectorScale2D( pml.velocity, start_s, pml.velocity );
+		}
 	}
 	// !racesow
 
