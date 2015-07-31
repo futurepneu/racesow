@@ -337,7 +337,7 @@ extern "C" {
 
 
 //#define S_PLAYER_FALL_0_to_3		"*fall_%i"					// player fall (height)
-#define S_PLAYER_FALLDEATH	    "*falldeath"             // player falling to his death
+#define S_PLAYER_FALLDEATH	    "*death"             	// player falling to his death //changed from "*falldeath" for racesow
 #define S_PLAYER_PAINS		    "*pain%i"                    // player pain (percent)
 #define S_PLAYER_DEATH		    "*death"
 
