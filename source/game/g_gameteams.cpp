@@ -77,6 +77,29 @@ static int G_Teams_CompareMembers( const void *a, const void *b )
 	return result;
 }
 
+// racesow
+/*
+* G_RS_Teams_CompareMembers
+* Modification of G_Teams_CompareMembers because flipping 
+* level.gametype.inverseScore would place 0.000 times on top.
+*/
+static int G_RS_Teams_CompareMembers( const void *a, const void *b )
+{
+	edict_t *edict_a = game.edicts + *(int *)a;
+	edict_t *edict_b = game.edicts + *(int *)b;
+	int score_a = edict_a->r.client->level.stats.score;
+	int score_b = edict_b->r.client->level.stats.score;
+	int result = ( level.gametype.inverseScore ? -1 : 1 ) * ( score_b - score_a );
+	if (!result)
+		result = Q_stricmp( edict_a->r.client->netname, edict_b->r.client->netname );
+	if (!result)
+		result = ENTNUM( edict_a ) - ENTNUM( edict_b );
+	if ( score_a * score_b ) // position lowest non-zero scores on top
+		return -result;
+	return result;
+}
+// !racesow
+
 /*
 * G_Teams_UpdateMembersList
 * It's better to count the list in detail once per fame, than
@@ -108,7 +131,7 @@ void G_Teams_UpdateMembersList( void )
 			}
 		}
 
-		qsort( teamlist[team].playerIndices, teamlist[team].numplayers, sizeof( teamlist[team].playerIndices[0] ), G_Teams_CompareMembers );
+		qsort( teamlist[team].playerIndices, teamlist[team].numplayers, sizeof( teamlist[team].playerIndices[0] ), G_RS_Teams_CompareMembers ); // racesow
 
 		if( teamlist[team].numplayers )
 		{

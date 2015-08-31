@@ -90,7 +90,7 @@ static int G_Chase_FindFollowPOV( edict_t *ent )
 	}
 
 	// find what players have what
-	score_best = -999999999;
+	score_best = 999999999; // racesow: changed from -999999999 to find lowest score (fastest time)
 	if( level.gametype.inverseScore )
 		score_best *= -1;
 	quad = warshell = regen = scorelead = -1;
@@ -131,8 +131,11 @@ static int G_Chase_FindFollowPOV( edict_t *ent )
 		}
 
 		// find the scoring leader
-		if( ( !level.gametype.inverseScore && target->r.client->ps.stats[STAT_SCORE] > score_best )
-				|| ( level.gametype.inverseScore && target->r.client->ps.stats[STAT_SCORE] < score_best ) )
+		if( ( !level.gametype.inverseScore && target->r.client->ps.stats[STAT_SCORE] // racesow: find lowest non-zero score (fastest time)
+				&& target->r.client->ps.stats[STAT_SCORE] < score_best )
+			|| ( level.gametype.inverseScore && target->r.client->ps.stats[STAT_SCORE] // racesow: find highest non-zero score (slowest time)
+				&& target->r.client->ps.stats[STAT_SCORE] > score_best )
+			)
 		{
 			score_best = target->r.client->ps.stats[STAT_SCORE];
 			scorelead = ENTNUM( target );
@@ -558,7 +561,11 @@ void Cmd_ChaseCam_f( edict_t *ent )
 
 	if( ent->s.team != TEAM_SPECTATOR && !ent->r.client->teamstate.is_coach )
 	{
-		G_Teams_JoinTeam( ent, TEAM_SPECTATOR );
+		// racesow - changed from G_Teams_JoinTeam( ent, TEAM_SPECTATOR ) as this makes
+		// a second G_ChasePlayer call with followmode 0, thereby overriding the chasecam mode set here
+		ent->r.client->team = TEAM_SPECTATOR;
+		G_ClientRespawn( ent, true );
+		// !racesow
 		if( !CheckFlood( ent, false )) { // prevent 'joined spectators' spam
 			G_PrintMsg( NULL, "%s%s joined the %s%s team.\n", ent->r.client->netname,
 				S_COLOR_WHITE, GS_TeamName( ent->s.team ), S_COLOR_WHITE );
