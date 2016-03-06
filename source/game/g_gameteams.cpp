@@ -29,7 +29,7 @@ cvar_t *g_teams_maxplayers;
 cvar_t *g_teams_allow_uneven;
 
 /*
-* G_Teams_InitLevel
+* G_Teams_Init
 */
 void G_Teams_Init( void )
 {
@@ -58,6 +58,7 @@ void G_Teams_Init( void )
 			ent->movetype = MOVETYPE_NOCLIP; // allow freefly
 			ent->r.client->teamstate.timeStamp = level.time;
 			ent->r.client->resp.timeStamp = level.time;
+			trap_GameCmd( ent, va( "qm %s", ent->r.client->level.quickMenuItems ) );
 		}
 	}
 
@@ -345,7 +346,7 @@ void G_Teams_SetTeam( edict_t *ent, int team )
 		// trap_MR_SendPartialReport();
 	}
 
-	//clean scores at changing team
+	// clear scores at changing team
 	memset( &ent->r.client->level.stats, 0, sizeof( ent->r.client->level.stats ) );
 
 	memset( &ent->r.client->teamstate, 0, sizeof( ent->r.client->teamstate ) );
@@ -816,7 +817,7 @@ void G_Teams_ExecuteChallengersQueue( void )
 			return;
 		lasttime = time;
 		if( lasttime )
-			G_CenterPrintMsg( NULL, "Waiting... %i", lasttime );
+			G_CenterPrintFormatMsg( NULL, "Waiting... %s", va( "%i", lasttime ), NULL );
 		else
 			G_CenterPrintMsg( NULL, "" );
 		return;
@@ -1319,6 +1320,19 @@ void G_Say_Team( edict_t *who, char *msg, bool checkflood )
 		G_ChatMsg( NULL, who, true, "%s", msg );
 		return;
 	}
+
+#ifdef AUTHED_SAY
+	if( sv_mm_enable->integer && who->r.client && who->r.client->mm_session <= 0 )
+	{
+		// unauthed players are only allowed to chat to public at non play-time
+		// they are allowed to team-chat at any time
+		if( GS_MatchState() == MATCH_STATE_PLAYTIME )
+		{
+			G_PrintMsg( who, "%s", S_COLOR_YELLOW "You must authenticate to be able to chat with other players during the match.\n");
+			return;
+		}
+	}
+#endif
 
 	Q_strncpyz( current_color, S_COLOR_WHITE, sizeof( current_color ) );
 
