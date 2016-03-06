@@ -2294,7 +2294,7 @@ static bool G_CallVotes_CheckPermission( void )
 	int i;
 
 	if( !vote || !vote->callvote || !vote->caller )
-		return qfalse;
+		return false;
 
 	Q_snprintfz( argsString, MAX_STRING_CHARS, "\"%s\"", vote->callvote->name );
 	for( i = 0; i < vote->argc; i++ )
